@@ -1,3 +1,7 @@
+import { createSeededRandom } from "./mock-data";
+
+const rand = createSeededRandom(100);
+
 // ==============================
 // Types
 // ==============================
@@ -202,8 +206,8 @@ export const mockHRAlerts: HRAlert[] = [
 
 export const mockPnL: MonthlyPnL[] = mockClients.map((client) => {
   const revenue = client.monthlyFee + client.adBudget * 0.15;
-  const operationCost = Math.floor(Math.random() * 15000) + 8000;
-  const commission = Math.floor(Math.random() * 5000) + 2000;
+  const operationCost = Math.floor(rand() * 15000) + 8000;
+  const commission = Math.floor(rand() * 5000) + 2000;
   const netProfit = revenue - client.adBudget - operationCost - commission;
   return {
     clinic: client.name,

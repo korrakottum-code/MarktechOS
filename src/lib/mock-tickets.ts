@@ -1,3 +1,7 @@
+import { createSeededRandom } from "./mock-data";
+
+const rand = createSeededRandom(300);
+
 // ==============================
 // Types
 // ==============================
@@ -105,7 +109,7 @@ const assignees = ["HR หัวหน้า", "IT Admin", "บัญชี", "O
 const statuses: TicketStatus[] = ["open", "open", "in-progress", "in-progress", "resolved", "closed"];
 
 export const mockTickets: Ticket[] = ticketTemplates.map((tpl, i) => {
-  const hoursAgo = Math.floor(Math.random() * 72) + 1;
+  const hoursAgo = Math.floor(rand() * 72) + 1;
   const createdAt = new Date(Date.now() - hoursAgo * 3600000);
   const slaBreached = hoursAgo > tpl.sla && statuses[i % statuses.length] !== "resolved" && statuses[i % statuses.length] !== "closed";
 
@@ -119,7 +123,7 @@ export const mockTickets: Ticket[] = ticketTemplates.map((tpl, i) => {
     createdBy: creators[i % creators.length],
     assignedTo: assignees[i % assignees.length],
     createdAt: createdAt.toISOString(),
-    updatedAt: new Date(createdAt.getTime() + Math.random() * 24 * 3600000).toISOString(),
+    updatedAt: new Date(createdAt.getTime() + rand() * 24 * 3600000).toISOString(),
     slaHours: tpl.sla,
     slaBreached,
   };

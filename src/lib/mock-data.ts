@@ -1,4 +1,18 @@
 // ==============================
+// Seeded PRNG (deterministic data)
+// ==============================
+
+export function createSeededRandom(seed: number) {
+  let s = seed;
+  return () => {
+    s = (s * 16807 + 0) % 2147483647;
+    return (s - 1) / 2147483646;
+  };
+}
+
+const rand = createSeededRandom(42);
+
+// ==============================
 // Types
 // ==============================
 
@@ -119,8 +133,8 @@ const adminNames = [
 ];
 
 export const mockAdmins: Admin[] = adminNames.map((name, i) => {
-  const leadsReceived = Math.floor(Math.random() * 40) + 20;
-  const closeRate = Math.floor(Math.random() * 40) + 15;
+  const leadsReceived = Math.floor(rand() * 40) + 20;
+  const closeRate = Math.floor(rand() * 40) + 15;
   const leadsClosed = Math.round((leadsReceived * closeRate) / 100);
   return {
     id: `admin-${i + 1}`,
@@ -130,8 +144,8 @@ export const mockAdmins: Admin[] = adminNames.map((name, i) => {
     leadsReceived,
     leadsClosed,
     closeRate,
-    avgResponseTime: Math.floor(Math.random() * 20) + 3,
-    revenue: leadsClosed * (Math.floor(Math.random() * 5000) + 3000),
+    avgResponseTime: Math.floor(rand() * 20) + 3,
+    revenue: leadsClosed * (Math.floor(rand() * 5000) + 3000),
     tier: getTier(closeRate),
     status: i < 8 ? "online" : i < 10 ? "busy" : "offline",
   };
@@ -169,30 +183,30 @@ const customerNames = [
 export const mockLeads: Lead[] = Array.from({ length: 30 }, (_, i) => ({
   id: `lead-${i + 1}`,
   name: customerNames[i % customerNames.length],
-  phone: `09${Math.floor(Math.random() * 90000000 + 10000000)}`,
-  channel: channels[Math.floor(Math.random() * channels.length)],
-  clinic: clinics[Math.floor(Math.random() * clinics.length)],
-  procedure: procedures[Math.floor(Math.random() * procedures.length)],
-  status: statuses[Math.floor(Math.random() * statuses.length)],
-  assignedTo: `admin-${Math.floor(Math.random() * 12) + 1}`,
+  phone: `09${Math.floor(rand() * 90000000 + 10000000)}`,
+  channel: channels[Math.floor(rand() * channels.length)],
+  clinic: clinics[Math.floor(rand() * clinics.length)],
+  procedure: procedures[Math.floor(rand() * procedures.length)],
+  status: statuses[Math.floor(rand() * statuses.length)],
+  assignedTo: `admin-${Math.floor(rand() * 12) + 1}`,
   createdAt: new Date(
-    Date.now() - Math.floor(Math.random() * 7 * 24 * 60 * 60 * 1000)
+    Date.now() - Math.floor(rand() * 7 * 24 * 60 * 60 * 1000)
   ).toISOString(),
-  value: Math.floor(Math.random() * 20000) + 5000,
+  value: Math.floor(rand() * 20000) + 5000,
   notes: "",
 }));
 
 export const mockClients: ClinicClient[] = clinics.map((name, i) => {
-  const revenue = Math.floor(Math.random() * 500000) + 200000;
-  const adSpend = Math.floor(Math.random() * 100000) + 50000;
+  const revenue = Math.floor(rand() * 500000) + 200000;
+  const adSpend = Math.floor(rand() * 100000) + 50000;
   return {
     id: `clinic-${i + 1}`,
     name,
     revenue,
     adSpend,
     profit: revenue - adSpend,
-    leads: Math.floor(Math.random() * 200) + 80,
-    closeRate: Math.floor(Math.random() * 30) + 25,
+    leads: Math.floor(rand() * 200) + 80,
+    closeRate: Math.floor(rand() * 30) + 25,
   };
 });
 

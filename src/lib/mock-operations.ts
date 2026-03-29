@@ -1,3 +1,7 @@
+import { createSeededRandom } from "./mock-data";
+
+const rand = createSeededRandom(200);
+
 // ==============================
 // Types
 // ==============================
@@ -148,7 +152,7 @@ const statuses: TaskStatus[] = ["backlog", "todo", "todo", "in-progress", "in-pr
 export const mockTasks: OperationTask[] = taskTemplates.map((tpl, i) => {
   const member = teamMembers[i % teamMembers.length];
   const clinic = clinics[i % clinics.length];
-  const daysOffset = Math.floor(Math.random() * 14) - 3;
+  const daysOffset = Math.floor(rand() * 14) - 3;
   return {
     id: `task-${i + 1}`,
     title: `${tpl.title} — ${clinic}`,
@@ -179,10 +183,10 @@ const campaigns = [
 
 export const mockAdsMetrics: AdsMetric[] = clinics.flatMap((clinic, ci) =>
   campaigns.slice(0, 2 + (ci % 2)).map((campaign, j) => {
-    const spend = Math.floor(Math.random() * 30000) + 5000;
-    const leads = Math.floor(Math.random() * 50) + 10;
-    const impressions = Math.floor(Math.random() * 100000) + 20000;
-    const clicks = Math.floor(impressions * (Math.random() * 0.03 + 0.01));
+    const spend = Math.floor(rand() * 30000) + 5000;
+    const leads = Math.floor(rand() * 50) + 10;
+    const impressions = Math.floor(rand() * 100000) + 20000;
+    const clicks = Math.floor(impressions * (rand() * 0.03 + 0.01));
     return {
       id: `ads-${ci}-${j}`,
       clinic,
@@ -190,11 +194,11 @@ export const mockAdsMetrics: AdsMetric[] = clinics.flatMap((clinic, ci) =>
       spend,
       leads,
       cpl: Math.round(spend / leads),
-      roas: +(Math.random() * 4 + 1).toFixed(2),
+      roas: +(rand() * 4 + 1).toFixed(2),
       impressions,
       clicks,
       ctr: +(clicks / impressions * 100).toFixed(2),
-      status: (j === 0 ? "active" : Math.random() > 0.5 ? "active" : "paused") as AdsMetric["status"],
+      status: (j === 0 ? "active" : rand() > 0.5 ? "active" : "paused") as AdsMetric["status"],
     };
   })
 );
