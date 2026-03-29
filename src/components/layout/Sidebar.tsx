@@ -50,7 +50,6 @@ const navItems = [
     href: "/ai-brain",
     icon: Brain,
     badge: "M5",
-    disabled: true,
   },
   {
     label: "Ticketing Hub",
@@ -125,30 +124,6 @@ export default function Sidebar({
             (item.href !== "/" && pathname.startsWith(item.href));
           const Icon = item.icon;
           const showLabel = !collapsed || mobileOpen;
-
-          if (item.disabled) {
-            return (
-              <div
-                key={item.href}
-                className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm opacity-40 cursor-not-allowed ${
-                  !showLabel ? "justify-center" : ""
-                }`}
-                title={!showLabel ? item.label : `${item.label} (เร็วๆ นี้)`}
-              >
-                <Icon size={20} className="shrink-0 text-foreground-muted" />
-                {showLabel && (
-                  <>
-                    <span className="text-foreground-muted truncate">
-                      {item.label}
-                    </span>
-                    <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-navy-700 text-foreground-muted">
-                      Soon
-                    </span>
-                  </>
-                )}
-              </div>
-            );
-          }
 
           return (
             <Link
