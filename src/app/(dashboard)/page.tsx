@@ -224,6 +224,18 @@ export default function DashboardPage() {
               >
                 💰 คำนวณ Commission
               </Link>
+              <Link
+                href="/ai-brain"
+                className="block p-3 rounded-xl bg-navy-800 hover:bg-navy-700 transition-colors text-sm text-foreground"
+              >
+                🧠 AI Brain — ถามได้ทุกเรื่อง
+              </Link>
+              <Link
+                href="/timeline"
+                className="block p-3 rounded-xl bg-navy-800 hover:bg-navy-700 transition-colors text-sm text-foreground"
+              >
+                📅 Timeline & Calendar
+              </Link>
             </div>
           </div>
         </div>

@@ -2,6 +2,7 @@
 
 import { Bell, Search, User, ChevronDown, Menu } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 
 interface TopBarProps {
   onMenuClick: () => void;
@@ -111,9 +112,13 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
                 ))}
               </div>
               <div className="px-4 py-2.5 text-center">
-                <button className="text-xs text-gold-400 hover:text-gold-300 transition-colors">
+                <Link
+                  href="/notifications"
+                  onClick={() => setShowNotif(false)}
+                  className="text-xs text-gold-400 hover:text-gold-300 transition-colors"
+                >
                   ดูทั้งหมด
-                </button>
+                </Link>
               </div>
             </div>
           )}
