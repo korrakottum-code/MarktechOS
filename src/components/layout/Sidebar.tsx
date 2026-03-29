@@ -10,6 +10,8 @@ import {
   Wallet,
   Brain,
   Ticket,
+  CalendarDays,
+  Bell,
   ChevronLeft,
   ChevronRight,
   X,
@@ -56,6 +58,16 @@ const navItems = [
     href: "/ticketing",
     icon: Ticket,
     badge: "M6",
+  },
+  {
+    label: "Timeline & Calendar",
+    href: "/timeline",
+    icon: CalendarDays,
+  },
+  {
+    label: "Notification Hub",
+    href: "/notifications",
+    icon: Bell,
   },
 ];
 
