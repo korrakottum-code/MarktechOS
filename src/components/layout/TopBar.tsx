@@ -1,10 +1,27 @@
 "use client";
 
-import { Bell, Search, User, ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { Bell, Search, User, ChevronDown, Menu } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 
-export default function TopBar() {
+interface TopBarProps {
+  onMenuClick: () => void;
+}
+
+export default function TopBar({ onMenuClick }: TopBarProps) {
   const [showNotif, setShowNotif] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  // Click outside to close notifications
+  useEffect(() => {
+    if (!showNotif) return;
+    function handleClick(e: MouseEvent) {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setShowNotif(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showNotif]);
 
   const mockNotifications = [
     {
@@ -34,9 +51,15 @@ export default function TopBar() {
   ];
 
   return (
-    <header className="h-16 border-b border-border bg-navy-950/80 backdrop-blur-md flex items-center justify-between px-6 sticky top-0 z-30">
-      {/* Search */}
+    <header className="h-16 border-b border-border bg-navy-950/80 backdrop-blur-md flex items-center justify-between px-4 sm:px-6 sticky top-0 z-30">
+      {/* Left: hamburger + search */}
       <div className="flex items-center gap-3 flex-1 max-w-md">
+        <button
+          onClick={onMenuClick}
+          className="lg:hidden p-2 rounded-xl hover:bg-navy-800 transition-colors"
+        >
+          <Menu size={20} className="text-foreground-muted" />
+        </button>
         <div className="relative w-full">
           <Search
             size={16}
@@ -53,7 +76,7 @@ export default function TopBar() {
       {/* Right Side */}
       <div className="flex items-center gap-4">
         {/* Notifications */}
-        <div className="relative">
+        <div className="relative" ref={notifRef}>
           <button
             onClick={() => setShowNotif(!showNotif)}
             className="relative p-2 rounded-xl hover:bg-navy-800 transition-colors"

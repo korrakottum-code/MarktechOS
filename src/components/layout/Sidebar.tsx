@@ -12,8 +12,8 @@ import {
   Ticket,
   ChevronLeft,
   ChevronRight,
+  X,
 } from "lucide-react";
-import { useState } from "react";
 
 const navItems = [
   {
@@ -60,15 +60,30 @@ const navItems = [
   },
 ];
 
-export default function Sidebar() {
+interface SidebarProps {
+  collapsed: boolean;
+  onToggleCollapse: () => void;
+  mobileOpen: boolean;
+  onCloseMobile: () => void;
+}
+
+export default function Sidebar({
+  collapsed,
+  onToggleCollapse,
+  mobileOpen,
+  onCloseMobile,
+}: SidebarProps) {
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
 
   return (
     <aside
-      className={`fixed top-0 left-0 z-40 h-screen flex flex-col transition-all duration-300 ease-in-out ${
-        collapsed ? "w-20" : "w-64"
-      } bg-navy-950 border-r border-border`}
+      className={`fixed top-0 left-0 z-50 h-screen flex flex-col transition-all duration-300 ease-in-out bg-navy-950 border-r border-border ${
+        collapsed ? "lg:w-20" : "lg:w-64"
+      } ${
+        mobileOpen
+          ? "translate-x-0 w-64"
+          : "-translate-x-full lg:translate-x-0"
+      }`}
     >
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 h-16 border-b border-border shrink-0">
@@ -83,8 +98,8 @@ export default function Sidebar() {
             />
           </svg>
         </div>
-        {!collapsed && (
-          <div className="animate-fade-in">
+        {(!collapsed || mobileOpen) && (
+          <div className="animate-fade-in flex-1">
             <h1 className="text-sm font-bold text-gold-gradient tracking-wide">
               MARKTECH OS
             </h1>
@@ -93,6 +108,13 @@ export default function Sidebar() {
             </p>
           </div>
         )}
+        {/* Mobile close button */}
+        <button
+          onClick={onCloseMobile}
+          className="lg:hidden p-1 rounded-lg hover:bg-navy-800 text-foreground-muted"
+        >
+          <X size={18} />
+        </button>
       </div>
 
       {/* Navigation */}
@@ -102,18 +124,19 @@ export default function Sidebar() {
             pathname === item.href ||
             (item.href !== "/" && pathname.startsWith(item.href));
           const Icon = item.icon;
+          const showLabel = !collapsed || mobileOpen;
 
           if (item.disabled) {
             return (
               <div
                 key={item.href}
                 className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm opacity-40 cursor-not-allowed ${
-                  collapsed ? "justify-center" : ""
+                  !showLabel ? "justify-center" : ""
                 }`}
-                title={collapsed ? item.label : `${item.label} (เร็วๆ นี้)`}
+                title={!showLabel ? item.label : `${item.label} (เร็วๆ นี้)`}
               >
                 <Icon size={20} className="shrink-0 text-foreground-muted" />
-                {!collapsed && (
+                {showLabel && (
                   <>
                     <span className="text-foreground-muted truncate">
                       {item.label}
@@ -131,14 +154,15 @@ export default function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
-              className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-200 ${
-                collapsed ? "justify-center" : ""
+              onClick={onCloseMobile}
+              className={`relative group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-200 ${
+                !showLabel ? "justify-center" : ""
               } ${
                 isActive
                   ? "bg-gradient-to-r from-gold-500/15 to-transparent text-gold-400 border border-gold-500/20"
                   : "text-foreground-muted hover:bg-navy-800 hover:text-foreground"
               }`}
-              title={collapsed ? item.label : undefined}
+              title={!showLabel ? item.label : undefined}
             >
               <Icon
                 size={20}
@@ -148,7 +172,7 @@ export default function Sidebar() {
                     : "text-foreground-muted group-hover:text-foreground"
                 }`}
               />
-              {!collapsed && (
+              {showLabel && (
                 <>
                   <span className="truncate">{item.label}</span>
                   {item.badge && (
@@ -172,10 +196,10 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Collapse Button */}
-      <div className="p-3 border-t border-border">
+      {/* Collapse Button — desktop only */}
+      <div className="hidden lg:block p-3 border-t border-border">
         <button
-          onClick={() => setCollapsed(!collapsed)}
+          onClick={onToggleCollapse}
           className="w-full flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm text-foreground-muted hover:bg-navy-800 hover:text-foreground transition-colors"
         >
           {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
