@@ -1,26 +1,139 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* MarkTech Brand Colors */
+  --navy-950: #0d1520;
+  --navy-900: #111d2e;
+  --navy-800: #1a2332;
+  --navy-700: #1e3048;
+  --navy-600: #253d5c;
+  --gold-500: #d4a843;
+  --gold-400: #e8b84b;
+  --gold-300: #f0cc6a;
+  --amber-500: #f59e0b;
+
+  /* Semantic */
+  --background: #0d1520;
+  --surface: #111d2e;
+  --surface-hover: #1a2332;
+  --border: #1e3048;
+  --foreground: #e8ecf1;
+  --foreground-muted: #8899ab;
+  --accent: #d4a843;
+  --accent-light: #e8b84b;
+
+  /* Status */
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #3b82f6;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-border: var(--border);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-foreground-muted: var(--foreground-muted);
+  --color-accent: var(--accent);
+  --color-accent-light: var(--accent-light);
+  --color-navy-950: var(--navy-950);
+  --color-navy-900: var(--navy-900);
+  --color-navy-800: var(--navy-800);
+  --color-navy-700: var(--navy-700);
+  --color-navy-600: var(--navy-600);
+  --color-gold-500: var(--gold-500);
+  --color-gold-400: var(--gold-400);
+  --color-gold-300: var(--gold-300);
+  --color-amber-500: var(--amber-500);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --font-sans: "Inter", "IBM Plex Sans Thai", sans-serif;
+  --font-thai: "IBM Plex Sans Thai", sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+/* Base */
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--navy-950);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--navy-600);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--gold-500);
+}
+
+/* Glass Effect */
+.glass {
+  background: rgba(17, 29, 46, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(30, 48, 72, 0.5);
+}
+
+/* Gold Gradient Text */
+.text-gold-gradient {
+  background: linear-gradient(135deg, #d4a843, #f0cc6a, #e8b84b);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Glow effects */
+.glow-gold {
+  box-shadow: 0 0 20px rgba(212, 168, 67, 0.15);
+}
+.glow-gold-strong {
+  box-shadow: 0 0 30px rgba(212, 168, 67, 0.25);
+}
+
+/* Stat Card */
+.stat-card {
+  background: linear-gradient(135deg, var(--navy-900), var(--navy-800));
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1.5rem;
+  transition: all 0.3s ease;
+}
+.stat-card:hover {
+  border-color: var(--gold-500);
+  box-shadow: 0 0 20px rgba(212, 168, 67, 0.1);
+  transform: translateY(-2px);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes pulse-gold {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(212, 168, 67, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(212, 168, 67, 0); }
+}
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+.animate-slide-in {
+  animation: slideInLeft 0.4s ease-out forwards;
+}
+.animate-pulse-gold {
+  animation: pulse-gold 2s infinite;
 }
