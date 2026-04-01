@@ -36,11 +36,19 @@ function buildResponsePayload(data: Awaited<ReturnType<typeof getAppData>>) {
 }
 
 export async function GET(request: NextRequest) {
-  const session = await requireSession(request);
-  if (!session.ok) return session.response;
+  try {
+    const session = await requireSession(request);
+    if (!session.ok) return session.response;
 
-  const data = await getAppData();
-  return NextResponse.json(buildResponsePayload(data));
+    const data = await getAppData();
+    return NextResponse.json(buildResponsePayload(data));
+  } catch (error: any) {
+    console.error("🏁 API Execution Error:", error);
+    return NextResponse.json(
+      { error: error.message || "Failed to fetch application data" }, 
+      { status: 500 }
+    );
+  }
 }
 
 export async function PUT(request: NextRequest) {
