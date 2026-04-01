@@ -2,20 +2,10 @@
 
 import { useState } from "react";
 import { Bell, Check, Filter, Clock } from "lucide-react";
+import { useAppData } from "@/lib/use-app-data";
+import type { AppNotification } from "@/lib/app-data-types";
 
-type NotifType = "lead" | "performance" | "content" | "ads" | "hr" | "finance" | "ticket" | "system";
-
-interface Notification {
-  id: string;
-  type: NotifType;
-  title: string;
-  message: string;
-  time: string;
-  read: boolean;
-  role: "admin" | "content" | "ads" | "am" | "ceo" | "finance" | "all";
-}
-
-const typeLabels: Record<NotifType, { icon: string; label: string; color: string }> = {
+const typeLabels: Record<AppNotification["type"], { icon: string; label: string; color: string }> = {
   lead: { icon: "📩", label: "Lead", color: "bg-blue-500/20 text-blue-400" },
   performance: { icon: "📊", label: "Performance", color: "bg-amber-500/20 text-amber-400" },
   content: { icon: "📋", label: "Content", color: "bg-purple-500/20 text-purple-400" },
@@ -25,23 +15,6 @@ const typeLabels: Record<NotifType, { icon: string; label: string; color: string
   ticket: { icon: "🎫", label: "Ticket", color: "bg-gray-500/20 text-gray-400" },
   system: { icon: "⚙️", label: "ระบบ", color: "bg-cyan-500/20 text-cyan-400" },
 };
-
-const mockNotifications: Notification[] = [
-  { id: "n1", type: "lead", title: "Lead ใหม่ 3 รายการ", message: "คุณแอน, คุณเบล, คุณมิ้นท์ สนใจ Botox จาก Facebook", time: "2 นาทีที่แล้ว", read: false, role: "admin" },
-  { id: "n2", type: "lead", title: "Lead #127 ยังไม่ถูกตอบ", message: "สมหญิง ยังไม่ตอบ Lead #127 (เกิน 15 นาที)", time: "15 นาทีที่แล้ว", read: false, role: "admin" },
-  { id: "n3", type: "performance", title: "ยอดปิดทีมถึง 38%", message: "Close Rate รวมทีม Admin อยู่ที่ 38% — ใกล้เป้า 40% แล้ว!", time: "1 ชม. ที่แล้ว", read: false, role: "ceo" },
-  { id: "n4", type: "content", title: "งานใหม่: แคปชัน BeautyX", message: "ชิ้นงานแคปชันโปรโมชัน — Deadline: พรุ่งนี้ 12:00", time: "2 ชม. ที่แล้ว", read: false, role: "content" },
-  { id: "n5", type: "content", title: "งาน #45 Approve แล้ว", message: "Banner Facebook Glow Up Clinic ได้รับ Approve จากลูกค้า", time: "3 ชม. ที่แล้ว", read: true, role: "content" },
-  { id: "n6", type: "ads", title: "ROAS คลินิก Dermis ต่ำ", message: "ROAS ต่ำกว่าเกณฑ์ 3 วันติด — ต้องปรับ Campaign", time: "4 ชม. ที่แล้ว", read: false, role: "ads" },
-  { id: "n7", type: "ads", title: "งบแอดเหลือ 20%", message: "BeautyX Clinic งบเหลือ ฿16,000 จาก ฿80,000 — ต้องขอเพิ่ม?", time: "5 ชม. ที่แล้ว", read: true, role: "ads" },
-  { id: "n8", type: "hr", title: "PIP: สมหญิง รอบ 2", message: "Close Rate ต่ำกว่า 30% ติดต่อกัน 2 เดือน", time: "6 ชม. ที่แล้ว", read: false, role: "ceo" },
-  { id: "n9", type: "hr", title: "ธนิดา มาสาย 5 ครั้ง", message: "มาสายสะสมในเดือนนี้ — เกินกำหนด", time: "8 ชม. ที่แล้ว", read: true, role: "am" },
-  { id: "n10", type: "finance", title: "รอบวางบิล BeautyX", message: "วางบิลค่าบริการ + ค่าแอด มี.ค. — ครบกำหนดใน 3 วัน", time: "10 ชม. ที่แล้ว", read: false, role: "finance" },
-  { id: "n11", type: "finance", title: "วันจ่ายเงินเดือน", message: "เหลืออีก 1 วัน — ตรวจสอบยอด Commission ให้เรียบร้อย", time: "12 ชม. ที่แล้ว", read: true, role: "finance" },
-  { id: "n12", type: "ticket", title: "Ticket ด่วน: Internet ห้อง Meeting", message: "IT Ticket — SLA 2 ชม. กำลังจะเกินกำหนด", time: "14 ชม. ที่แล้ว", read: false, role: "all" },
-  { id: "n13", type: "performance", title: "สรุปรายวัน CEO", message: "ปิดการขาย 15 เคส / ยอดรวม ฿245,000 / แอดมิน 2 คนต่ำกว่าเกณฑ์", time: "1 วันที่แล้ว", read: true, role: "ceo" },
-  { id: "n14", type: "system", title: "Backup สำเร็จ", message: "Daily Backup เวลา 03:00 น. เสร็จสมบูรณ์", time: "1 วันที่แล้ว", read: true, role: "all" },
-];
 
 const roleFilters = [
   { key: "all" as const, label: "ทั้งหมด" },
@@ -53,8 +26,22 @@ const roleFilters = [
 ];
 
 export default function NotificationsPage() {
+  const { payload, loading, error } = useAppData();
+  const sourceNotifications = payload?.data.notifications ?? [];
   const [roleFilter, setRoleFilter] = useState<string>("all");
-  const [notifications, setNotifications] = useState(mockNotifications);
+  const [notificationsState, setNotificationsState] = useState<AppNotification[] | null>(
+    null
+  );
+
+  const notifications = notificationsState ?? sourceNotifications;
+
+  if (loading) {
+    return <div className="text-sm text-foreground-muted">กำลังโหลดข้อมูล...</div>;
+  }
+
+  if (error) {
+    return <div className="text-sm text-red-400">โหลดข้อมูลไม่สำเร็จ: {error}</div>;
+  }
 
   const filtered =
     roleFilter === "all"
@@ -65,14 +52,27 @@ export default function NotificationsPage() {
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
+  const persistNotifications = async (next: AppNotification[]) => {
+    setNotificationsState(next);
+    await fetch("/api/app-data", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ section: "notifications", value: next }),
+    });
+  };
+
   const markAllRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    const next = notifications.map((n) => ({ ...n, read: true }));
+    void persistNotifications(next);
   };
 
   const toggleRead = (id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: !n.read } : n))
+    const next = notifications.map((n) =>
+      n.id === id ? { ...n, read: !n.read } : n
     );
+    void persistNotifications(next);
   };
 
   return (

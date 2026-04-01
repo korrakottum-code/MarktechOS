@@ -3,13 +3,12 @@
 import { useState } from "react";
 import { Calendar, Clock, AlertTriangle, Filter } from "lucide-react";
 import {
-  mockEvents,
-  getTimelineStats,
   getSourceColor,
   getSourceIcon,
   getSourceLabel,
-  EventSource,
-} from "@/lib/mock-events";
+} from "@/lib/app-utils";
+import type { EventSource } from "@/lib/app-data-types";
+import { useAppData } from "@/lib/use-app-data";
 
 const sourceFilters: { key: EventSource | "all"; label: string }[] = [
   { key: "all", label: "ทั้งหมด" },
@@ -22,13 +21,23 @@ const sourceFilters: { key: EventSource | "all"; label: string }[] = [
 ];
 
 export default function TimelinePage() {
-  const stats = getTimelineStats();
+  const { payload, loading, error } = useAppData();
+  const stats = payload?.stats.timeline;
+  const events = payload?.data.events ?? [];
   const [filter, setFilter] = useState<EventSource | "all">("all");
+
+  if (loading || !stats) {
+    return <div className="text-sm text-foreground-muted">กำลังโหลดข้อมูล...</div>;
+  }
+
+  if (error) {
+    return <div className="text-sm text-red-400">โหลดข้อมูลไม่สำเร็จ: {error}</div>;
+  }
 
   const filtered =
     filter === "all"
-      ? mockEvents
-      : mockEvents.filter((e) => e.source === filter);
+      ? events
+      : events.filter((e) => e.source === filter);
 
   // Group by date
   const grouped = filtered.reduce<Record<string, typeof filtered>>((acc, ev) => {

@@ -1,10 +1,10 @@
 "use client";
 
+import type { Admin } from "@/lib/app-data-types";
 import {
-  Admin,
   getCommission,
   formatCurrency,
-} from "@/lib/mock-data";
+} from "@/lib/app-utils";
 import { Wallet, TrendingUp, AlertTriangle, Users } from "lucide-react";
 
 interface Props {

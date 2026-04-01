@@ -1,0 +1,2619 @@
+{
+  "admins": [
+    {
+      "id": "admin-1",
+      "name": "สมหญิง",
+      "avatar": "ส",
+      "role": "admin",
+      "leadsReceived": 20,
+      "leadsClosed": 7,
+      "closeRate": 35,
+      "avgResponseTime": 17,
+      "revenue": 30212,
+      "tier": "bronze",
+      "status": "online"
+    },
+    {
+      "id": "admin-2",
+      "name": "วิภา",
+      "avatar": "ว",
+      "role": "admin",
+      "leadsReceived": 35,
+      "leadsClosed": 8,
+      "closeRate": 22,
+      "avgResponseTime": 22,
+      "revenue": 44488,
+      "tier": "none",
+      "status": "online"
+    },
+    {
+      "id": "admin-3",
+      "name": "กนกวรรณ",
+      "avatar": "ก",
+      "role": "admin",
+      "leadsReceived": 41,
+      "leadsClosed": 10,
+      "closeRate": 25,
+      "avgResponseTime": 5,
+      "revenue": 70770,
+      "tier": "none",
+      "status": "online"
+    },
+    {
+      "id": "admin-4",
+      "name": "ปาริชาด",
+      "avatar": "ป",
+      "role": "admin",
+      "leadsReceived": 56,
+      "leadsClosed": 18,
+      "closeRate": 33,
+      "avgResponseTime": 7,
+      "revenue": 76266,
+      "tier": "bronze",
+      "status": "online"
+    },
+    {
+      "id": "admin-5",
+      "name": "นภาพร",
+      "avatar": "น",
+      "role": "admin",
+      "leadsReceived": 27,
+      "leadsClosed": 7,
+      "closeRate": 27,
+      "avgResponseTime": 5,
+      "revenue": 49252,
+      "tier": "none",
+      "status": "online"
+    },
+    {
+      "id": "admin-6",
+      "name": "ศิริพร",
+      "avatar": "ศ",
+      "role": "admin",
+      "leadsReceived": 41,
+      "leadsClosed": 20,
+      "closeRate": 48,
+      "avgResponseTime": 17,
+      "revenue": 67820,
+      "tier": "silver",
+      "status": "online"
+    },
+    {
+      "id": "admin-7",
+      "name": "จารุวรรณ",
+      "avatar": "จ",
+      "role": "admin",
+      "leadsReceived": 41,
+      "leadsClosed": 8,
+      "closeRate": 20,
+      "avgResponseTime": 20,
+      "revenue": 42576,
+      "tier": "none",
+      "status": "online"
+    },
+    {
+      "id": "admin-8",
+      "name": "พิมพ์ชนก",
+      "avatar": "พ",
+      "role": "admin",
+      "leadsReceived": 38,
+      "leadsClosed": 13,
+      "closeRate": 33,
+      "avgResponseTime": 7,
+      "revenue": 39793,
+      "tier": "bronze",
+      "status": "online"
+    },
+    {
+      "id": "admin-9",
+      "name": "อรอุมา",
+      "avatar": "อ",
+      "role": "admin",
+      "leadsReceived": 20,
+      "leadsClosed": 11,
+      "closeRate": 54,
+      "avgResponseTime": 21,
+      "revenue": 76219,
+      "tier": "gold",
+      "status": "busy"
+    },
+    {
+      "id": "admin-10",
+      "name": "ธนิดา",
+      "avatar": "ธ",
+      "role": "admin",
+      "leadsReceived": 42,
+      "leadsClosed": 19,
+      "closeRate": 45,
+      "avgResponseTime": 15,
+      "revenue": 89699,
+      "tier": "silver",
+      "status": "busy"
+    },
+    {
+      "id": "admin-11",
+      "name": "ชลิตา",
+      "avatar": "ช",
+      "role": "admin",
+      "leadsReceived": 35,
+      "leadsClosed": 9,
+      "closeRate": 25,
+      "avgResponseTime": 10,
+      "revenue": 55836,
+      "tier": "none",
+      "status": "offline"
+    },
+    {
+      "id": "admin-12",
+      "name": "ภัทรา",
+      "avatar": "ภ",
+      "role": "admin",
+      "leadsReceived": 34,
+      "leadsClosed": 6,
+      "closeRate": 17,
+      "avgResponseTime": 13,
+      "revenue": 22728,
+      "tier": "none",
+      "status": "offline"
+    }
+  ],
+  "leads": [
+    {
+      "id": "lead-1",
+      "name": "คุณแอน",
+      "phone": "0950843674",
+      "channel": "instagram",
+      "clinic": "BeautyX Clinic",
+      "procedure": "Botox",
+      "status": "lost",
+      "assignedTo": "admin-7",
+      "createdAt": "2026-03-29T04:29:28.016Z",
+      "value": 24866,
+      "notes": ""
+    },
+    {
+      "id": "lead-2",
+      "name": "คุณเบล",
+      "phone": "0949035707",
+      "channel": "line",
+      "clinic": "BeautyX Clinic",
+      "procedure": "โบท็อกซ์หน้าเรียว",
+      "status": "lost",
+      "assignedTo": "admin-3",
+      "createdAt": "2026-03-25T00:30:31.371Z",
+      "value": 12987,
+      "notes": ""
+    },
+    {
+      "id": "lead-3",
+      "name": "คุณมิ้นท์",
+      "phone": "0949507183",
+      "channel": "line",
+      "clinic": "BeautyX Clinic",
+      "procedure": "PRP",
+      "status": "lost",
+      "assignedTo": "admin-2",
+      "createdAt": "2026-03-29T14:28:31.976Z",
+      "value": 7679,
+      "notes": ""
+    },
+    {
+      "id": "lead-4",
+      "name": "คุณใบเฟิร์น",
+      "phone": "0967369205",
+      "channel": "instagram",
+      "clinic": "Glow Up Clinic",
+      "procedure": "โบท็อกซ์หน้าเรียว",
+      "status": "negotiating",
+      "assignedTo": "admin-2",
+      "createdAt": "2026-03-22T22:13:12.632Z",
+      "value": 11971,
+      "notes": ""
+    },
+    {
+      "id": "lead-5",
+      "name": "คุณโบว์",
+      "phone": "0979149394",
+      "channel": "instagram",
+      "clinic": "Dermis Premium",
+      "procedure": "Mesotherapy",
+      "status": "negotiating",
+      "assignedTo": "admin-6",
+      "createdAt": "2026-03-23T08:39:52.692Z",
+      "value": 14346,
+      "notes": ""
+    },
+    {
+      "id": "lead-6",
+      "name": "คุณนุ่น",
+      "phone": "0997950782",
+      "channel": "instagram",
+      "clinic": "Dermis Premium",
+      "procedure": "PRP",
+      "status": "closed",
+      "assignedTo": "admin-7",
+      "createdAt": "2026-03-24T00:34:02.537Z",
+      "value": 15624,
+      "notes": ""
+    },
+    {
+      "id": "lead-7",
+      "name": "คุณเจน",
+      "phone": "0937665312",
+      "channel": "instagram",
+      "clinic": "Glow Up Clinic",
+      "procedure": "ร้อยไหม",
+      "status": "negotiating",
+      "assignedTo": "admin-8",
+      "createdAt": "2026-03-29T08:53:39.539Z",
+      "value": 14795,
+      "notes": ""
+    },
+    {
+      "id": "lead-8",
+      "name": "คุณมุก",
+      "phone": "0951061513",
+      "channel": "facebook",
+      "clinic": "Dermis Premium",
+      "procedure": "ร้อยไหม",
+      "status": "negotiating",
+      "assignedTo": "admin-12",
+      "createdAt": "2026-03-28T22:26:21.435Z",
+      "value": 13565,
+      "notes": ""
+    },
+    {
+      "id": "lead-9",
+      "name": "คุณออม",
+      "phone": "0936326946",
+      "channel": "instagram",
+      "clinic": "Glow Up Clinic",
+      "procedure": "Laser CO2",
+      "status": "closed",
+      "assignedTo": "admin-12",
+      "createdAt": "2026-03-29T16:28:16.599Z",
+      "value": 14558,
+      "notes": ""
+    },
+    {
+      "id": "lead-10",
+      "name": "คุณเก้า",
+      "phone": "0983943472",
+      "channel": "line",
+      "clinic": "BeautyX Clinic",
+      "procedure": "ร้อยไหม",
+      "status": "new",
+      "assignedTo": "admin-10",
+      "createdAt": "2026-03-27T01:39:41.275Z",
+      "value": 6525,
+      "notes": ""
+    },
+    {
+      "id": "lead-11",
+      "name": "คุณส้ม",
+      "phone": "0963786535",
+      "channel": "instagram",
+      "clinic": "Glow Up Clinic",
+      "procedure": "ร้อยไหม",
+      "status": "contacted",
+      "assignedTo": "admin-8",
+      "createdAt": "2026-03-28T09:09:22.537Z",
+      "value": 10689,
+      "notes": ""
+    },
+    {
+      "id": "lead-12",
+      "name": "คุณปลา",
+      "phone": "0999021102",
+      "channel": "facebook",
+      "clinic": "Dermis Premium",
+      "procedure": "โบท็อกซ์หน้าเรียว",
+      "status": "closed",
+      "assignedTo": "admin-2",
+      "createdAt": "2026-03-27T07:17:51.560Z",
+      "value": 9447,
+      "notes": ""
+    },
+    {
+      "id": "lead-13",
+      "name": "คุณน้ำ",
+      "phone": "0936893266",
+      "channel": "facebook",
+      "clinic": "FaceCraft Clinic",
+      "procedure": "ฉีดผิว",
+      "status": "negotiating",
+      "assignedTo": "admin-7",
+      "createdAt": "2026-03-26T09:15:55.438Z",
+      "value": 12319,
+      "notes": ""
+    },
+    {
+      "id": "lead-14",
+      "name": "คุณเอิร์ธ",
+      "phone": "0936396446",
+      "channel": "instagram",
+      "clinic": "SkinLab Thailand",
+      "procedure": "ร้อยไหม",
+      "status": "contacted",
+      "assignedTo": "admin-5",
+      "createdAt": "2026-03-29T01:12:54.443Z",
+      "value": 19581,
+      "notes": ""
+    },
+    {
+      "id": "lead-15",
+      "name": "คุณฟ้า",
+      "phone": "0946841846",
+      "channel": "facebook",
+      "clinic": "Glow Up Clinic",
+      "procedure": "โบท็อกซ์หน้าเรียว",
+      "status": "new",
+      "assignedTo": "admin-11",
+      "createdAt": "2026-03-23T10:05:56.627Z",
+      "value": 24297,
+      "notes": ""
+    },
+    {
+      "id": "lead-16",
+      "name": "คุณไอซ์",
+      "phone": "0981500028",
+      "channel": "facebook",
+      "clinic": "SkinLab Thailand",
+      "procedure": "Filler",
+      "status": "lost",
+      "assignedTo": "admin-10",
+      "createdAt": "2026-03-22T22:02:25.059Z",
+      "value": 11884,
+      "notes": ""
+    },
+    {
+      "id": "lead-17",
+      "name": "คุณเดียร์",
+      "phone": "0966556834",
+      "channel": "line",
+      "clinic": "FaceCraft Clinic",
+      "procedure": "Botox",
+      "status": "closed",
+      "assignedTo": "admin-12",
+      "createdAt": "2026-03-22T23:33:06.492Z",
+      "value": 7606,
+      "notes": ""
+    },
+    {
+      "id": "lead-18",
+      "name": "คุณพลอย",
+      "phone": "0943222088",
+      "channel": "facebook",
+      "clinic": "SkinLab Thailand",
+      "procedure": "Filler",
+      "status": "negotiating",
+      "assignedTo": "admin-2",
+      "createdAt": "2026-03-24T06:14:16.150Z",
+      "value": 10002,
+      "notes": ""
+    },
+    {
+      "id": "lead-19",
+      "name": "คุณแนน",
+      "phone": "0929488331",
+      "channel": "instagram",
+      "clinic": "Dermis Premium",
+      "procedure": "ร้อยไหม",
+      "status": "lost",
+      "assignedTo": "admin-7",
+      "createdAt": "2026-03-26T15:33:00.244Z",
+      "value": 17745,
+      "notes": ""
+    },
+    {
+      "id": "lead-20",
+      "name": "คุณจ๋า",
+      "phone": "0994347851",
+      "channel": "instagram",
+      "clinic": "SkinLab Thailand",
+      "procedure": "Botox",
+      "status": "closed",
+      "assignedTo": "admin-2",
+      "createdAt": "2026-03-25T19:23:19.603Z",
+      "value": 17125,
+      "notes": ""
+    },
+    {
+      "id": "lead-21",
+      "name": "คุณบี",
+      "phone": "0940980247",
+      "channel": "instagram",
+      "clinic": "Glow Up Clinic",
+      "procedure": "PRP",
+      "status": "negotiating",
+      "assignedTo": "admin-8",
+      "createdAt": "2026-03-26T05:56:23.551Z",
+      "value": 6139,
+      "notes": ""
+    },
+    {
+      "id": "lead-22",
+      "name": "คุณนิว",
+      "phone": "0966722835",
+      "channel": "line",
+      "clinic": "BeautyX Clinic",
+      "procedure": "PRP",
+      "status": "contacted",
+      "assignedTo": "admin-1",
+      "createdAt": "2026-03-26T14:15:34.549Z",
+      "value": 19762,
+      "notes": ""
+    },
+    {
+      "id": "lead-23",
+      "name": "คุณกิ่ง",
+      "phone": "0996736372",
+      "channel": "line",
+      "clinic": "BeautyX Clinic",
+      "procedure": "ฉีดผิว",
+      "status": "contacted",
+      "assignedTo": "admin-6",
+      "createdAt": "2026-03-27T05:47:48.109Z",
+      "value": 12615,
+      "notes": ""
+    },
+    {
+      "id": "lead-24",
+      "name": "คุณเมย์",
+      "phone": "0986124600",
+      "channel": "website",
+      "clinic": "FaceCraft Clinic",
+      "procedure": "โบท็อกซ์หน้าเรียว",
+      "status": "new",
+      "assignedTo": "admin-9",
+      "createdAt": "2026-03-27T23:39:24.861Z",
+      "value": 17313,
+      "notes": ""
+    },
+    {
+      "id": "lead-25",
+      "name": "คุณปอ",
+      "phone": "0912085569",
+      "channel": "instagram",
+      "clinic": "Dermis Premium",
+      "procedure": "Mesotherapy",
+      "status": "contacted",
+      "assignedTo": "admin-11",
+      "createdAt": "2026-03-23T01:41:51.715Z",
+      "value": 14027,
+      "notes": ""
+    },
+    {
+      "id": "lead-26",
+      "name": "คุณทราย",
+      "phone": "0953245659",
+      "channel": "website",
+      "clinic": "BeautyX Clinic",
+      "procedure": "Botox",
+      "status": "negotiating",
+      "assignedTo": "admin-7",
+      "createdAt": "2026-03-26T23:20:51.892Z",
+      "value": 15887,
+      "notes": ""
+    },
+    {
+      "id": "lead-27",
+      "name": "คุณวิว",
+      "phone": "0969828198",
+      "channel": "line",
+      "clinic": "Dermis Premium",
+      "procedure": "Filler",
+      "status": "closed",
+      "assignedTo": "admin-10",
+      "createdAt": "2026-03-23T00:19:42.432Z",
+      "value": 13659,
+      "notes": ""
+    },
+    {
+      "id": "lead-28",
+      "name": "คุณเจี๊ยบ",
+      "phone": "0917938345",
+      "channel": "instagram",
+      "clinic": "FaceCraft Clinic",
+      "procedure": "Mesotherapy",
+      "status": "negotiating",
+      "assignedTo": "admin-4",
+      "createdAt": "2026-03-22T21:01:34.284Z",
+      "value": 20937,
+      "notes": ""
+    },
+    {
+      "id": "lead-29",
+      "name": "คุณหญิง",
+      "phone": "0943646553",
+      "channel": "instagram",
+      "clinic": "BeautyX Clinic",
+      "procedure": "Mesotherapy",
+      "status": "closed",
+      "assignedTo": "admin-12",
+      "createdAt": "2026-03-24T14:35:18.010Z",
+      "value": 22010,
+      "notes": ""
+    },
+    {
+      "id": "lead-30",
+      "name": "คุณฝ้าย",
+      "phone": "0923197047",
+      "channel": "instagram",
+      "clinic": "BeautyX Clinic",
+      "procedure": "Laser CO2",
+      "status": "contacted",
+      "assignedTo": "admin-6",
+      "createdAt": "2026-03-24T16:38:19.560Z",
+      "value": 19440,
+      "notes": ""
+    }
+  ],
+  "clinicClients": [
+    {
+      "id": "clinic-1",
+      "name": "BeautyX Clinic",
+      "revenue": 321212,
+      "adSpend": 92897,
+      "profit": 228315,
+      "leads": 238,
+      "closeRate": 43
+    },
+    {
+      "id": "clinic-2",
+      "name": "Glow Up Clinic",
+      "revenue": 446677,
+      "adSpend": 130108,
+      "profit": 316569,
+      "leads": 242,
+      "closeRate": 33
+    },
+    {
+      "id": "clinic-3",
+      "name": "SkinLab Thailand",
+      "revenue": 307623,
+      "adSpend": 115813,
+      "profit": 191810,
+      "leads": 126,
+      "closeRate": 36
+    },
+    {
+      "id": "clinic-4",
+      "name": "Dermis Premium",
+      "revenue": 321099,
+      "adSpend": 112349,
+      "profit": 208750,
+      "leads": 103,
+      "closeRate": 43
+    },
+    {
+      "id": "clinic-5",
+      "name": "FaceCraft Clinic",
+      "revenue": 385253,
+      "adSpend": 62509,
+      "profit": 322744,
+      "leads": 186,
+      "closeRate": 36
+    }
+  ],
+  "serviceProducts": [
+    {
+      "id": "svc-1",
+      "name": "Monthly Performance Marketing Service",
+      "shortName": "Performance Marketing",
+      "icon": "📊",
+      "description": "บริการดูแลโฆษณาออนไลน์ครบวงจร",
+      "features": [
+        {
+          "title": "วางแผนโฆษณา (Advertising Strategy)",
+          "detail": "วิเคราะห์กลุ่มเป้าหมาย พื้นที่ทำเล จุดขาย และแนวทางขึ้นแอดสำหรับบริการของคลินิก"
+        },
+        {
+          "title": "ขึ้นโฆษณา (Ad Creation & Management)",
+          "detail": "จัดการและยิงโฆษณาแบบ ไม่จำกัดจำนวนชุดแอด"
+        },
+        {
+          "title": "ควบคุมงบ (Budget Management)",
+          "detail": "ช่วยควบคุมการใช้จ่ายให้มีประสิทธิภาพสูงสุดภายใต้งบประมาณที่ลูกค้ากำหนด"
+        },
+        {
+          "title": "ปรับแอดให้เกิดผลสูงสุด (Optimization)",
+          "detail": "วิเคราะห์ผลแอดรายสัปดาห์ ปรับกลุ่มเป้าหมาย / คอนเทนต์ / งบ เพื่อให้ได้ CTR, CPL, CPM ที่ดีที่สุด"
+        },
+        {
+          "title": "รายงานผล & สรุปประสิทธิภาพ",
+          "detail": "สรุปผลเป็นรายเดือน พร้อมคำแนะนำการพัฒนาต่อเนื่อง"
+        }
+      ],
+      "priceLabel": "ตามแพ็กเกจ",
+      "category": "marketing",
+      "activeClients": 4
+    },
+    {
+      "id": "svc-2",
+      "name": "Marketing Content",
+      "shortName": "Content",
+      "icon": "🎨",
+      "description": "บริการผลิตคอนเทนต์ดูแลเพจ",
+      "features": [
+        {
+          "title": "วิเคราะห์เพจ & วางแผนคอนเทนต์",
+          "detail": "ตรวจสอบเนื้อหาเดิมของเพจ และวางธีม/แผนโพสต์ให้เหมาะกับกลุ่มเป้าหมาย"
+        },
+        {
+          "title": "แนะนำแนวทางคอนเทนต์",
+          "detail": "เสนอหัวข้อ พร้อมไกด์ไลน์สำหรับการสื่อสาร"
+        },
+        {
+          "title": "ออกแบบคอนเทนต์ (12 ชิ้น/เดือน)",
+          "detail": "คอนเทนต์ภาพนิ่งพร้อม caption เช่น โปรโมชั่น / ความรู้ / รีวิว ฯลฯ"
+        },
+        {
+          "title": "อัปโหลดลงเพจ",
+          "detail": "จัดคิวโพสต์ตามแผน ให้เหมาะสมในแต่ละวัน"
+        },
+        {
+          "title": "ปรับปรุงตามผลตอบรับ",
+          "detail": "แนะนำการปรับรูปแบบโพสต์ในเดือนถัดไป จาก Report"
+        }
+      ],
+      "priceLabel": "ตามแพ็กเกจ",
+      "category": "content",
+      "activeClients": 3
+    },
+    {
+      "id": "svc-3",
+      "name": "Page Admin",
+      "shortName": "Page Admin",
+      "icon": "💬",
+      "description": "บริการแอดมินตอบแชทให้ลูกค้า",
+      "features": [
+        {
+          "title": "ตอบแชทลูกค้า 08:00–20:00 ทุกวัน",
+          "detail": "ตอบกลับข้อความลูกค้าใน Inbox, คอมเมนต์ และช่องทางที่เกี่ยวข้อง พร้อมใช้สคริปต์บริการหรือแนวทางที่ตกลงไว้"
+        },
+        {
+          "title": "สรุปบทสนทนา (Chat Summary Report)",
+          "detail": "สรุปบทสนทนาแต่ละวัน แจ้งจำนวนข้อความ ปัญหาหรือคำถามที่พบบ่อย"
+        },
+        {
+          "title": "รวบรวมข้อมูลคิว/จอง/ความต้องการ",
+          "detail": "แยกเก็บข้อมูลลูกค้าที่สนใจ เช่น วันที่จอง / บริการที่สอบถาม / ข้อมูลติดต่อ เพื่อส่งต่อทีมถัดไป"
+        },
+        {
+          "title": "วิเคราะห์พฤติกรรมลูกค้าเบื้องต้น",
+          "detail": "วิเคราะห์คำถามที่พบบ่อย เวลาเข้าแชทบ่อยสุด ประเภทบริการที่สนใจ — นำไปปรับกลยุทธ์แอดและเนื้อหา"
+        },
+        {
+          "title": "แนะนำการพัฒนา Workflow การตอบแชท",
+          "detail": "ช่วยพัฒนา script การตอบ การจัดการแชท และการส่งต่อภายในทีมให้มีประสิทธิภาพยิ่งขึ้น"
+        }
+      ],
+      "priceLabel": "ตามแพ็กเกจ",
+      "category": "admin",
+      "activeClients": 5
+    }
+  ],
+  "salesDeals": [
+    {
+      "businessName": "Prestige Skin Clinic",
+      "contactPerson": "คุณนุ่น",
+      "phone": "081-999-1234",
+      "businessType": "คลินิกความงาม",
+      "services": [
+        "svc-1",
+        "svc-2",
+        "svc-3"
+      ],
+      "dealValue": 125000,
+      "stage": "negotiation",
+      "probability": 70,
+      "salesperson": "คุณอาร์ม",
+      "createdAt": "2026-03-15T19:27:53.314Z",
+      "expectedClose": "2026-04-05T19:27:53.314Z",
+      "notes": "สนใจแพ็กเกจเต็ม ขอราคาพิเศษ year contract",
+      "id": "deal-1"
+    },
+    {
+      "businessName": "Clear Vision Dental",
+      "contactPerson": "คุณหมออ๋อง",
+      "phone": "089-888-5555",
+      "businessType": "คลินิกทันตกรรม",
+      "services": [
+        "svc-1",
+        "svc-2"
+      ],
+      "dealValue": 65000,
+      "stage": "proposal",
+      "probability": 50,
+      "salesperson": "คุณอาร์ม",
+      "createdAt": "2026-03-22T19:27:53.314Z",
+      "expectedClose": "2026-04-12T19:27:53.314Z",
+      "notes": "ยังลังเลเรื่อง Page Admin",
+      "id": "deal-2"
+    },
+    {
+      "businessName": "Zen Spa & Wellness",
+      "contactPerson": "คุณเจน",
+      "phone": "092-333-7777",
+      "businessType": "สปา",
+      "services": [
+        "svc-2"
+      ],
+      "dealValue": 35000,
+      "stage": "contacted",
+      "probability": 30,
+      "salesperson": "คุณมินท์",
+      "createdAt": "2026-03-26T19:27:53.314Z",
+      "expectedClose": "2026-04-28T19:27:53.314Z",
+      "notes": "เพิ่งติดต่อ รอนัด meeting",
+      "id": "deal-3"
+    },
+    {
+      "businessName": "Aura Beauty Clinic สาขาพระราม 9",
+      "contactPerson": "คุณเอม",
+      "phone": "086-111-4444",
+      "businessType": "คลินิกความงาม",
+      "services": [
+        "svc-1",
+        "svc-2",
+        "svc-3"
+      ],
+      "dealValue": 145000,
+      "stage": "won",
+      "probability": 100,
+      "salesperson": "คุณอาร์ม",
+      "createdAt": "2026-02-27T19:27:53.314Z",
+      "expectedClose": "2026-03-24T19:27:53.314Z",
+      "notes": "ปิดสำเร็จ! เริ่มงานเดือนหน้า",
+      "id": "deal-4"
+    },
+    {
+      "businessName": "NaturaCare Clinic",
+      "contactPerson": "คุณต้อง",
+      "phone": "095-222-6666",
+      "businessType": "คลินิกความงาม",
+      "services": [
+        "svc-1"
+      ],
+      "dealValue": 45000,
+      "stage": "prospect",
+      "probability": 10,
+      "salesperson": "คุณมินท์",
+      "createdAt": "2026-03-28T19:27:53.314Z",
+      "expectedClose": "2026-05-13T19:27:53.314Z",
+      "notes": "Lead จาก referral",
+      "id": "deal-5"
+    },
+    {
+      "businessName": "Lumiere Aesthetics",
+      "contactPerson": "คุณบี",
+      "phone": "088-555-9999",
+      "businessType": "คลินิกความงาม",
+      "services": [
+        "svc-1",
+        "svc-3"
+      ],
+      "dealValue": 85000,
+      "stage": "demo",
+      "probability": 40,
+      "salesperson": "คุณอาร์ม",
+      "createdAt": "2026-03-19T19:27:53.314Z",
+      "expectedClose": "2026-04-18T19:27:53.314Z",
+      "notes": "Demo เสร็จแล้ว รอ feedback",
+      "id": "deal-6"
+    }
+  ],
+  "operationTasks": [
+    {
+      "id": "task-1",
+      "title": "แคปชันโปรโมชั่นเดือนนี้ — BeautyX Clinic",
+      "description": "ชิ้นงาน caption สำหรับ BeautyX Clinic",
+      "clinic": "BeautyX Clinic",
+      "type": "caption",
+      "status": "backlog",
+      "priority": "urgent",
+      "assignee": "ปิติ",
+      "assigneeAvatar": "ป",
+      "dueDate": "2026-03-26T19:27:53.314Z",
+      "createdAt": "2026-03-22T19:27:53.314Z",
+      "tags": [
+        "content",
+        "promo"
+      ]
+    },
+    {
+      "id": "task-2",
+      "title": "ดีไซน์ Banner Facebook — Glow Up Clinic",
+      "description": "ชิ้นงาน graphic สำหรับ Glow Up Clinic",
+      "clinic": "Glow Up Clinic",
+      "type": "graphic",
+      "status": "todo",
+      "priority": "high",
+      "assignee": "มานิต",
+      "assigneeAvatar": "ม",
+      "dueDate": "2026-03-30T19:27:53.314Z",
+      "createdAt": "2026-03-21T19:27:53.314Z",
+      "tags": [
+        "design",
+        "ads"
+      ]
+    },
+    {
+      "id": "task-3",
+      "title": "ตัดต่อ Reels ก่อน-หลัง — SkinLab Thailand",
+      "description": "ชิ้นงาน video สำหรับ SkinLab Thailand",
+      "clinic": "SkinLab Thailand",
+      "type": "video",
+      "status": "todo",
+      "priority": "medium",
+      "assignee": "กานต์",
+      "assigneeAvatar": "ก",
+      "dueDate": "2026-03-27T19:27:53.314Z",
+      "createdAt": "2026-03-20T19:27:53.314Z",
+      "tags": [
+        "video",
+        "reels"
+      ]
+    },
+    {
+      "id": "task-4",
+      "title": "เขียน Ad Copy แคมเปญใหม่ — Dermis Premium",
+      "description": "ชิ้นงาน ad-copy สำหรับ Dermis Premium",
+      "clinic": "Dermis Premium",
+      "type": "ad-copy",
+      "status": "in-progress",
+      "priority": "medium",
+      "assignee": "เจน",
+      "assigneeAvatar": "จ",
+      "dueDate": "2026-04-05T19:27:53.314Z",
+      "createdAt": "2026-03-19T19:27:53.314Z",
+      "tags": [
+        "ads",
+        "copywriting"
+      ]
+    },
+    {
+      "id": "task-5",
+      "title": "ถ่ายภาพ Content รีวิว — FaceCraft Clinic",
+      "description": "ชิ้นงาน photo สำหรับ FaceCraft Clinic",
+      "clinic": "FaceCraft Clinic",
+      "type": "photo",
+      "status": "in-progress",
+      "priority": "low",
+      "assignee": "ฟ้า",
+      "assigneeAvatar": "ฟ",
+      "dueDate": "2026-04-02T19:27:53.314Z",
+      "createdAt": "2026-03-18T19:27:53.314Z",
+      "tags": [
+        "photo",
+        "review"
+      ]
+    },
+    {
+      "id": "task-6",
+      "title": "Infographic ข้อมูลหัตถการ — BeautyX Clinic",
+      "description": "ชิ้นงาน graphic สำหรับ BeautyX Clinic",
+      "clinic": "BeautyX Clinic",
+      "type": "graphic",
+      "status": "review",
+      "priority": "urgent",
+      "assignee": "บอม",
+      "assigneeAvatar": "บ",
+      "dueDate": "2026-04-06T19:27:53.314Z",
+      "createdAt": "2026-03-17T19:27:53.314Z",
+      "tags": [
+        "design",
+        "info"
+      ]
+    },
+    {
+      "id": "task-7",
+      "title": "คลิปอธิบายโปรโมชั่น — Glow Up Clinic",
+      "description": "ชิ้นงาน video สำหรับ Glow Up Clinic",
+      "clinic": "Glow Up Clinic",
+      "type": "video",
+      "status": "done",
+      "priority": "high",
+      "assignee": "ปิติ",
+      "assigneeAvatar": "ป",
+      "dueDate": "2026-03-31T19:27:53.314Z",
+      "createdAt": "2026-03-16T19:27:53.314Z",
+      "tags": [
+        "video",
+        "promo"
+      ]
+    },
+    {
+      "id": "task-8",
+      "title": "แคปชัน Testimonial ลูกค้า — SkinLab Thailand",
+      "description": "ชิ้นงาน caption สำหรับ SkinLab Thailand",
+      "clinic": "SkinLab Thailand",
+      "type": "caption",
+      "status": "done",
+      "priority": "medium",
+      "assignee": "มานิต",
+      "assigneeAvatar": "ม",
+      "dueDate": "2026-04-05T19:27:53.314Z",
+      "createdAt": "2026-03-15T19:27:53.314Z",
+      "tags": [
+        "content",
+        "testimonial"
+      ]
+    },
+    {
+      "id": "task-9",
+      "title": "ภาพ Carousel สินค้า — Dermis Premium",
+      "description": "ชิ้นงาน graphic สำหรับ Dermis Premium",
+      "clinic": "Dermis Premium",
+      "type": "graphic",
+      "status": "backlog",
+      "priority": "medium",
+      "assignee": "กานต์",
+      "assigneeAvatar": "ก",
+      "dueDate": "2026-04-07T19:27:53.314Z",
+      "createdAt": "2026-03-14T19:27:53.314Z",
+      "tags": [
+        "design",
+        "carousel"
+      ]
+    },
+    {
+      "id": "task-10",
+      "title": "Ad Copy A/B Test — FaceCraft Clinic",
+      "description": "ชิ้นงาน ad-copy สำหรับ FaceCraft Clinic",
+      "clinic": "FaceCraft Clinic",
+      "type": "ad-copy",
+      "status": "todo",
+      "priority": "low",
+      "assignee": "เจน",
+      "assigneeAvatar": "จ",
+      "dueDate": "2026-04-08T19:27:53.314Z",
+      "createdAt": "2026-03-13T19:27:53.314Z",
+      "tags": [
+        "ads",
+        "test"
+      ]
+    },
+    {
+      "id": "task-11",
+      "title": "แคปชัน FAQ ตอบคำถาม — BeautyX Clinic",
+      "description": "ชิ้นงาน caption สำหรับ BeautyX Clinic",
+      "clinic": "BeautyX Clinic",
+      "type": "caption",
+      "status": "todo",
+      "priority": "urgent",
+      "assignee": "ฟ้า",
+      "assigneeAvatar": "ฟ",
+      "dueDate": "2026-04-04T19:27:53.314Z",
+      "createdAt": "2026-03-12T19:27:53.314Z",
+      "tags": [
+        "content",
+        "faq"
+      ]
+    },
+    {
+      "id": "task-12",
+      "title": "วิดีโอ BTS คลินิก — Glow Up Clinic",
+      "description": "ชิ้นงาน video สำหรับ Glow Up Clinic",
+      "clinic": "Glow Up Clinic",
+      "type": "video",
+      "status": "in-progress",
+      "priority": "high",
+      "assignee": "บอม",
+      "assigneeAvatar": "บ",
+      "dueDate": "2026-04-07T19:27:53.314Z",
+      "createdAt": "2026-03-11T19:27:53.314Z",
+      "tags": [
+        "video",
+        "bts"
+      ]
+    },
+    {
+      "id": "task-13",
+      "title": "Story Template ประจำสัปดาห์ — SkinLab Thailand",
+      "description": "ชิ้นงาน graphic สำหรับ SkinLab Thailand",
+      "clinic": "SkinLab Thailand",
+      "type": "graphic",
+      "status": "in-progress",
+      "priority": "medium",
+      "assignee": "ปิติ",
+      "assigneeAvatar": "ป",
+      "dueDate": "2026-03-28T19:27:53.314Z",
+      "createdAt": "2026-03-10T19:27:53.314Z",
+      "tags": [
+        "design",
+        "story"
+      ]
+    },
+    {
+      "id": "task-14",
+      "title": "ถ่ายภาพผลิตภัณฑ์ใหม่ — Dermis Premium",
+      "description": "ชิ้นงาน photo สำหรับ Dermis Premium",
+      "clinic": "Dermis Premium",
+      "type": "photo",
+      "status": "review",
+      "priority": "medium",
+      "assignee": "มานิต",
+      "assigneeAvatar": "ม",
+      "dueDate": "2026-04-07T19:27:53.314Z",
+      "createdAt": "2026-03-09T19:27:53.314Z",
+      "tags": [
+        "photo",
+        "product"
+      ]
+    },
+    {
+      "id": "task-15",
+      "title": "แคปชัน Case Study — FaceCraft Clinic",
+      "description": "ชิ้นงาน caption สำหรับ FaceCraft Clinic",
+      "clinic": "FaceCraft Clinic",
+      "type": "caption",
+      "status": "done",
+      "priority": "low",
+      "assignee": "กานต์",
+      "assigneeAvatar": "ก",
+      "dueDate": "2026-04-04T19:27:53.314Z",
+      "createdAt": "2026-03-08T19:27:53.314Z",
+      "tags": [
+        "content",
+        "case-study"
+      ]
+    }
+  ],
+  "adsMetrics": [
+    {
+      "id": "ads-0-0",
+      "clinic": "BeautyX Clinic",
+      "campaign": "โปรเปิดคลินิก",
+      "spend": 33201,
+      "leads": 21,
+      "cpl": 1581,
+      "roas": 2.47,
+      "impressions": 73963,
+      "clicks": 2255,
+      "ctr": 3.05,
+      "status": "active"
+    },
+    {
+      "id": "ads-0-1",
+      "clinic": "BeautyX Clinic",
+      "campaign": "Botox Month",
+      "spend": 19915,
+      "leads": 27,
+      "cpl": 738,
+      "roas": 1.93,
+      "impressions": 99532,
+      "clicks": 1255,
+      "ctr": 1.26,
+      "status": "paused"
+    },
+    {
+      "id": "ads-1-0",
+      "clinic": "Glow Up Clinic",
+      "campaign": "โปรเปิดคลินิก",
+      "spend": 16789,
+      "leads": 49,
+      "cpl": 343,
+      "roas": 1.26,
+      "impressions": 39987,
+      "clicks": 685,
+      "ctr": 1.71,
+      "status": "active"
+    },
+    {
+      "id": "ads-1-1",
+      "clinic": "Glow Up Clinic",
+      "campaign": "Botox Month",
+      "spend": 18188,
+      "leads": 34,
+      "cpl": 535,
+      "roas": 3.59,
+      "impressions": 69290,
+      "clicks": 1142,
+      "ctr": 1.65,
+      "status": "active"
+    },
+    {
+      "id": "ads-1-2",
+      "clinic": "Glow Up Clinic",
+      "campaign": "Filler Festival",
+      "spend": 13462,
+      "leads": 20,
+      "cpl": 673,
+      "roas": 3.04,
+      "impressions": 26773,
+      "clicks": 595,
+      "ctr": 2.22,
+      "status": "active"
+    },
+    {
+      "id": "ads-2-0",
+      "clinic": "SkinLab Thailand",
+      "campaign": "โปรเปิดคลินิก",
+      "spend": 25135,
+      "leads": 25,
+      "cpl": 1005,
+      "roas": 4.77,
+      "impressions": 73717,
+      "clicks": 1460,
+      "ctr": 1.98,
+      "status": "active"
+    },
+    {
+      "id": "ads-2-1",
+      "clinic": "SkinLab Thailand",
+      "campaign": "Botox Month",
+      "spend": 21259,
+      "leads": 24,
+      "cpl": 886,
+      "roas": 3.22,
+      "impressions": 49895,
+      "clicks": 1316,
+      "ctr": 2.64,
+      "status": "active"
+    },
+    {
+      "id": "ads-3-0",
+      "clinic": "Dermis Premium",
+      "campaign": "โปรเปิดคลินิก",
+      "spend": 30589,
+      "leads": 25,
+      "cpl": 1224,
+      "roas": 4.37,
+      "impressions": 50347,
+      "clicks": 1305,
+      "ctr": 2.59,
+      "status": "active"
+    },
+    {
+      "id": "ads-3-1",
+      "clinic": "Dermis Premium",
+      "campaign": "Botox Month",
+      "spend": 8385,
+      "leads": 56,
+      "cpl": 150,
+      "roas": 4.23,
+      "impressions": 110457,
+      "clicks": 1960,
+      "ctr": 1.77,
+      "status": "paused"
+    },
+    {
+      "id": "ads-3-2",
+      "clinic": "Dermis Premium",
+      "campaign": "Filler Festival",
+      "spend": 28860,
+      "leads": 21,
+      "cpl": 1374,
+      "roas": 4,
+      "impressions": 34657,
+      "clicks": 921,
+      "ctr": 2.66,
+      "status": "paused"
+    },
+    {
+      "id": "ads-4-0",
+      "clinic": "FaceCraft Clinic",
+      "campaign": "โปรเปิดคลินิก",
+      "spend": 29852,
+      "leads": 30,
+      "cpl": 995,
+      "roas": 4.56,
+      "impressions": 96348,
+      "clicks": 3707,
+      "ctr": 3.85,
+      "status": "active"
+    },
+    {
+      "id": "ads-4-1",
+      "clinic": "FaceCraft Clinic",
+      "campaign": "Botox Month",
+      "spend": 10879,
+      "leads": 10,
+      "cpl": 1088,
+      "roas": 3.25,
+      "impressions": 50285,
+      "clicks": 564,
+      "ctr": 1.12,
+      "status": "paused"
+    }
+  ],
+  "clients": [
+    {
+      "id": "client-1",
+      "name": "BeautyX Clinic",
+      "contactPerson": "คุณพลอย",
+      "phone": "081-234-5678",
+      "contractStart": "2025-01-01",
+      "contractEnd": "2025-12-31",
+      "monthlyFee": 45000,
+      "adBudget": 80000,
+      "services": [
+        "Facebook Ads",
+        "Content Creation",
+        "Admin ตอบแชท",
+        "Graphic Design"
+      ],
+      "status": "active",
+      "onboardingComplete": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "category": "แบรนด์",
+          "question": "Tone of voice ที่ต้องการ",
+          "answer": "สุภาพ เป็นกันเอง ใช้ภาษาง่ายๆ",
+          "filledAt": "2025-01-05"
+        },
+        {
+          "id": "r2",
+          "category": "เป้าหมาย",
+          "question": "เป้าหมาย Lead ต่อเดือน",
+          "answer": "100 Lead / เดือน",
+          "filledAt": "2025-01-05"
+        },
+        {
+          "id": "r3",
+          "category": "หัตถการ",
+          "question": "บริการหลักที่ต้องการโปรโมท",
+          "answer": "Botox, Filler, Laser",
+          "filledAt": "2025-01-05"
+        }
+      ]
+    },
+    {
+      "id": "client-2",
+      "name": "Glow Up Clinic",
+      "contactPerson": "คุณแนน",
+      "phone": "089-876-5432",
+      "contractStart": "2025-03-01",
+      "contractEnd": "2026-02-28",
+      "monthlyFee": 35000,
+      "adBudget": 60000,
+      "services": [
+        "Facebook Ads",
+        "Instagram Ads",
+        "Content Creation"
+      ],
+      "status": "active",
+      "onboardingComplete": true,
+      "requirements": [
+        {
+          "id": "r4",
+          "category": "แบรนด์",
+          "question": "Tone of voice ที่ต้องการ",
+          "answer": "หรูหรา พรีเมียม",
+          "filledAt": "2025-03-05"
+        },
+        {
+          "id": "r5",
+          "category": "เป้าหมาย",
+          "question": "เป้าหมาย Lead ต่อเดือน",
+          "answer": "80 Lead / เดือน",
+          "filledAt": "2025-03-05"
+        }
+      ]
+    },
+    {
+      "id": "client-3",
+      "name": "SkinLab Thailand",
+      "contactPerson": "คุณโบว์",
+      "phone": "092-111-2233",
+      "contractStart": "2025-06-01",
+      "contractEnd": "2026-05-31",
+      "monthlyFee": 55000,
+      "adBudget": 120000,
+      "services": [
+        "Facebook Ads",
+        "Instagram Ads",
+        "Content Creation",
+        "Admin ตอบแชท",
+        "Video Production",
+        "LINE OA Management"
+      ],
+      "status": "active",
+      "onboardingComplete": true,
+      "requirements": [
+        {
+          "id": "r6",
+          "category": "แบรนด์",
+          "question": "Tone of voice ที่ต้องการ",
+          "answer": "เป็นผู้เชี่ยวชาญ ให้ข้อมูลเชิงลึก",
+          "filledAt": "2025-06-03"
+        }
+      ]
+    },
+    {
+      "id": "client-4",
+      "name": "Dermis Premium",
+      "contactPerson": "คุณเบล",
+      "phone": "086-444-5566",
+      "contractStart": "2025-02-01",
+      "contractEnd": "2025-07-31",
+      "monthlyFee": 30000,
+      "adBudget": 40000,
+      "services": [
+        "Facebook Ads",
+        "Graphic Design"
+      ],
+      "status": "warning",
+      "onboardingComplete": true,
+      "requirements": []
+    },
+    {
+      "id": "client-5",
+      "name": "FaceCraft Clinic",
+      "contactPerson": "คุณมิ้นท์",
+      "phone": "095-777-8899",
+      "contractStart": "2025-08-01",
+      "contractEnd": "2026-07-31",
+      "monthlyFee": 40000,
+      "adBudget": 70000,
+      "services": [
+        "Facebook Ads",
+        "Content Creation",
+        "Admin ตอบแชท",
+        "Graphic Design"
+      ],
+      "status": "active",
+      "onboardingComplete": false,
+      "requirements": [
+        {
+          "id": "r7",
+          "category": "แบรนด์",
+          "question": "Tone of voice ที่ต้องการ",
+          "answer": "",
+          "filledAt": ""
+        }
+      ]
+    }
+  ],
+  "hrAlerts": [
+    {
+      "id": "hr-1",
+      "employeeName": "สมหญิง",
+      "type": "low-performance",
+      "severity": "critical",
+      "message": "Close Rate ต่ำกว่า 30% ติดต่อกัน 2 เดือน — เข้า PIP",
+      "date": "2025-03-28",
+      "actionTaken": false
+    },
+    {
+      "id": "hr-2",
+      "employeeName": "ธนิดา",
+      "type": "late",
+      "severity": "warning",
+      "message": "มาสายสะสม 5 ครั้ง ในเดือนนี้",
+      "date": "2025-03-27",
+      "actionTaken": false
+    },
+    {
+      "id": "hr-3",
+      "employeeName": "อรอุมา",
+      "type": "absent",
+      "severity": "warning",
+      "message": "ลาป่วยสะสม 3 วัน ติดต่อกัน ไม่มีใบรับรองแพทย์",
+      "date": "2025-03-26",
+      "actionTaken": true
+    },
+    {
+      "id": "hr-4",
+      "employeeName": "ปาริชาด",
+      "type": "contract-end",
+      "severity": "info",
+      "message": "สัญญาจ้างหมดอายุในอีก 30 วัน — ต้องตัดสินใจต่อสัญญา",
+      "date": "2025-04-28",
+      "actionTaken": false
+    },
+    {
+      "id": "hr-5",
+      "employeeName": "บอม (Content)",
+      "type": "pip",
+      "severity": "critical",
+      "message": "ส่งงานไม่ตรง Deadline 4 ครั้ง / เดือน — เข้า PIP",
+      "date": "2025-03-25",
+      "actionTaken": false
+    }
+  ],
+  "pnlRows": [
+    {
+      "clinic": "BeautyX Clinic",
+      "revenue": 57000,
+      "adSpend": 80000,
+      "operationCost": 8011,
+      "commission": 2768,
+      "netProfit": -33779,
+      "margin": -59.3
+    },
+    {
+      "clinic": "Glow Up Clinic",
+      "revenue": 44000,
+      "adSpend": 60000,
+      "operationCost": 16407,
+      "commission": 6325,
+      "netProfit": -38732,
+      "margin": -88
+    },
+    {
+      "clinic": "SkinLab Thailand",
+      "revenue": 73000,
+      "adSpend": 120000,
+      "operationCost": 12150,
+      "commission": 6479,
+      "netProfit": -65629,
+      "margin": -89.9
+    },
+    {
+      "clinic": "Dermis Premium",
+      "revenue": 36000,
+      "adSpend": 40000,
+      "operationCost": 18566,
+      "commission": 6432,
+      "netProfit": -28998,
+      "margin": -80.5
+    },
+    {
+      "clinic": "FaceCraft Clinic",
+      "revenue": 50500,
+      "adSpend": 70000,
+      "operationCost": 21944,
+      "commission": 4346,
+      "netProfit": -45790,
+      "margin": -90.7
+    }
+  ],
+  "attendanceAdjustments": [
+    {
+      "id": "att-1",
+      "adminId": "admin-1",
+      "name": "สมหญิง",
+      "lateDays": 0,
+      "absentDays": 1,
+      "leaveDays": 3,
+      "overtimeHours": 4,
+      "lateDeduction": 0,
+      "absentDeduction": 450,
+      "allowance": 160,
+      "netAdjustment": -290
+    },
+    {
+      "id": "att-2",
+      "adminId": "admin-2",
+      "name": "วิภา",
+      "lateDays": 0,
+      "absentDays": 2,
+      "leaveDays": 1,
+      "overtimeHours": 0,
+      "lateDeduction": 0,
+      "absentDeduction": 900,
+      "allowance": 0,
+      "netAdjustment": -900
+    },
+    {
+      "id": "att-3",
+      "adminId": "admin-3",
+      "name": "กนกวรรณ",
+      "lateDays": 1,
+      "absentDays": 0,
+      "leaveDays": 1,
+      "overtimeHours": 0,
+      "lateDeduction": 120,
+      "absentDeduction": 0,
+      "allowance": 0,
+      "netAdjustment": -120
+    },
+    {
+      "id": "att-4",
+      "adminId": "admin-4",
+      "name": "ปาริชาด",
+      "lateDays": 0,
+      "absentDays": 2,
+      "leaveDays": 3,
+      "overtimeHours": 3,
+      "lateDeduction": 0,
+      "absentDeduction": 900,
+      "allowance": 120,
+      "netAdjustment": -780
+    },
+    {
+      "id": "att-5",
+      "adminId": "admin-5",
+      "name": "นภาพร",
+      "lateDays": 5,
+      "absentDays": 0,
+      "leaveDays": 1,
+      "overtimeHours": 6,
+      "lateDeduction": 600,
+      "absentDeduction": 0,
+      "allowance": 240,
+      "netAdjustment": -360
+    },
+    {
+      "id": "att-6",
+      "adminId": "admin-6",
+      "name": "ศิริพร",
+      "lateDays": 0,
+      "absentDays": 0,
+      "leaveDays": 1,
+      "overtimeHours": 7,
+      "lateDeduction": 0,
+      "absentDeduction": 0,
+      "allowance": 930,
+      "netAdjustment": 930
+    },
+    {
+      "id": "att-7",
+      "adminId": "admin-7",
+      "name": "จารุวรรณ",
+      "lateDays": 0,
+      "absentDays": 0,
+      "leaveDays": 3,
+      "overtimeHours": 0,
+      "lateDeduction": 0,
+      "absentDeduction": 0,
+      "allowance": 350,
+      "netAdjustment": 350
+    },
+    {
+      "id": "att-8",
+      "adminId": "admin-8",
+      "name": "พิมพ์ชนก",
+      "lateDays": 1,
+      "absentDays": 1,
+      "leaveDays": 1,
+      "overtimeHours": 3,
+      "lateDeduction": 120,
+      "absentDeduction": 450,
+      "allowance": 120,
+      "netAdjustment": -450
+    },
+    {
+      "id": "att-9",
+      "adminId": "admin-9",
+      "name": "อรอุมา",
+      "lateDays": 2,
+      "absentDays": 2,
+      "leaveDays": 3,
+      "overtimeHours": 6,
+      "lateDeduction": 240,
+      "absentDeduction": 900,
+      "allowance": 540,
+      "netAdjustment": -600
+    },
+    {
+      "id": "att-10",
+      "adminId": "admin-10",
+      "name": "ธนิดา",
+      "lateDays": 5,
+      "absentDays": 1,
+      "leaveDays": 1,
+      "overtimeHours": 8,
+      "lateDeduction": 600,
+      "absentDeduction": 450,
+      "allowance": 620,
+      "netAdjustment": -430
+    },
+    {
+      "id": "att-11",
+      "adminId": "admin-11",
+      "name": "ชลิตา",
+      "lateDays": 2,
+      "absentDays": 2,
+      "leaveDays": 3,
+      "overtimeHours": 6,
+      "lateDeduction": 240,
+      "absentDeduction": 900,
+      "allowance": 240,
+      "netAdjustment": -900
+    },
+    {
+      "id": "att-12",
+      "adminId": "admin-12",
+      "name": "ภัทรา",
+      "lateDays": 4,
+      "absentDays": 2,
+      "leaveDays": 1,
+      "overtimeHours": 0,
+      "lateDeduction": 480,
+      "absentDeduction": 900,
+      "allowance": 0,
+      "netAdjustment": -1380
+    }
+  ],
+  "adBudgetWallets": [
+    {
+      "id": "wallet-1",
+      "clinic": "BeautyX Clinic",
+      "serviceFeeCollected": 295515,
+      "adWalletBalance": 129172,
+      "usedAdSpend": 92897,
+      "remainingAdBudget": 36275,
+      "billingDueDate": "2026-03-30T19:27:53.314Z",
+      "status": "healthy"
+    },
+    {
+      "id": "wallet-2",
+      "clinic": "Glow Up Clinic",
+      "serviceFeeCollected": 410943,
+      "adWalletBalance": 170125,
+      "usedAdSpend": 130108,
+      "remainingAdBudget": 40017,
+      "billingDueDate": "2026-03-31T19:27:53.314Z",
+      "status": "watch"
+    },
+    {
+      "id": "wallet-3",
+      "clinic": "SkinLab Thailand",
+      "serviceFeeCollected": 283013,
+      "adWalletBalance": 145131,
+      "usedAdSpend": 115813,
+      "remainingAdBudget": 29318,
+      "billingDueDate": "2026-04-01T19:27:53.314Z",
+      "status": "watch"
+    },
+    {
+      "id": "wallet-4",
+      "clinic": "Dermis Premium",
+      "serviceFeeCollected": 295411,
+      "adWalletBalance": 136964,
+      "usedAdSpend": 112349,
+      "remainingAdBudget": 24615,
+      "billingDueDate": "2026-04-02T19:27:53.314Z",
+      "status": "watch"
+    },
+    {
+      "id": "wallet-5",
+      "clinic": "FaceCraft Clinic",
+      "serviceFeeCollected": 354433,
+      "adWalletBalance": 93790,
+      "usedAdSpend": 62509,
+      "remainingAdBudget": 31281,
+      "billingDueDate": "2026-03-30T19:27:53.314Z",
+      "status": "healthy"
+    }
+  ],
+  "cashflowEntries": [
+    {
+      "id": "cf-exp-ad-4",
+      "date": "2026-03-28T19:27:53.314Z",
+      "type": "expense",
+      "category": "ad-spend",
+      "label": "ตัดค่าใช้จ่ายแอด FaceCraft Clinic",
+      "amount": 62509,
+      "reference": "FaceCraft Clinic"
+    },
+    {
+      "id": "cf-ops-tools",
+      "date": "2026-03-28T19:27:53.314Z",
+      "type": "expense",
+      "category": "operations",
+      "label": "ค่าเครื่องมือระบบและซอฟต์แวร์",
+      "amount": 27500
+    },
+    {
+      "id": "cf-exp-ad-3",
+      "date": "2026-03-27T19:27:53.314Z",
+      "type": "expense",
+      "category": "ad-spend",
+      "label": "ตัดค่าใช้จ่ายแอด Dermis Premium",
+      "amount": 112349,
+      "reference": "Dermis Premium"
+    },
+    {
+      "id": "cf-income-ad-4",
+      "date": "2026-03-27T19:27:53.314Z",
+      "type": "income",
+      "category": "ad-topup",
+      "label": "รับงบแอด FaceCraft Clinic",
+      "amount": 93790,
+      "reference": "FaceCraft Clinic"
+    },
+    {
+      "id": "cf-payroll-base",
+      "date": "2026-03-27T19:27:53.314Z",
+      "type": "expense",
+      "category": "payroll",
+      "label": "จ่ายเงินเดือนฐานทีม Admin",
+      "amount": 120000
+    },
+    {
+      "id": "cf-payroll-commission",
+      "date": "2026-03-27T19:27:53.314Z",
+      "type": "expense",
+      "category": "commission",
+      "label": "จ่ายคอมมิชชันตาม Tier",
+      "amount": 2500
+    },
+    {
+      "id": "cf-exp-ad-2",
+      "date": "2026-03-26T19:27:53.314Z",
+      "type": "expense",
+      "category": "ad-spend",
+      "label": "ตัดค่าใช้จ่ายแอด SkinLab Thailand",
+      "amount": 115813,
+      "reference": "SkinLab Thailand"
+    },
+    {
+      "id": "cf-income-ad-3",
+      "date": "2026-03-26T19:27:53.314Z",
+      "type": "income",
+      "category": "ad-topup",
+      "label": "รับงบแอด Dermis Premium",
+      "amount": 136964,
+      "reference": "Dermis Premium"
+    },
+    {
+      "id": "cf-income-fee-4",
+      "date": "2026-03-26T19:27:53.314Z",
+      "type": "income",
+      "category": "service-fee",
+      "label": "รับค่าบริการ FaceCraft Clinic",
+      "amount": 354433,
+      "reference": "FaceCraft Clinic"
+    },
+    {
+      "id": "cf-exp-ad-1",
+      "date": "2026-03-25T19:27:53.314Z",
+      "type": "expense",
+      "category": "ad-spend",
+      "label": "ตัดค่าใช้จ่ายแอด Glow Up Clinic",
+      "amount": 130108,
+      "reference": "Glow Up Clinic"
+    },
+    {
+      "id": "cf-income-ad-2",
+      "date": "2026-03-25T19:27:53.314Z",
+      "type": "income",
+      "category": "ad-topup",
+      "label": "รับงบแอด SkinLab Thailand",
+      "amount": 145131,
+      "reference": "SkinLab Thailand"
+    },
+    {
+      "id": "cf-income-fee-3",
+      "date": "2026-03-25T19:27:53.314Z",
+      "type": "income",
+      "category": "service-fee",
+      "label": "รับค่าบริการ Dermis Premium",
+      "amount": 295411,
+      "reference": "Dermis Premium"
+    },
+    {
+      "id": "cf-exp-ad-0",
+      "date": "2026-03-24T19:27:53.314Z",
+      "type": "expense",
+      "category": "ad-spend",
+      "label": "ตัดค่าใช้จ่ายแอด BeautyX Clinic",
+      "amount": 92897,
+      "reference": "BeautyX Clinic"
+    },
+    {
+      "id": "cf-income-ad-1",
+      "date": "2026-03-24T19:27:53.314Z",
+      "type": "income",
+      "category": "ad-topup",
+      "label": "รับงบแอด Glow Up Clinic",
+      "amount": 170125,
+      "reference": "Glow Up Clinic"
+    },
+    {
+      "id": "cf-income-fee-2",
+      "date": "2026-03-24T19:27:53.314Z",
+      "type": "income",
+      "category": "service-fee",
+      "label": "รับค่าบริการ SkinLab Thailand",
+      "amount": 283013,
+      "reference": "SkinLab Thailand"
+    },
+    {
+      "id": "cf-income-ad-0",
+      "date": "2026-03-23T19:27:53.314Z",
+      "type": "income",
+      "category": "ad-topup",
+      "label": "รับงบแอด BeautyX Clinic",
+      "amount": 129172,
+      "reference": "BeautyX Clinic"
+    },
+    {
+      "id": "cf-income-fee-1",
+      "date": "2026-03-23T19:27:53.314Z",
+      "type": "income",
+      "category": "service-fee",
+      "label": "รับค่าบริการ Glow Up Clinic",
+      "amount": 410943,
+      "reference": "Glow Up Clinic"
+    },
+    {
+      "id": "cf-income-fee-0",
+      "date": "2026-03-22T19:27:53.314Z",
+      "type": "income",
+      "category": "service-fee",
+      "label": "รับค่าบริการ BeautyX Clinic",
+      "amount": 295515,
+      "reference": "BeautyX Clinic"
+    }
+  ],
+  "tickets": [
+    {
+      "id": "TK-001",
+      "title": "ขอลาพักร้อน 3 วัน",
+      "description": "รายละเอียด: ขอลาพักร้อน 3 วัน",
+      "category": "hr",
+      "priority": "low",
+      "status": "open",
+      "createdBy": "สมหญิง",
+      "assignedTo": "HR หัวหน้า",
+      "createdAt": "2026-03-29T18:27:53.314Z",
+      "updatedAt": "2026-03-30T05:32:12.782Z",
+      "slaHours": 24,
+      "slaBreached": false
+    },
+    {
+      "id": "TK-002",
+      "title": "คอมพิวเตอร์ค้าง เปิดไม่ติด",
+      "description": "รายละเอียด: คอมพิวเตอร์ค้าง เปิดไม่ติด",
+      "category": "it",
+      "priority": "high",
+      "status": "open",
+      "createdBy": "วิภา",
+      "assignedTo": "IT Admin",
+      "createdAt": "2026-03-27T17:27:53.314Z",
+      "updatedAt": "2026-03-28T07:44:44.733Z",
+      "slaHours": 4,
+      "slaBreached": true
+    },
+    {
+      "id": "TK-003",
+      "title": "ขออนุมัติงบโฆษณาเพิ่ม",
+      "description": "รายละเอียด: ขออนุมัติงบโฆษณาเพิ่ม",
+      "category": "finance",
+      "priority": "medium",
+      "status": "in-progress",
+      "createdBy": "กนกวรรณ",
+      "assignedTo": "บัญชี",
+      "createdAt": "2026-03-27T07:27:53.314Z",
+      "updatedAt": "2026-03-27T23:58:15.423Z",
+      "slaHours": 24,
+      "slaBreached": true
+    },
+    {
+      "id": "TK-004",
+      "title": "ขอเปลี่ยน Password อีเมลบริษัท",
+      "description": "รายละเอียด: ขอเปลี่ยน Password อีเมลบริษัท",
+      "category": "it",
+      "priority": "medium",
+      "status": "in-progress",
+      "createdBy": "ปิติ",
+      "assignedTo": "Ops Manager",
+      "createdAt": "2026-03-29T10:27:53.314Z",
+      "updatedAt": "2026-03-30T02:17:26.775Z",
+      "slaHours": 8,
+      "slaBreached": true
+    },
+    {
+      "id": "TK-005",
+      "title": "แจ้งซ่อมแอร์ออฟฟิศชั้น 2",
+      "description": "รายละเอียด: แจ้งซ่อมแอร์ออฟฟิศชั้น 2",
+      "category": "ops",
+      "priority": "low",
+      "status": "resolved",
+      "createdBy": "มานิต",
+      "assignedTo": "ฝ่ายบุคคล",
+      "createdAt": "2026-03-27T10:27:53.314Z",
+      "updatedAt": "2026-03-27T20:15:13.176Z",
+      "slaHours": 48,
+      "slaBreached": false
+    },
+    {
+      "id": "TK-006",
+      "title": "ขอใบรับรองเงินเดือน",
+      "description": "รายละเอียด: ขอใบรับรองเงินเดือน",
+      "category": "hr",
+      "priority": "medium",
+      "status": "closed",
+      "createdBy": "กานต์",
+      "assignedTo": "HR หัวหน้า",
+      "createdAt": "2026-03-29T15:27:53.314Z",
+      "updatedAt": "2026-03-30T11:15:45.677Z",
+      "slaHours": 24,
+      "slaBreached": false
+    },
+    {
+      "id": "TK-007",
+      "title": "ขอเบิกค่าเดินทางประจำเดือน",
+      "description": "รายละเอียด: ขอเบิกค่าเดินทางประจำเดือน",
+      "category": "finance",
+      "priority": "low",
+      "status": "open",
+      "createdBy": "สมหญิง",
+      "assignedTo": "IT Admin",
+      "createdAt": "2026-03-28T22:27:53.314Z",
+      "updatedAt": "2026-03-29T07:23:02.418Z",
+      "slaHours": 48,
+      "slaBreached": false
+    },
+    {
+      "id": "TK-008",
+      "title": "Internet ห้อง Meeting ใช้ไม่ได้",
+      "description": "รายละเอียด: Internet ห้อง Meeting ใช้ไม่ได้",
+      "category": "it",
+      "priority": "urgent",
+      "status": "open",
+      "createdBy": "วิภา",
+      "assignedTo": "บัญชี",
+      "createdAt": "2026-03-29T16:27:53.314Z",
+      "updatedAt": "2026-03-30T14:18:22.325Z",
+      "slaHours": 2,
+      "slaBreached": true
+    },
+    {
+      "id": "TK-009",
+      "title": "ขอลาป่วย 1 วัน",
+      "description": "รายละเอียด: ขอลาป่วย 1 วัน",
+      "category": "hr",
+      "priority": "low",
+      "status": "in-progress",
+      "createdBy": "กนกวรรณ",
+      "assignedTo": "Ops Manager",
+      "createdAt": "2026-03-28T18:27:53.314Z",
+      "updatedAt": "2026-03-29T01:53:30.300Z",
+      "slaHours": 24,
+      "slaBreached": true
+    },
+    {
+      "id": "TK-010",
+      "title": "ขอ Access เข้าระบบ CRM",
+      "description": "รายละเอียด: ขอ Access เข้าระบบ CRM",
+      "category": "it",
+      "priority": "high",
+      "status": "in-progress",
+      "createdBy": "ปิติ",
+      "assignedTo": "ฝ่ายบุคคล",
+      "createdAt": "2026-03-29T17:27:53.314Z",
+      "updatedAt": "2026-03-29T18:43:44.110Z",
+      "slaHours": 4,
+      "slaBreached": false
+    },
+    {
+      "id": "TK-011",
+      "title": "แจ้งปัญหา Printer ชั้น 3",
+      "description": "รายละเอียด: แจ้งปัญหา Printer ชั้น 3",
+      "category": "ops",
+      "priority": "medium",
+      "status": "resolved",
+      "createdBy": "มานิต",
+      "assignedTo": "HR หัวหน้า",
+      "createdAt": "2026-03-29T01:27:53.314Z",
+      "updatedAt": "2026-03-29T02:13:42.018Z",
+      "slaHours": 24,
+      "slaBreached": false
+    },
+    {
+      "id": "TK-012",
+      "title": "ขอเอกสาร 50 ทวิ",
+      "description": "รายละเอียด: ขอเอกสาร 50 ทวิ",
+      "category": "finance",
+      "priority": "medium",
+      "status": "closed",
+      "createdBy": "กานต์",
+      "assignedTo": "IT Admin",
+      "createdAt": "2026-03-27T17:27:53.314Z",
+      "updatedAt": "2026-03-27T20:36:27.257Z",
+      "slaHours": 48,
+      "slaBreached": false
+    }
+  ],
+  "events": [
+    {
+      "id": "ev-1",
+      "title": "ส่งแคปชัน BeautyX เดือน เม.ย.",
+      "description": "12 ชิ้นงาน Content ประจำเดือน",
+      "date": "2026-04-01",
+      "time": "12:00",
+      "source": "operation",
+      "priority": "high",
+      "clinic": "BeautyX Clinic",
+      "assignee": "ปิติ"
+    },
+    {
+      "id": "ev-2",
+      "title": "ตัดต่อ Reels SkinLab",
+      "description": "Reels ก่อน-หลัง 3 คลิป",
+      "date": "2026-04-02",
+      "time": "17:00",
+      "source": "operation",
+      "priority": "medium",
+      "clinic": "SkinLab Thailand",
+      "assignee": "กานต์"
+    },
+    {
+      "id": "ev-3",
+      "title": "Approve กราฟิก Glow Up",
+      "description": "Banner Facebook 5 ชิ้น",
+      "date": "2026-03-31",
+      "time": "10:00",
+      "source": "operation",
+      "priority": "high",
+      "clinic": "Glow Up Clinic",
+      "assignee": "เจน"
+    },
+    {
+      "id": "ev-4",
+      "title": "ประชุม Review ยอด Admin",
+      "description": "ประชุมสรุปยอดรายสัปดาห์",
+      "date": "2026-03-31",
+      "time": "14:00",
+      "source": "crm",
+      "priority": "high",
+      "assignee": "AM"
+    },
+    {
+      "id": "ev-5",
+      "title": "Training สคริปต์ปิดการขาย",
+      "description": "อบรมทีม Admin เรื่อง Handle Objection",
+      "date": "2026-04-04",
+      "time": "10:00",
+      "source": "crm",
+      "priority": "medium"
+    },
+    {
+      "id": "ev-6",
+      "title": "ต่อสัญญา Dermis Premium",
+      "description": "สัญญาหมด 31 ก.ค. — ต้องตัดสินใจ",
+      "date": "2026-03-30",
+      "source": "client",
+      "priority": "urgent",
+      "clinic": "Dermis Premium"
+    },
+    {
+      "id": "ev-7",
+      "title": "Onboarding FaceCraft เฟส 2",
+      "description": "เก็บ Requirement เพิ่มเติม",
+      "date": "2026-04-03",
+      "time": "13:00",
+      "source": "client",
+      "priority": "high",
+      "clinic": "FaceCraft Clinic",
+      "assignee": "คุณแนน"
+    },
+    {
+      "id": "ev-8",
+      "title": "Meeting Review SkinLab",
+      "description": "ประชุม Monthly Report กับลูกค้า",
+      "date": "2026-04-06",
+      "time": "15:00",
+      "source": "client",
+      "priority": "medium",
+      "clinic": "SkinLab Thailand"
+    },
+    {
+      "id": "ev-9",
+      "title": "วันจ่ายเงินเดือน",
+      "description": "จ่ายเงินเดือน + Commission ทั้งทีม",
+      "date": "2026-03-31",
+      "source": "finance",
+      "priority": "urgent"
+    },
+    {
+      "id": "ev-10",
+      "title": "วางบิล BeautyX",
+      "description": "วางบิลค่าบริการ + ค่าแอดเดือน มี.ค.",
+      "date": "2026-04-01",
+      "source": "finance",
+      "priority": "high",
+      "clinic": "BeautyX Clinic"
+    },
+    {
+      "id": "ev-11",
+      "title": "สรุปงบแอด Q1",
+      "description": "สรุปค่าใช้จ่ายโฆษณาไตรมาส 1",
+      "date": "2026-04-02",
+      "source": "finance",
+      "priority": "medium"
+    },
+    {
+      "id": "ev-12",
+      "title": "PIP Review สมหญิง",
+      "description": "ประเมินผล PIP รอบที่ 2",
+      "date": "2026-04-01",
+      "time": "11:00",
+      "source": "hr",
+      "priority": "urgent",
+      "assignee": "สมหญิง"
+    },
+    {
+      "id": "ev-13",
+      "title": "สัมภาษณ์ Admin ใหม่",
+      "description": "สัมภาษณ์ผู้สมัคร 3 คน",
+      "date": "2026-04-03",
+      "time": "09:00",
+      "source": "hr",
+      "priority": "high"
+    },
+    {
+      "id": "ev-14",
+      "title": "ต่อสัญญา ปาริชาด",
+      "description": "สัญญาหมดอายุใน 30 วัน",
+      "date": "2026-04-05",
+      "source": "hr",
+      "priority": "medium",
+      "assignee": "ปาริชาด"
+    },
+    {
+      "id": "ev-15",
+      "title": "SLA: Internet ห้อง Meeting",
+      "description": "Ticket IT ด่วน — SLA 2 ชม.",
+      "date": "2026-03-30",
+      "time": "09:00",
+      "source": "ticket",
+      "priority": "urgent"
+    },
+    {
+      "id": "ev-16",
+      "title": "SLA: ขออนุมัติงบโฆษณา",
+      "description": "Ticket Finance — SLA 24 ชม.",
+      "date": "2026-03-31",
+      "source": "ticket",
+      "priority": "medium"
+    }
+  ],
+  "notifications": [
+    {
+      "id": "n1",
+      "type": "lead",
+      "title": "Lead ใหม่ 3 รายการ",
+      "message": "คุณแอน, คุณเบล, คุณมิ้นท์ สนใจ Botox จาก Facebook",
+      "time": "2 นาทีที่แล้ว",
+      "read": false,
+      "role": "admin"
+    },
+    {
+      "id": "n2",
+      "type": "lead",
+      "title": "Lead #127 ยังไม่ถูกตอบ",
+      "message": "สมหญิง ยังไม่ตอบ Lead #127 (เกิน 15 นาที)",
+      "time": "15 นาทีที่แล้ว",
+      "read": false,
+      "role": "admin"
+    },
+    {
+      "id": "n3",
+      "type": "performance",
+      "title": "ยอดปิดทีมถึง 38%",
+      "message": "Close Rate รวมทีม Admin อยู่ที่ 38% — ใกล้เป้า 40% แล้ว!",
+      "time": "1 ชม. ที่แล้ว",
+      "read": false,
+      "role": "ceo"
+    },
+    {
+      "id": "n4",
+      "type": "system",
+      "title": "Backup สำเร็จ",
+      "message": "Daily Backup เวลา 03:00 น. เสร็จสมบูรณ์",
+      "time": "1 วันที่แล้ว",
+      "read": true,
+      "role": "all"
+    }
+  ],
+  "backupPolicy": {
+    "schedule": "ทุกวัน 03:00 น.",
+    "retentionDaily": "ย้อนหลัง 30 วัน",
+    "retentionMonthly": "ย้อนหลัง 12 เดือน",
+    "retentionYearly": "เก็บถาวรรายปี",
+    "primaryStorage": "AWS S3 (ap-southeast-1)",
+    "secondaryStorage": "GCS Coldline (asia-southeast1)",
+    "nextRunAt": "2026-03-31T00:00:00.000Z"
+  },
+  "backupLogs": [
+    {
+      "id": "bk-001",
+      "startedAt": "2026-03-30T03:00:00.000Z",
+      "finishedAt": "2026-03-30T03:09:00.000Z",
+      "status": "success",
+      "sizeGb": 3.55,
+      "recordsCount": 184740,
+      "primaryLocation": "s3://marktech-os-prod-backup/daily",
+      "secondaryLocation": "gs://marktech-os-dr-backup/daily"
+    },
+    {
+      "id": "bk-002",
+      "startedAt": "2026-03-29T03:00:00.000Z",
+      "finishedAt": "2026-03-29T03:15:00.000Z",
+      "status": "success",
+      "sizeGb": 4.83,
+      "recordsCount": 185907,
+      "primaryLocation": "s3://marktech-os-prod-backup/daily",
+      "secondaryLocation": "gs://marktech-os-dr-backup/daily"
+    },
+    {
+      "id": "bk-003",
+      "startedAt": "2026-03-28T03:00:00.000Z",
+      "finishedAt": "2026-03-28T03:18:00.000Z",
+      "status": "success",
+      "sizeGb": 4.01,
+      "recordsCount": 216598,
+      "primaryLocation": "s3://marktech-os-prod-backup/daily",
+      "secondaryLocation": "gs://marktech-os-dr-backup/daily"
+    },
+    {
+      "id": "bk-004",
+      "startedAt": "2026-03-27T03:00:00.000Z",
+      "finishedAt": "2026-03-27T03:13:00.000Z",
+      "status": "success",
+      "sizeGb": 4.87,
+      "recordsCount": 206393,
+      "primaryLocation": "s3://marktech-os-prod-backup/daily",
+      "secondaryLocation": "gs://marktech-os-dr-backup/daily"
+    },
+    {
+      "id": "bk-005",
+      "startedAt": "2026-03-26T03:00:00.000Z",
+      "finishedAt": "2026-03-26T03:20:00.000Z",
+      "status": "success",
+      "sizeGb": 4.67,
+      "recordsCount": 204286,
+      "primaryLocation": "s3://marktech-os-prod-backup/daily",
+      "secondaryLocation": "gs://marktech-os-dr-backup/daily"
+    },
+    {
+      "id": "bk-006",
+      "startedAt": "2026-03-25T03:00:00.000Z",
+      "finishedAt": "2026-03-25T03:19:00.000Z",
+      "status": "failed",
+      "sizeGb": 4.02,
+      "recordsCount": 224167,
+      "primaryLocation": "s3://marktech-os-prod-backup/daily",
+      "secondaryLocation": "gs://marktech-os-dr-backup/daily",
+      "errorMessage": "Upload ไป Secondary Region timeout (retry สำเร็จบางส่วน)"
+    },
+    {
+      "id": "bk-007",
+      "startedAt": "2026-03-24T03:00:00.000Z",
+      "finishedAt": "2026-03-24T03:25:00.000Z",
+      "status": "success",
+      "sizeGb": 4.79,
+      "recordsCount": 197397,
+      "primaryLocation": "s3://marktech-os-prod-backup/daily",
+      "secondaryLocation": "gs://marktech-os-dr-backup/daily"
+    },
+    {
+      "id": "bk-008",
+      "startedAt": "2026-03-23T03:00:00.000Z",
+      "finishedAt": "2026-03-23T03:20:00.000Z",
+      "status": "success",
+      "sizeGb": 4.28,
+      "recordsCount": 222712,
+      "primaryLocation": "s3://marktech-os-prod-backup/daily",
+      "secondaryLocation": "gs://marktech-os-dr-backup/daily"
+    },
+    {
+      "id": "bk-009",
+      "startedAt": "2026-03-22T03:00:00.000Z",
+      "finishedAt": "2026-03-22T03:17:00.000Z",
+      "status": "success",
+      "sizeGb": 3.92,
+      "recordsCount": 200552,
+      "primaryLocation": "s3://marktech-os-prod-backup/daily",
+      "secondaryLocation": "gs://marktech-os-dr-backup/daily"
+    },
+    {
+      "id": "bk-010",
+      "startedAt": "2026-03-21T03:00:00.000Z",
+      "finishedAt": "2026-03-21T03:10:00.000Z",
+      "status": "success",
+      "sizeGb": 3.59,
+      "recordsCount": 217129,
+      "primaryLocation": "s3://marktech-os-prod-backup/daily",
+      "secondaryLocation": "gs://marktech-os-dr-backup/daily"
+    },
+    {
+      "id": "bk-011",
+      "startedAt": "2026-03-20T03:00:00.000Z",
+      "finishedAt": "2026-03-20T03:14:00.000Z",
+      "status": "warning",
+      "sizeGb": 3.59,
+      "recordsCount": 221668,
+      "primaryLocation": "s3://marktech-os-prod-backup/daily",
+      "secondaryLocation": "gs://marktech-os-dr-backup/daily",
+      "errorMessage": "Snapshot ใช้เวลานานผิดปกติ (+45%)"
+    },
+    {
+      "id": "bk-012",
+      "startedAt": "2026-03-19T03:00:00.000Z",
+      "finishedAt": "2026-03-19T03:24:00.000Z",
+      "status": "success",
+      "sizeGb": 4.79,
+      "recordsCount": 181709,
+      "primaryLocation": "s3://marktech-os-prod-backup/daily",
+      "secondaryLocation": "gs://marktech-os-dr-backup/daily"
+    },
+    {
+      "id": "bk-013",
+      "startedAt": "2026-03-18T03:00:00.000Z",
+      "finishedAt": "2026-03-18T03:19:00.000Z",
+      "status": "success",
+      "sizeGb": 4.44,
+      "recordsCount": 181622,
+      "primaryLocation": "s3://marktech-os-prod-backup/daily",
+      "secondaryLocation": "gs://marktech-os-dr-backup/daily"
+    },
+    {
+      "id": "bk-014",
+      "startedAt": "2026-03-17T03:00:00.000Z",
+      "finishedAt": "2026-03-17T03:24:00.000Z",
+      "status": "success",
+      "sizeGb": 4.81,
+      "recordsCount": 199870,
+      "primaryLocation": "s3://marktech-os-prod-backup/daily",
+      "secondaryLocation": "gs://marktech-os-dr-backup/daily"
+    }
+  ],
+  "monthlyReports": [
+    {
+      "id": "mr-001",
+      "monthLabel": "มีนาคม 2569",
+      "generatedAt": "2026-04-01T01:30:00.000Z",
+      "totalRevenue": 926159,
+      "netProfit": 1394756,
+      "avgCloseRate": 32,
+      "avgRoas": 3.39,
+      "slaRate": 80,
+      "recipients": [
+        "ceo@marktech.media",
+        "am@marktech.media",
+        "head.finance@marktech.media"
+      ],
+      "status": "queued",
+      "actionItems": [
+        "Close Rate ต่ำกว่าเป้า 35% — เพิ่ม coaching ทีม Admin",
+        "SLA ต่ำกว่า 90% — เร่งแก้คิว Ticket กลุ่ม IT/Ops",
+        "พบ Backup ล้มเหลวในรอบเดือน — ตรวจ DR runbook ภายใน 24 ชม."
+      ]
+    },
+    {
+      "id": "mr-002",
+      "monthLabel": "กุมภาพันธ์ 2569",
+      "generatedAt": "2026-03-01T01:30:00.000Z",
+      "totalRevenue": 889113,
+      "netProfit": 1337240,
+      "avgCloseRate": 31,
+      "avgRoas": 3.31,
+      "slaRate": 80,
+      "recipients": [
+        "ceo@marktech.media",
+        "am@marktech.media",
+        "head.finance@marktech.media"
+      ],
+      "status": "sent",
+      "actionItems": [
+        "Close Rate ต่ำกว่าเป้า 35% — เพิ่ม coaching ทีม Admin",
+        "SLA ต่ำกว่า 90% — เร่งแก้คิว Ticket กลุ่ม IT/Ops",
+        "พบ Backup ล้มเหลวในรอบเดือน — ตรวจ DR runbook ภายใน 24 ชม."
+      ]
+    },
+    {
+      "id": "mr-003",
+      "monthLabel": "มกราคม 2569",
+      "generatedAt": "2026-02-01T01:30:00.000Z",
+      "totalRevenue": 852066,
+      "netProfit": 1279725,
+      "avgCloseRate": 30,
+      "avgRoas": 3.23,
+      "slaRate": 80,
+      "recipients": [
+        "ceo@marktech.media",
+        "am@marktech.media",
+        "head.finance@marktech.media"
+      ],
+      "status": "sent",
+      "actionItems": [
+        "Close Rate ต่ำกว่าเป้า 35% — เพิ่ม coaching ทีม Admin",
+        "SLA ต่ำกว่า 90% — เร่งแก้คิว Ticket กลุ่ม IT/Ops",
+        "พบ Backup ล้มเหลวในรอบเดือน — ตรวจ DR runbook ภายใน 24 ชม."
+      ]
+    },
+    {
+      "id": "mr-004",
+      "monthLabel": "ธันวาคม 2568",
+      "generatedAt": "2026-01-01T01:30:00.000Z",
+      "totalRevenue": 815020,
+      "netProfit": 1222209,
+      "avgCloseRate": 29,
+      "avgRoas": 3.15,
+      "slaRate": 80,
+      "recipients": [
+        "ceo@marktech.media",
+        "am@marktech.media",
+        "head.finance@marktech.media"
+      ],
+      "status": "sent",
+      "actionItems": [
+        "Close Rate ต่ำกว่าเป้า 35% — เพิ่ม coaching ทีม Admin",
+        "SLA ต่ำกว่า 90% — เร่งแก้คิว Ticket กลุ่ม IT/Ops",
+        "พบ Backup ล้มเหลวในรอบเดือน — ตรวจ DR runbook ภายใน 24 ชม."
+      ]
+    },
+    {
+      "id": "mr-005",
+      "monthLabel": "พฤศจิกายน 2568",
+      "generatedAt": "2025-12-01T01:30:00.000Z",
+      "totalRevenue": 777974,
+      "netProfit": 1164693,
+      "avgCloseRate": 28,
+      "avgRoas": 3.07,
+      "slaRate": 80,
+      "recipients": [
+        "ceo@marktech.media",
+        "am@marktech.media",
+        "head.finance@marktech.media"
+      ],
+      "status": "sent",
+      "actionItems": [
+        "Close Rate ต่ำกว่าเป้า 35% — เพิ่ม coaching ทีม Admin",
+        "SLA ต่ำกว่า 90% — เร่งแก้คิว Ticket กลุ่ม IT/Ops",
+        "พบ Backup ล้มเหลวในรอบเดือน — ตรวจ DR runbook ภายใน 24 ชม."
+      ]
+    },
+    {
+      "id": "mr-006",
+      "monthLabel": "ตุลาคม 2568",
+      "generatedAt": "2025-11-01T01:30:00.000Z",
+      "totalRevenue": 740927,
+      "netProfit": 1107178,
+      "avgCloseRate": 27,
+      "avgRoas": 2.99,
+      "slaRate": 80,
+      "recipients": [
+        "ceo@marktech.media",
+        "am@marktech.media",
+        "head.finance@marktech.media"
+      ],
+      "status": "sent",
+      "actionItems": [
+        "Close Rate ต่ำกว่าเป้า 35% — เพิ่ม coaching ทีม Admin",
+        "SLA ต่ำกว่า 90% — เร่งแก้คิว Ticket กลุ่ม IT/Ops",
+        "พบ Backup ล้มเหลวในรอบเดือน — ตรวจ DR runbook ภายใน 24 ชม."
+      ]
+    }
+  ],
+  "recipientConfigs": [
+    {
+      "id": "rc-1",
+      "role": "ceo",
+      "label": "CEO",
+      "scope": "เห็นภาพรวมทุกโมดูล",
+      "enabled": true,
+      "emails": [
+        "ceo@marktech.media"
+      ]
+    },
+    {
+      "id": "rc-2",
+      "role": "am",
+      "label": "AM",
+      "scope": "เห็นเฉพาะพอร์ตลูกค้าที่ดูแล",
+      "enabled": true,
+      "emails": [
+        "am@marktech.media"
+      ]
+    },
+    {
+      "id": "rc-3",
+      "role": "head_finance",
+      "label": "Head Finance",
+      "scope": "เห็นส่วนการเงิน + cashflow",
+      "enabled": true,
+      "emails": [
+        "head.finance@marktech.media"
+      ]
+    },
+    {
+      "id": "rc-4",
+      "role": "head_ops",
+      "label": "Head Ops",
+      "scope": "เห็นคุณภาพงาน Production + SLA",
+      "enabled": false,
+      "emails": [
+        "head.ops@marktech.media"
+      ]
+    }
+  ],
+  "aiQuickActions": [
+    {
+      "id": "qa-1",
+      "label": "ข้อมูลหัตถการ Botox",
+      "icon": "💉",
+      "prompt": "ช่วยสรุปข้อมูลหัตถการ Botox ให้หน่อย ราคา ข้อควรระวัง ระยะพักฟื้น",
+      "category": "procedure"
+    },
+    {
+      "id": "qa-2",
+      "label": "สคริปต์ปิดการขาย",
+      "icon": "🎯",
+      "prompt": "ขอสคริปต์สำหรับปิดการขายลูกค้าที่สนใจ Filler",
+      "category": "script"
+    },
+    {
+      "id": "qa-3",
+      "label": "โปรโมชัน BeautyX",
+      "icon": "🏷️",
+      "prompt": "ตอนนี้ BeautyX Clinic มีโปรโมชันอะไรบ้าง?",
+      "category": "promotion"
+    },
+    {
+      "id": "qa-4",
+      "label": "กฎวันลา/สิทธิ์",
+      "icon": "📋",
+      "prompt": "พนักงานมีสิทธิ์ลากี่วัน? กฎการลาป่วย ลากิจ ลาพักร้อนเป็นอย่างไร?",
+      "category": "policy"
+    },
+    {
+      "id": "qa-5",
+      "label": "คำต้องห้าม อย.",
+      "icon": "⚠️",
+      "prompt": "มีคำต้องห้ามอะไรบ้างที่ห้ามใช้ในโพสต์คลินิกความงาม?",
+      "category": "policy"
+    },
+    {
+      "id": "qa-6",
+      "label": "Handle Objection",
+      "icon": "💬",
+      "prompt": "ลูกค้าบอกว่าแพงไป จะตอบอย่างไรดี?",
+      "category": "script"
+    }
+  ],
+  "aiKnowledgeBase": {
+    "global": {
+      "label": "Global Knowledge Base",
+      "items": [
+        {
+          "icon": "📚",
+          "label": "ข้อมูลหัตถการ",
+          "count": 45
+        },
+        {
+          "icon": "📝",
+          "label": "สคริปต์มาตรฐาน",
+          "count": 28
+        },
+        {
+          "icon": "⚠️",
+          "label": "คำต้องห้าม อย.",
+          "count": 67
+        },
+        {
+          "icon": "💊",
+          "label": "FAQ ทั่วไป",
+          "count": 120
+        }
+      ]
+    },
+    "clinics": [
+      {
+        "name": "BeautyX Clinic",
+        "docs": 34,
+        "lastUpdated": "2026-03-28"
+      },
+      {
+        "name": "Glow Up Clinic",
+        "docs": 22,
+        "lastUpdated": "2026-03-25"
+      },
+      {
+        "name": "SkinLab Thailand",
+        "docs": 41,
+        "lastUpdated": "2026-03-29"
+      },
+      {
+        "name": "Dermis Premium",
+        "docs": 18,
+        "lastUpdated": "2026-03-20"
+      },
+      {
+        "name": "FaceCraft Clinic",
+        "docs": 15,
+        "lastUpdated": "2026-03-27"
+      }
+    ]
+  }
+}

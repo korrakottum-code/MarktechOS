@@ -1,13 +1,13 @@
 "use client";
 
+import type { Admin } from "@/lib/app-data-types";
 import {
-  Admin,
   getTierLabel,
   getTierBg,
   formatCurrency,
   getMotivationalMessage,
   getCommission,
-} from "@/lib/mock-data";
+} from "@/lib/app-utils";
 
 interface Props {
   admins: Admin[];
@@ -34,6 +34,9 @@ export default function AdminPerformanceBoard({ admins }: Props) {
               <th className="px-6 py-3 font-medium">#</th>
               <th className="px-6 py-3 font-medium">แอดมิน</th>
               <th className="px-6 py-3 font-medium">สถานะ</th>
+              <th className="px-6 py-3 font-medium text-left">
+                เพจที่ดูแล
+              </th>
               <th className="px-6 py-3 font-medium text-center">
                 Lead รับ/ปิด
               </th>
@@ -112,6 +115,20 @@ export default function AdminPerformanceBoard({ admins }: Props) {
                           ? "ไม่ว่าง"
                           : "ออฟไลน์"}
                       </span>
+                    </div>
+                  </td>
+
+                  {/* Managed Clinics */}
+                  <td className="px-6 py-3">
+                    <div className="flex flex-wrap gap-1">
+                      {admin.managedClinics?.map((clinic) => (
+                        <span
+                          key={clinic}
+                          className="text-[10px] px-1.5 py-0.5 rounded bg-navy-700 text-foreground-muted border border-border/50"
+                        >
+                          {clinic}
+                        </span>
+                      )) || <span className="text-[10px] text-foreground-muted italic">— ไม่มีเพจที่ดูแล</span>}
                     </div>
                   </td>
 

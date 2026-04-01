@@ -1,0 +1,346 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Staff {
+  id              String                 @id @default(cuid())
+  name            String
+  avatar          String
+  role            String                 @default("admin")
+  leadsReceived   Int                    @default(0)
+  leadsClosed     Int                    @default(0)
+  closeRate       Float                  @default(0)
+  avgResponseTime Float                  @default(0)
+  revenue         Float                  @default(0)
+  tier            String                 @default("none")
+  status          String                 @default("online")
+  managedClinics  String[]
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  email           String?                @unique
+  phone           String?                @unique
+  attendances     AttendanceAdjustment[]
+  hrAlerts        HRAlert[]
+  leads           Lead[]
+}
+
+model Clinic {
+  id                  String          @id @default(cuid())
+  name                String          @unique
+  revenue             Float           @default(0)
+  adSpend             Float           @default(0)
+  profit              Float           @default(0)
+  leadsCount          Int             @default(0)
+  closeRate           Float           @default(0)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  facebookAdAccountId String?         @unique
+  facebookPageId      String?         @unique
+  wallet              AdBudgetWallet?
+  adsMetrics          AdsMetric[]
+  profile             ClientProfile?
+  leads               Lead[]
+  tasks               OperationTask[]
+}
+
+model Lead {
+  id           String   @id @default(cuid())
+  name         String
+  phone        String
+  channel      String
+  clinicName   String
+  procedure    String
+  status       String   @default("new")
+  assignedToId String?
+  value        Float    @default(0)
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  assignedTo   Staff?   @relation(fields: [assignedToId], references: [id])
+  clinic       Clinic   @relation(fields: [clinicName], references: [name])
+}
+
+model Service {
+  id            String   @id @default(cuid())
+  name          String
+  shortName     String
+  icon          String
+  description   String
+  features      Json
+  priceLabel    String
+  category      String
+  activeClients Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model SalesDeal {
+  id            String    @id @default(cuid())
+  businessName  String
+  contactPerson String
+  phone         String
+  businessType  String
+  services      String[]
+  dealValue     Float     @default(0)
+  stage         String
+  probability   Float     @default(0)
+  salesperson   String
+  expectedClose DateTime?
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model OperationTask {
+  id             String    @id @default(cuid())
+  title          String
+  description    String
+  clinicName     String
+  type           String
+  status         String
+  priority       String
+  assignee       String
+  assigneeAvatar String
+  dueDate        DateTime?
+  tags           String[]
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  clinic         Clinic    @relation(fields: [clinicName], references: [name])
+}
+
+model AdsMetric {
+  id          String   @id @default(cuid())
+  clinicName  String
+  campaign    String
+  spend       Float    @default(0)
+  leads       Int      @default(0)
+  cpl         Float    @default(0)
+  roas        Float    @default(0)
+  impressions Int      @default(0)
+  clicks      Int      @default(0)
+  ctr         Float    @default(0)
+  status      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  clinic      Clinic   @relation(fields: [clinicName], references: [name])
+}
+
+model ClientProfile {
+  id                    String    @id @default(cuid())
+  clinicName            String    @unique
+  contactPerson         String
+  phone                 String
+  contractStart         DateTime?
+  contractEnd           DateTime?
+  monthlyFee            Float     @default(0)
+  adBudget              Float     @default(0)
+  services              String[]
+  status                String
+  onboardingComplete    Boolean   @default(false)
+  assignedAdminIds      String[]
+  npsScore              Int?
+  retentionPlan         String?
+  offboardingReason     String?
+  requirements          Json
+  onboardingChecklists  Json
+  offboardingChecklists Json
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  clinic                Clinic    @relation(fields: [clinicName], references: [name])
+}
+
+model HRAlert {
+  id           String   @id @default(cuid())
+  employeeName String
+  employeeId   String?
+  type         String
+  severity     String
+  message      String
+  date         DateTime @default(now())
+  actionTaken  Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  staff        Staff?   @relation(fields: [employeeId], references: [id])
+}
+
+model AttendanceAdjustment {
+  id              String   @id @default(cuid())
+  staffId         String
+  name            String
+  lateDays        Int      @default(0)
+  absentDays      Int      @default(0)
+  leaveDays       Int      @default(0)
+  overtimeHours   Int      @default(0)
+  lateDeduction   Float    @default(0)
+  absentDeduction Float    @default(0)
+  allowance       Float    @default(0)
+  netAdjustment   Float    @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  staff           Staff    @relation(fields: [staffId], references: [id])
+}
+
+model AdBudgetWallet {
+  id                  String    @id @default(cuid())
+  clinicName          String    @unique
+  serviceFeeCollected Float     @default(0)
+  adWalletBalance     Float     @default(0)
+  usedAdSpend         Float     @default(0)
+  remainingAdBudget   Float     @default(0)
+  billingDueDate      DateTime?
+  status              String
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  clinic              Clinic    @relation(fields: [clinicName], references: [name])
+}
+
+model CashflowEntry {
+  id        String   @id @default(cuid())
+  date      DateTime @default(now())
+  type      String
+  category  String
+  label     String
+  amount    Float    @default(0)
+  reference String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Ticket {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  status      String   @default("open")
+  priority    String   @default("medium")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  assignedTo  String?
+  category    String
+  createdBy   String
+  slaBreached Boolean  @default(false)
+  slaHours    Int      @default(24)
+}
+
+model CalendarEvent {
+  id          String   @id @default(cuid())
+  title       String
+  clinicName  String?
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  assignee    String?
+  date        DateTime
+  priority    String
+  source      String
+  time        String?
+}
+
+model AppNotification {
+  id        String   @id @default(cuid())
+  type      String
+  title     String
+  message   String
+  time      String?
+  read      Boolean  @default(false)
+  role      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AIKnowledge {
+  id        String   @id @default(cuid())
+  prompt    String
+  answer    String
+  category  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Invoice {
+  id                String   @id @default(cuid())
+  clientId          String
+  clientName        String
+  invoiceNumber     String   @unique
+  issueDate         DateTime
+  dueDate           DateTime
+  amount            Float
+  type              String
+  status            String
+  paidDate          DateTime?
+  overdueEscalation String?
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model BackupJobLog {
+  id                String   @id @default(cuid())
+  startedAt         DateTime @default(now())
+  finishedAt        DateTime?
+  status            String
+  sizeGb            Float
+  recordsCount      Int
+  primaryLocation   String
+  secondaryLocation String
+  errorMessage      String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model MonthlyExecutiveReport {
+  id           String   @id @default(cuid())
+  monthLabel   String
+  generatedAt  DateTime @default(now())
+  totalRevenue Float
+  netProfit    Float
+  avgCloseRate Float
+  avgRoas      Float
+  slaRate      Float
+  recipients   String[]
+  status       String
+  actionItems  String[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model RecipientConfig {
+  id        String   @id @default(cuid())
+  role      String
+  label     String
+  scope     String
+  enabled   Boolean  @default(true)
+  emails    String[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AIQuickAction {
+  id        String   @id @default(cuid())
+  label     String
+  icon      String
+  prompt    String
+  category  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model FinanceSettings {
+  id                     String   @id @default("singleton")
+  adsOptTeamTotalSalary  Float    @default(60000)
+  totalOfficeOverhead    Float    @default(45000)
+  generalOpsFixedSalary  Float    @default(35000)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+}
+
+model AppState {
+  id        String   @id @default("singleton")
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

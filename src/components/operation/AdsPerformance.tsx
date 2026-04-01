@@ -1,12 +1,16 @@
 "use client";
 
-import { AdsMetric, mockAdsMetrics } from "@/lib/mock-operations";
-import { formatCurrency, formatNumber } from "@/lib/mock-data";
+import type { AdsMetric } from "@/lib/app-data-types";
+import { formatCurrency, formatNumber } from "@/lib/app-utils";
 import { TrendingUp, TrendingDown } from "lucide-react";
 
-export default function AdsPerformance() {
-  const activeAds = mockAdsMetrics.filter((a) => a.status === "active");
-  const pausedAds = mockAdsMetrics.filter((a) => a.status !== "active");
+interface AdsPerformanceProps {
+  metrics?: AdsMetric[];
+}
+
+export default function AdsPerformance({ metrics = [] }: AdsPerformanceProps) {
+  const activeAds = metrics.filter((a) => a.status === "active");
+  const pausedAds = metrics.filter((a) => a.status !== "active");
 
   return (
     <div className="bg-navy-900 border border-border rounded-2xl overflow-hidden">
@@ -35,7 +39,7 @@ export default function AdsPerformance() {
             </tr>
           </thead>
           <tbody>
-            {mockAdsMetrics
+            {metrics
               .sort((a, b) => b.roas - a.roas)
               .map((ad) => (
                 <tr

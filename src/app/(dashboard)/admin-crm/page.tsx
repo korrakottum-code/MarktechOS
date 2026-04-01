@@ -1,14 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import {
-  serviceProducts,
-  mockDeals,
-  getSalesPipelineStats,
-  getDealStageLabel,
+import type { SalesDeal, OperationTask, Admin, Lead } from "@/lib/app-data-types";
+import { 
+  serviceProducts, 
+  getDealStageLabel, 
   getDealStageColor,
-} from "@/lib/mock-services";
-import { formatCurrency } from "@/lib/mock-data";
+  formatCurrency 
+} from "@/lib/app-utils";
+// Duplicate imports removed, Admin, Lead, formatCurrency already handled above
+import { useAppData } from "@/lib/use-app-data";
+import { useAppDataMutation } from "@/lib/use-app-data-mutation";
+import LeadFormModal from "@/components/crm/LeadFormModal";
 import {
   Package,
   TrendingUp,
@@ -17,34 +20,85 @@ import {
   ChevronDown,
   ChevronUp,
   Users,
+  LayoutDashboard,
 } from "lucide-react";
+import { createOnboardingTasks, createClientFromDeal } from "@/lib/integration-utils";
+// Duplicate import removed, OperationTask already imported above
+import ExecutiveDashboard from "@/components/dashboard/ExecutiveDashboard";
+import MarkTechDatePicker from "@/components/ui/DatePicker";
+import { Filter, Calendar } from "lucide-react";
 
 export default function AdminCrmPage() {
-  const [activeTab, setActiveTab] = useState<"admin" | "sales" | "services">(
-    "admin"
-  );
+  const { payload, loading, error, setPayload } = useAppData();
+  const { patchSection } = useAppDataMutation(setPayload);
+  const [activeTab, setActiveTab] = useState<"overview" | "admin">("overview");
+  const [filterRange, setFilterRange] = useState<{ start?: Date; end?: Date }>({ start: undefined, end: undefined });
+  const [leadModal, setLeadModal] = useState<{ open: boolean; lead?: Lead }>({ open: false });
+
+  const admins = payload?.data.admins ?? [];
+  const leads = payload?.data.leads ?? [];
+  const deals = (payload?.data.salesDeals ?? []) as SalesDeal[];
+  const operationTasks = (payload?.data.operationTasks ?? []) as OperationTask[];
+  const dashboardStats = payload?.stats.dashboard;
+  const salesStats = payload?.stats.sales;
+
+  if (loading || !dashboardStats || !salesStats) {
+    return <div className="text-sm text-foreground-muted">กำลังโหลดข้อมูล...</div>;
+  }
+
+  if (error) {
+    return <div className="text-sm text-red-400">โหลดข้อมูลไม่สำเร็จ: {error}</div>;
+  }
+
+  function handleSaveLead(lead: Lead) {
+    const existing = leads.find((l) => l.id === lead.id);
+    const updated = existing
+      ? leads.map((l) => (l.id === lead.id ? lead : l))
+      : [...leads, lead];
+    patchSection("leads", updated);
+    setLeadModal({ open: false });
+  }
+
+  function handleDeleteLead(id: string) {
+    const updated = leads.filter((l) => l.id !== id);
+    patchSection("leads", updated);
+    setLeadModal({ open: false });
+  }
 
   return (
     <div className="space-y-6">
+      {leadModal.open && (
+        <LeadFormModal
+          lead={leadModal.lead}
+          admins={admins}
+          onSave={handleSaveLead}
+          onDelete={handleDeleteLead}
+          onClose={() => setLeadModal({ open: false })}
+        />
+      )}
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-          📊 Admin CRM & Sales Pipeline
-          <span className="text-xs px-2 py-0.5 rounded-full bg-gold-500/20 text-gold-400 font-normal">
-            Module 1
+        <div className="flex items-center gap-2 mb-1">
+          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gold-500/20 text-gold-400 border border-gold-500/20 uppercase tracking-wider">
+            Module 5
           </span>
+          <span className="text-[10px] text-foreground-muted uppercase tracking-[0.2em]">
+            Phase 4: Chat Admin & Execution
+          </span>
+        </div>
+        <h1 className="text-2xl font-bold text-foreground">
+          Admin CRM (Chat Execution)
         </h1>
         <p className="text-foreground-muted mt-1">
-          จัดการทีมแอดมิน · Sales Pipeline · Service Catalog
+          มอนิเตอร์ประสิทธิภาพการตอบแชท · จัดการคิว Lead ของคนไข้รายวัน
         </p>
       </div>
 
       {/* Tab Switcher */}
       <div className="flex items-center gap-1 bg-navy-900 border border-border rounded-xl p-1 w-fit">
         {[
-          { key: "admin" as const, label: "💬 Admin CRM", desc: "ทีมตอบแชท" },
-          { key: "sales" as const, label: "🤝 Sales Pipeline", desc: "ทีมขาย" },
-          { key: "services" as const, label: "📦 Service Catalog", desc: "บริการ" },
+          { key: "overview" as const, label: "💡 Overview", desc: "ภาพรวมแอดมิน" },
+          { key: "admin" as const, label: "💬 Admin Performance", desc: "ประสิทธิภาพ" },
         ].map((tab) => (
           <button
             key={tab.key}
@@ -60,10 +114,50 @@ export default function AdminCrmPage() {
         ))}
       </div>
 
+      {/* Global Filter Bar */}
+      <div className="bg-navy-900/50 border border-border/50 rounded-3xl p-4 flex flex-wrap items-center gap-6 shadow-xl backdrop-blur-md">
+        <div className="flex items-center gap-2">
+          <Filter size={14} className="text-gold-400" />
+          <span className="text-[10px] font-bold text-foreground-muted uppercase tracking-widest">Performance Filters:</span>
+        </div>
+        
+        <div className="flex items-center gap-4 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold text-foreground-muted uppercase">Analysis Period:</span>
+            <MarkTechDatePicker 
+              mode="range" 
+              value={filterRange} 
+              onChange={setFilterRange} 
+              placeholder="Select Date Range"
+              className="w-64"
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 bg-navy-950/50 px-4 py-2.5 rounded-xl border border-border/50">
+           <Calendar size={14} className="text-gold-400" />
+           <span className="text-xs text-foreground font-medium">Viewing Range: <span className="text-gold-400 font-bold">{filterRange.start ? filterRange.start.toLocaleDateString('th-TH') : "Today"} - {filterRange.end ? filterRange.end.toLocaleDateString('th-TH') : "Now"}</span></span>
+        </div>
+      </div>
+
       {/* Content */}
-      {activeTab === "admin" && <AdminCRMContent />}
-      {activeTab === "sales" && <SalesPipelineContent />}
-      {activeTab === "services" && <ServiceCatalogContent />}
+      {activeTab === "overview" && (
+        <ExecutiveDashboard 
+          leads={leads}
+          deals={deals}
+          tasks={operationTasks}
+          stats={{ crm: dashboardStats, sales: salesStats }}
+        />
+      )}
+      {activeTab === "admin" && (
+        <AdminCRMContent
+          admins={admins}
+          leads={leads}
+          stats={dashboardStats}
+          onCreateLead={() => setLeadModal({ open: true })}
+          onEditLead={(lead) => setLeadModal({ open: true, lead })}
+        />
+      )}
     </div>
   );
 }
@@ -72,21 +166,32 @@ export default function AdminCrmPage() {
 // Tab 1: Admin CRM (เดิม)
 // ==============================
 
-import {
-  mockAdmins,
-  mockLeads,
-  getDashboardStats,
-} from "@/lib/mock-data";
 import AdminPerformanceBoard from "@/components/crm/AdminPerformanceBoard";
 import LeadQueue from "@/components/crm/LeadQueue";
 import GamificationBar from "@/components/crm/GamificationBar";
 import { Clock } from "lucide-react";
 
-function AdminCRMContent() {
-  const stats = getDashboardStats();
+function AdminCRMContent({
+  admins,
+  leads,
+  stats,
+  onCreateLead,
+  onEditLead,
+}: {
+  admins: Admin[];
+  leads: Lead[];
+  stats: {
+    totalLeads: number;
+    closedLeads: number;
+    newLeads: number;
+    avgCloseRate: number;
+  };
+  onCreateLead: () => void;
+  onEditLead: (lead: Lead) => void;
+}) {
   const avgResponseTime =
-    mockAdmins.reduce((sum, a) => sum + a.avgResponseTime, 0) /
-    mockAdmins.length;
+    admins.reduce((sum, a) => sum + a.avgResponseTime, 0) /
+    (admins.length || 1);
 
   const crmCards = [
     {
@@ -125,6 +230,25 @@ function AdminCRMContent() {
 
   return (
     <div className="space-y-6">
+      {/* Header with Add Button */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-foreground">
+            💬 Admin CRM — ทีมแอดมิน
+          </h2>
+          <p className="text-sm text-foreground-muted mt-1">
+            มอนิเตอร์ประสิทธิภาพการตอบแชทและจัดการ Lead ของแอดมิน
+          </p>
+        </div>
+        <button
+          onClick={onCreateLead}
+          className="flex items-center gap-2 px-4 py-2 bg-gold-500 text-navy-950 rounded-xl text-sm font-medium hover:bg-gold-400 transition-colors shadow-lg shadow-gold-500/20"
+        >
+          <Plus size={18} />
+          สร้าง Lead ใหม่
+        </button>
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {crmCards.map((card, i) => {
           const Icon = card.icon;
@@ -152,9 +276,9 @@ function AdminCRMContent() {
           );
         })}
       </div>
-      <GamificationBar admins={mockAdmins} />
-      <AdminPerformanceBoard admins={mockAdmins} />
-      <LeadQueue leads={mockLeads} admins={mockAdmins} />
+      <GamificationBar admins={admins} />
+      <AdminPerformanceBoard admins={admins} />
+      <LeadQueue leads={leads} admins={admins} onCreateLead={onCreateLead} onEditLead={onEditLead} />
     </div>
   );
 }
@@ -162,9 +286,29 @@ function AdminCRMContent() {
 // ==============================
 // Tab 2: Sales Pipeline
 // ==============================
+import { Plus } from "lucide-react";
+import DealFormModal from "@/components/crm/DealFormModal";
 
-function SalesPipelineContent() {
-  const stats = getSalesPipelineStats();
+function SalesPipelineContent({
+  deals,
+  salesStats,
+  services,
+  onCreateDeal,
+  onEditDeal,
+}: {
+  deals: SalesDeal[];
+  salesStats: {
+    totalDeals: number;
+    wonDeals: number;
+    pipelineValue: number;
+    weightedPipeline: number;
+    wonValue: number;
+  };
+  services: typeof serviceProducts;
+  onCreateDeal: () => void;
+  onEditDeal: (deal: SalesDeal) => void;
+}) {
+  const stats = salesStats;
 
   const salesCards = [
     {
@@ -234,13 +378,22 @@ function SalesPipelineContent() {
 
       {/* Deals Table */}
       <div className="bg-navy-900 border border-border rounded-2xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-border">
-          <h2 className="text-lg font-semibold text-foreground">
-            🤝 Sales Pipeline — Deals ทั้งหมด
-          </h2>
-          <p className="text-sm text-foreground-muted mt-1">
-            ติดตามทุก Deal ตั้งแต่ Prospect จนถึง Won
-          </p>
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">
+              🤝 Sales Pipeline — Deals ทั้งหมด
+            </h2>
+            <p className="text-sm text-foreground-muted mt-1">
+              ติดตามทุก Deal ตั้งแต่ Prospect จนถึง Won
+            </p>
+          </div>
+          <button
+            onClick={onCreateDeal}
+            className="flex items-center gap-2 px-4 py-2 bg-gold-500 text-navy-950 rounded-xl text-sm font-medium hover:bg-gold-400 transition-colors shadow-lg shadow-gold-500/20"
+          >
+            <Plus size={18} />
+            สร้าง Deal ใหม่
+          </button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -257,14 +410,15 @@ function SalesPipelineContent() {
               </tr>
             </thead>
             <tbody>
-              {mockDeals.map((deal) => {
-                const services = deal.services.map(
+              {deals.map((deal) => {
+                const dealServices = deal.services.map(
                   (sid) =>
-                    serviceProducts.find((s) => s.id === sid)?.shortName || sid
+                    services.find((s) => s.id === sid)?.shortName || sid
                 );
                 return (
                   <tr
                     key={deal.id}
+                    onClick={() => onEditDeal(deal)}
                     className={`border-b border-border/30 hover:bg-navy-800/50 transition-colors cursor-pointer ${
                       deal.stage === "won" ? "bg-emerald-500/5" : ""
                     }`}
@@ -285,7 +439,7 @@ function SalesPipelineContent() {
                     </td>
                     <td className="px-6 py-3">
                       <div className="flex flex-wrap gap-1">
-                        {services.map((s) => (
+                        {dealServices.map((s) => (
                           <span
                             key={s}
                             className="text-[10px] px-1.5 py-0.5 rounded bg-navy-700 text-foreground-muted"
@@ -352,7 +506,7 @@ function SalesPipelineContent() {
 // Tab 3: Service Catalog
 // ==============================
 
-function ServiceCatalogContent() {
+function ServiceCatalogContent({ services }: { services: typeof serviceProducts }) {
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const getCategoryColor = (cat: string) => {
@@ -379,7 +533,7 @@ function ServiceCatalogContent() {
         </p>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {serviceProducts.map((svc) => (
+          {services.map((svc) => (
             <div
               key={svc.id}
               className={`bg-gradient-to-br ${getCategoryColor(

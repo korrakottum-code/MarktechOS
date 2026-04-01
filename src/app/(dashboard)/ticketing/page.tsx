@@ -1,38 +1,93 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
-  mockTickets,
-  getTicketStats,
   getCategoryLabel,
   getCategoryColor,
   getTicketPriorityLabel,
   getTicketPriorityColor,
   getTicketStatusColor,
   getTicketStatusLabel,
-  TicketCategory,
-  TicketStatus,
-} from "@/lib/mock-tickets";
+} from "@/lib/app-utils";
+import type { TicketCategory, Ticket as TicketType } from "@/lib/app-data-types";
+import { useAppData } from "@/lib/use-app-data";
+import { useAppDataMutation } from "@/lib/use-app-data-mutation";
+import TicketFormModal from "@/components/ticketing/TicketFormModal";
+// Duplicate import removed, TicketType already imported above
 import {
   Ticket,
-  AlertTriangle,
   CheckCircle2,
   Clock,
   Plus,
   Search,
-  Filter,
   Shield,
+  AlertTriangle,
 } from "lucide-react";
 
 export default function TicketingPage() {
-  const stats = getTicketStats();
-  const [categoryFilter, setCategoryFilter] = useState<TicketCategory | "all">("all");
-  const [statusFilter, setStatusFilter] = useState<TicketStatus | "all">("all");
-  const [search, setSearch] = useState("");
+  const { payload, loading, error, setPayload } = useAppData();
+  const { patchSection } = useAppDataMutation(setPayload);
+  const stats = payload?.stats.tickets;
+  const tickets = (payload?.data.tickets ?? []) as TicketType[];
 
-  const filtered = mockTickets
+  // SLA Engine: Monitor and flag breaches
+  useEffect(() => {
+    if (loading || !tickets.length) return;
+
+    let hasChange = false;
+    const now = new Date().getTime();
+
+    const checkedTickets = tickets.map(ticket => {
+      if (ticket.status === "resolved" || ticket.status === "closed" || ticket.slaBreached) {
+        return ticket;
+      }
+
+      const created = new Date(ticket.createdAt).getTime();
+      const hoursAgo = (now - created) / (1000 * 60 * 60);
+      const threshold = ticket.category === "crisis" ? 2 : 24;
+
+      if (hoursAgo > threshold) {
+        hasChange = true;
+        return { ...ticket, slaBreached: true };
+      }
+      return ticket;
+    });
+
+    if (hasChange) {
+      console.log("SLA Engine: Detected new breaches, syncing to SQL...");
+      patchSection("tickets", checkedTickets);
+    }
+  }, [loading, tickets, patchSection]);
+
+  const [categoryFilter, setCategoryFilter] = useState<TicketCategory | "all">("all");
+  const [search, setSearch] = useState("");
+  const [ticketModal, setTicketModal] = useState<{ open: boolean; ticket?: TicketType }>({ open: false });
+
+  function handleSaveTicket(ticket: TicketType) {
+    const existing = tickets.find((t) => t.id === ticket.id);
+    const updated = existing
+      ? tickets.map((t) => (t.id === ticket.id ? ticket : t))
+      : [...tickets, ticket];
+    patchSection("tickets", updated);
+    setTicketModal({ open: false });
+  }
+
+  function handleDeleteTicket(id: string) {
+    const updated = tickets.filter((t) => t.id !== id);
+    patchSection("tickets", updated);
+    setTicketModal({ open: false });
+  }
+
+  if (loading || !stats) {
+    return <div className="text-sm text-foreground-muted">กำลังโหลดข้อมูล...</div>;
+  }
+
+  if (error) {
+    return <div className="text-sm text-red-400">โหลดข้อมูลไม่สำเร็จ: {error}</div>;
+  }
+
+  const filtered = tickets
     .filter((t) => categoryFilter === "all" || t.category === categoryFilter)
-    .filter((t) => statusFilter === "all" || t.status === statusFilter)
     .filter((t) => t.title.toLowerCase().includes(search.toLowerCase()) || t.createdBy.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
@@ -78,24 +133,43 @@ export default function TicketingPage() {
     { value: "ops", label: "⚙️ Ops" },
     { value: "finance", label: "💰 การเงิน" },
     { value: "general", label: "📋 ทั่วไป" },
+    { value: "crisis", label: "🚨 Crisis (V2)" },
   ];
+
+  const activeCrises = tickets.filter(t => t.category === "crisis" && t.status !== "resolved" && t.status !== "closed");
 
   return (
     <div className="space-y-6">
+      {ticketModal.open && (
+        <TicketFormModal
+          ticket={ticketModal.ticket}
+          ticketCount={tickets.length}
+          onSave={handleSaveTicket}
+          onClose={() => setTicketModal({ open: false })}
+        />
+      )}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            🎫 Ticketing Hub
-            <span className="text-xs px-2 py-0.5 rounded-full bg-gold-500/20 text-gold-400 font-normal">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gold-500/20 text-gold-400 border border-gold-500/20 uppercase tracking-wider">
               Module 6
             </span>
+            <span className="text-[10px] text-foreground-muted uppercase tracking-[0.2em]">
+              Phase 4.5: Crisis & Escalation
+            </span>
+          </div>
+          <h1 className="text-2xl font-bold text-foreground">
+            Ticketing & Crisis Hub
           </h1>
           <p className="text-foreground-muted mt-1">
             ระบบจัดการคำร้อง — HR, IT, Ops, การเงิน พร้อม SLA Tracking
           </p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2.5 bg-gold-500 text-navy-950 rounded-xl font-medium text-sm hover:bg-gold-400 transition-colors">
+        <button
+          onClick={() => setTicketModal({ open: true })}
+          className="flex items-center gap-2 px-4 py-2.5 bg-gold-500 text-navy-950 rounded-xl font-medium text-sm hover:bg-gold-400 transition-colors"
+        >
           <Plus size={18} />
           สร้าง Ticket ใหม่
         </button>
@@ -121,6 +195,51 @@ export default function TicketingPage() {
           );
         })}
       </div>
+
+      {/* Active Crisis Section (V2 Workflow) */}
+      {activeCrises.length > 0 && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-2xl overflow-hidden mb-6">
+          <div className="bg-red-500/20 px-6 py-4 flex items-center justify-between border-b border-red-500/30">
+            <h2 className="text-lg font-bold text-red-400 flex items-center gap-2">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+              </span>
+              🚨 Active Crisis Escalations
+            </h2>
+            <span className="text-xs font-mono font-medium text-red-400 bg-red-500/20 px-3 py-1 rounded-full">
+              SLA &lt; 2 Hrs
+            </span>
+          </div>
+          <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            {activeCrises.map((crisis) => (
+              <div 
+                key={crisis.id} 
+                onClick={() => setTicketModal({ open: true, ticket: crisis })}
+                className="bg-navy-900 border border-red-500/30 rounded-xl p-4 cursor-pointer hover:border-red-400/50 transition-colors shadow-lg shadow-red-500/5 relative overflow-hidden"
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <div className="space-y-1">
+                    <p className="text-xs font-mono text-red-400/70">{crisis.id} • {crisis.assignedTo}</p>
+                    <h3 className="text-red-400 font-semibold">{crisis.title}</h3>
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider bg-red-500/20 text-red-400 px-2 py-1 rounded-md">
+                    {getTicketPriorityLabel(crisis.priority)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-end mt-4">
+                  <span className="text-xs text-foreground-muted bg-navy-800 px-2 py-1 rounded-lg">
+                    {getTicketStatusLabel(crisis.status)}
+                  </span>
+                  <span className={`text-xs font-medium ${crisis.slaBreached ? "text-red-500 animate-pulse" : "text-amber-400"}`}>
+                    ⏰ {crisis.slaBreached ? "SLA Breached!" : "SLA Tracking..."}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Ticket List */}
       <div className="bg-navy-900 border border-border rounded-2xl overflow-hidden">
@@ -178,11 +297,11 @@ export default function TicketingPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((ticket, i) => {
-                const hoursElapsed = Math.round((Date.now() - new Date(ticket.createdAt).getTime()) / 3600000);
+              {filtered.map((ticket) => {
                 return (
                   <tr
                     key={ticket.id}
+                    onClick={() => setTicketModal({ open: true, ticket })}
                     className={`border-b border-border/30 hover:bg-navy-800/50 transition-colors cursor-pointer ${
                       ticket.slaBreached ? "bg-red-500/5" : ""
                     }`}
@@ -222,9 +341,11 @@ export default function TicketingPage() {
                       )}
                     </td>
                     <td className="px-6 py-3 text-right text-foreground-muted text-xs">
-                      {hoursElapsed < 24
-                        ? `${hoursElapsed} ชม.`
-                        : `${Math.floor(hoursElapsed / 24)} วัน`}
+                      {new Date(ticket.createdAt).toLocaleDateString("th-TH", {
+                        day: "numeric",
+                        month: "short",
+                        year: "2-digit",
+                      })}
                     </td>
                   </tr>
                 );

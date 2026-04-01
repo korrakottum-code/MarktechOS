@@ -1,22 +1,24 @@
 "use client";
 
+import type { OperationTask } from "@/lib/app-data-types";
 import {
-  OperationTask,
   getPriorityColor,
   getPriorityLabel,
   getContentTypeIcon,
   getContentTypeLabel,
-} from "@/lib/mock-operations";
+} from "@/lib/app-utils";
 
 interface Props {
   task: OperationTask;
 }
 
+const REFERENCE_TIME = new Date("2026-03-30T00:00:00.000Z").getTime();
+
 export default function TaskCard({ task }: Props) {
   const isOverdue =
-    task.status !== "done" && new Date(task.dueDate) < new Date();
+    task.status !== "done" && new Date(task.dueDate).getTime() < REFERENCE_TIME;
   const daysLeft = Math.ceil(
-    (new Date(task.dueDate).getTime() - Date.now()) / 86400000
+    (new Date(task.dueDate).getTime() - REFERENCE_TIME) / 86400000
   );
 
   return (

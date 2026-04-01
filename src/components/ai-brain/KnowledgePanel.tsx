@@ -1,13 +1,25 @@
 "use client";
 
 import { Database, Building2 } from "lucide-react";
-import { knowledgeBaseInfo, QuickAction, quickActions } from "@/lib/mock-ai-responses";
+import type { QuickAction } from "@/lib/app-data-types";
 
 interface KnowledgePanelProps {
   onQuickAction: (prompt: string) => void;
+  quickActions: QuickAction[];
+  knowledgeBaseInfo: {
+    global: {
+      label: string;
+      items: { icon: string; label: string; count: number }[];
+    };
+    clinics: { name: string; docs: number; lastUpdated: string }[];
+  };
 }
 
-export default function KnowledgePanel({ onQuickAction }: KnowledgePanelProps) {
+export default function KnowledgePanel({
+  onQuickAction,
+  quickActions,
+  knowledgeBaseInfo,
+}: KnowledgePanelProps) {
   return (
     <div className="h-full overflow-y-auto p-4 space-y-6">
       {/* Quick Actions */}

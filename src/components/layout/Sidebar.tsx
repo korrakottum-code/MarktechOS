@@ -10,12 +10,16 @@ import {
   Wallet,
   Brain,
   Ticket,
+  Target,
   CalendarDays,
   Bell,
+  ShieldCheck,
   ChevronLeft,
   ChevronRight,
   X,
 } from "lucide-react";
+import { useAuthSession } from "@/lib/use-auth-session";
+import { canAccessPath } from "@/lib/auth/permissions";
 
 const navItems = [
   {
@@ -24,40 +28,46 @@ const navItems = [
     icon: LayoutDashboard,
   },
   {
-    label: "Admin CRM & Sales",
-    href: "/admin-crm",
-    icon: MessageSquare,
+    label: "Sales & Deal Pipeline",
+    href: "/sales",
+    icon: Target,
     badge: "M1",
-  },
-  {
-    label: "Operation & Content",
-    href: "/operation",
-    icon: Layers,
-    badge: "M2",
-  },
-  {
-    label: "Client & HR Dashboard",
-    href: "/client-hr",
-    icon: BarChart3,
-    badge: "M3",
   },
   {
     label: "Accounting & Finance",
     href: "/incentive",
     icon: Wallet,
+    badge: "M2",
+  },
+  {
+    label: "Client Hub (Onboard)",
+    href: "/client-hr",
+    icon: BarChart3,
+    badge: "M3",
+  },
+  {
+    label: "Operation & Production",
+    href: "/operation",
+    icon: Layers,
     badge: "M4",
   },
   {
-    label: "AI Brain (RAG)",
-    href: "/ai-brain",
-    icon: Brain,
+    label: "Admin CRM (Chat)",
+    href: "/admin-crm",
+    icon: MessageSquare,
     badge: "M5",
   },
   {
-    label: "Ticketing Hub",
+    label: "Ticketing & Crisis",
     href: "/ticketing",
     icon: Ticket,
     badge: "M6",
+  },
+  {
+    label: "AI Brain (Insight)",
+    href: "/ai-brain",
+    icon: Brain,
+    badge: "XL",
   },
   {
     label: "Timeline & Calendar",
@@ -65,9 +75,9 @@ const navItems = [
     icon: CalendarDays,
   },
   {
-    label: "Notification Hub",
-    href: "/notifications",
-    icon: Bell,
+    label: "Platform Ops",
+    href: "/platform-ops",
+    icon: ShieldCheck,
   },
 ];
 
@@ -85,6 +95,12 @@ export default function Sidebar({
   onCloseMobile,
 }: SidebarProps) {
   const pathname = usePathname();
+  const { user } = useAuthSession();
+
+  const visibleNavItems = navItems.filter((item) => {
+    if (!user?.role) return true;
+    return canAccessPath(item.href, user.role);
+  });
 
   return (
     <aside
@@ -130,7 +146,7 @@ export default function Sidebar({
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
-        {navItems.map((item) => {
+        {visibleNavItems.map((item) => {
           const isActive =
             pathname === item.href ||
             (item.href !== "/" && pathname.startsWith(item.href));

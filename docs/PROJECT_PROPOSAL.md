@@ -27,7 +27,7 @@
 
 ## 2. 🛠️ System Modules (รายละเอียดระบบสำหรับทีม Dev)
 
-ระบบ Marktech OS ประกอบด้วย **6 โมดูลหลัก + 1 Cross-Module Platform Layer** ที่เชื่อมโยงข้อมูลถึงกัน (Data Integration):
+ระบบ Marktech OS ประกอบด้วย **7 โมดูลหลัก + 1 Cross-Module Platform Layer** ที่เชื่อมโยงข้อมูลถึงกัน (Data Integration):
 
 ```mermaid
 graph TB
@@ -308,6 +308,24 @@ graph TB
 
 ---
 
+### Module 7: Finance & Invoice (ระบบจัดการใบแจ้งหนี้และวางบิล) 🆕
+
+> **เป้าหมาย:** ครบวงจรการเงินตั้งแต่ออกใบเสนอราคา เซ็นสัญญา วางบิล ตามเงินค้างชำระ — ทุกอย่างอยู่ในที่เดียว ไม่ตกหล่น
+
+| Feature | รายละเอียด |
+|---|---|
+| **Invoice Generation** | สร้างใบแจ้งหนี้อัตโนมัติ — ค่าบริการรายเดือน, งบโฆษณา, ค่ามัดจำ — ด้วยเลขที่ Invoice ที่ไม่ซ้ำกัน |
+| **Billing Cycle Management** | ตั้งรอบวางบิลรายเดือน (เช่น วางบิลทุกวันที่ 25, Due Date วันที่ 5 เดือนถัดไป) |
+| **Payment Tracking** | ติดตามสถานะ: ฉบับร่าง → ส่งแล้ว → ชำระแล้ว → เกินกำหนด |
+| **Overdue Escalation** | Day 1: แจ้ง AM → Day 7: แจ้งลูกค้า → Day 14: CEO โทรตาม → Day 30: พิจารณาหยุดงาน |
+| **Contract & Deposit** | เก็บข้อมูลสัญญา, ค่ามัดจำ, เงื่อนไขพิเศษ ผูกกับ Client Profile |
+| **Revenue Dashboard** | แสดงรายได้รวม, ยอดค้างชำระ, Collection Rate เป็น Real-time |
+
+> [!WARNING]
+> **จุดเชื่อมกับ Module อื่น:** ข้อมูล Invoice เชื่อมกับ Module 3 (Client Dashboard) และ Module 4 (Accounting) — เมื่อลูกค้าค้างชำระเกิน 30 วัน → อาจเข้ากระบวนการ Offboarding
+
+---
+
 ### 🔲 Cross-Module: Auto Backup & Monthly Executive Report
 
 > **เป้าหมาย:** ปกป้องข้อมูลบริษัท และส่งสรุปภาพรวมให้ผู้บริหารอัตโนมัติ — ไม่ต้องเข้าระบบเพื่อดูตัวเลข
@@ -381,6 +399,101 @@ flowchart LR
 
 ---
 
+### 🆕 Agency Journey Flow v2.0 — วงจรธุรกิจ End-to-End
+
+> **เป้าหมาย:** แสดงภาพรวมทุก Phase ของการให้บริการลูกค้า ตั้งแต่ขายได้จนถึงยกเลิกสัญญา — ทุกส่วนเชื่อมกันผ่าน Module ต่างๆ
+
+| Phase | ชื่อ | ทีมรับผิดชอบ | Module หลัก |
+|---|---|---|---|
+| 🟣 Phase 1 | **Sales** | Sale | Module 1B — Sales Pipeline |
+| 💰 Phase 1.5 | **Billing & Contract** | Finance / CEO | Module 7 — Finance & Invoice |
+| 🟠 Phase 2 | **Onboarding** | AM + ทุกฝ่าย | Module 3 — Client Requirement Hub |
+| 🔵 Phase 3 | **Production** | Content + Graphic + Ads | Module 2 — Operation & Content |
+| 🟢 Phase 4 | **Execution** | Admin + Ads | Module 1A — Admin CRM |
+| 🔴 Emergency | **Crisis Management** | CEO + AM | Module 6 — Escalation & Ticket |
+| 🟡 Phase 5 | **Report & Retain** | AM + CEO | Module 3 — P&L Dashboard |
+| ⚫ Phase 6 | **Offboarding** | AM + Finance | Module 7 — Finance |
+
+> [!TIP]
+> ทุก Phase เชื่อมกันเป็นเส้นตรง **บนลงล่าง** — ข้อมูลจาก Phase ก่อนหน้าไหลเข้า Phase ถัดไป และ AI Brain (Module 5) ดูดข้อมูลจากทุกชั้นมาสนับสนุน
+
+---
+
+### 🆕 Communication Matrix — ใครคุยกับใคร ผ่านช่องทางไหน
+
+| สถานการณ์ | ช่องทาง | ผู้รับผิดชอบ | SLA |
+|---|---|---|---|
+| **Prospect Follow-up** | โทร + LINE | Sale | ภายใน 24 ชม. หลัง Lead เข้า |
+| **Onboarding ประสานงาน** | LINE Group (AM + ลูกค้า) | AM | ตอบภายใน 4 ชม. (เวลางาน) |
+| **Content Approval** | ระบบ Approve / LINE | AM → ลูกค้า | ลูกค้าตอบภายใน 48 ชม. |
+| **Admin ตอบแชท Lead** | Facebook Inbox / LINE OA | Admin | ภายใน 5 นาที (ในเวลางาน) |
+| **Monthly Report** | Email + Meeting (Zoom/Onsite) | AM | ส่ง Report ก่อนประชุม 2 วัน |
+| **Complaint / Escalation** | LINE / โทร | AM → CEO (ถ้า Critical) | Low: 24 ชม. / Critical: 2 ชม. |
+| **Crisis** | โทรทันที + LINE Group | CEO + AM | ภายใน 30 นาที |
+| **Invoice / Billing** | Email + LINE | Finance / AM | ส่งบิลตามรอบ |
+| **Offboarding** | Email (เป็นทางการ) + Meeting | AM | ตาม Notice Period ในสัญญา |
+
+---
+
+### 🆕 SLA & Escalation Matrix
+
+| Metric | Target | Warning | Escalate to |
+|---|---|---|---|
+| **Admin Response Time** | ≤ 5 นาที | > 15 นาที | AM |
+| **Content Revision** | ≤ 3 ครั้ง/ชิ้น | ครั้งที่ 3 | AM → ลูกค้า |
+| **Client Approval** | ≤ 48 ชม. | > 48 ชม. AM ติดตาม | > 72 ชม. Auto-approve |
+| **Ads Review (Meta)** | ผ่านครั้งแรก | Rejected | Ads Team แก้ + resubmit |
+| **Monthly Payment** | ตรงเวลา | Day 7 Overdue | Day 14: CEO / Day 30: หยุดงาน |
+| **ROAS** | ≥ 3x | < 2x ติดต่อ 2 สัปดาห์ | CEO + ลูกค้าประชุมด่วน |
+| **NPS Score** | ≥ 8 | 5-7: Retention Plan | < 5: CEO เข้ามา |
+| **Crisis Response** | ≤ 30 นาที | > 1 ชม. | CEO ทันที |
+
+---
+
+### 🆕 Checklist Templates
+
+#### Sale → AM Handoff Checklist
+
+- [ ] สัญญาที่เซ็นแล้ว (PDF)
+- [ ] ใบเสนอราคาที่ลูกค้า Approve
+- [ ] Contact Info: ชื่อ, เบอร์, LINE, Email ของผู้ประสานงาน
+- [ ] Service Package ที่เลือก + ราคา
+- [ ] ข้อตกลงพิเศษ / ส่วนลด / เงื่อนไขเพิ่มเติม
+- [ ] วันที่คาดว่าจะเริ่มงาน
+- [ ] งบโฆษณา / เดือน
+- [ ] Notes จาก Sale (สิ่งที่ลูกค้าให้ความสำคัญ)
+
+#### Onboarding Checklist
+
+- [ ] Client Profile Card กรอกครบ
+- [ ] Brand Guideline / CI ได้รับแล้ว
+- [ ] Facebook Page Access — ได้รับ Admin/Editor
+- [ ] Ad Account Access — ได้รับสิทธิ์
+- [ ] LINE OA Access (ถ้ามี)
+- [ ] Requirement Checklist ครบ
+- [ ] Admin ตอบแชท — ระบุตัวแล้ว
+- [ ] Kick-off Meeting จัดแล้ว
+- [ ] Timeline & KPI ยืนยันแล้ว
+- [ ] Billing Cycle ตั้งค่าแล้ว
+
+#### Offboarding Checklist
+
+- [ ] แจ้งยกเลิกเป็นลายลักษณ์อักษร
+- [ ] คืน Facebook Page Admin Access
+- [ ] คืน Ad Account Access
+- [ ] คืน LINE OA Access
+- [ ] ส่งมอบ Source Files ทั้งหมด (PSD, AI, Video)
+- [ ] ส่งมอบ Content Calendar & Assets
+- [ ] ส่ง Final Performance Report
+- [ ] เคลียร์ค่าบริการค้าง
+- [ ] เคลียร์ค่าโฆษณาค้าง
+- [ ] คืน Deposit (ถ้ามี)
+- [ ] Exit Interview เสร็จแล้ว
+- [ ] Archive ข้อมูลลูกค้า
+- [ ] ลบข้อมูลส่วนบุคคลตาม PDPA (หลัง 1 ปี)
+
+---
+
 ## 3. 📍 Roadmap & Implementation Plan
 
 เพื่อให้ระบบสามารถสร้าง Impact ต่อรายได้บริษัทได้เร็วที่สุด แบ่งเป็น **3 Phases**:
@@ -399,6 +512,7 @@ gantt
     Operation - Module 2           :b1, 2026-06, 2M
     Client P&L Dashboard - Module 3:b2, 2026-06, 2M
     Ticketing - Module 6           :b3, 2026-06, 2M
+    Finance & Invoice - Module 7   :b4, 2026-06, 2M
 
     section Phase 3
     AI Brain RAG - Module 5        :c1, 2026-08, 2M
@@ -506,4 +620,4 @@ gantt
 
 ---
 
-*Document Version 1.3 — March 2026 (Updated: แยก Admin/Sale, เพิ่ม Service Catalog, ลบ hardcoded headcount, เพิ่ม Sales Pipeline)*
+*Document Version 1.4 — March 2026 (Updated: เพิ่ม Module 7 Finance & Invoice, Agency Flow v2, Admin Assignment Status, Billing & Overdue Escalation)*

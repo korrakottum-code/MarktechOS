@@ -3,14 +3,41 @@
 import { Bell, Search, User, ChevronDown, Menu } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+
+import { useAuthSession } from "@/lib/use-auth-session";
+import { useAppData } from "@/lib/use-app-data";
 
 interface TopBarProps {
   onMenuClick: () => void;
 }
 
 export default function TopBar({ onMenuClick }: TopBarProps) {
+  const router = useRouter();
+  const { user } = useAuthSession();
+  const { payload } = useAppData();
+  const notifications = payload?.data.notifications ?? [];
+  const unreadCount = notifications.filter((n) => !n.read).length;
   const [showNotif, setShowNotif] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
+
+  const roleLabel = user ? user.role.toUpperCase() : "GUEST";
+
+  async function handleLogout() {
+    if (loggingOut) return;
+
+    setLoggingOut(true);
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+      });
+      router.push("/login");
+      router.refresh();
+    } finally {
+      setLoggingOut(false);
+    }
+  }
 
   // Click outside to close notifications
   useEffect(() => {
@@ -24,32 +51,6 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [showNotif]);
 
-  const mockNotifications = [
-    {
-      id: 1,
-      text: "🔔 Lead ใหม่เข้ามา 3 รายการ",
-      time: "2 นาทีที่แล้ว",
-      unread: true,
-    },
-    {
-      id: 2,
-      text: "⚠️ แอดมินสมหญิง ยังไม่ตอบ Lead #127",
-      time: "15 นาทีที่แล้ว",
-      unread: true,
-    },
-    {
-      id: 3,
-      text: "🎉 ยอดปิดทีมรวมถึง 38% แล้ว!",
-      time: "1 ชม. ที่แล้ว",
-      unread: false,
-    },
-    {
-      id: 4,
-      text: "📋 งานใหม่: แคปชัน คลินิก BeautyX",
-      time: "2 ชม. ที่แล้ว",
-      unread: false,
-    },
-  ];
 
   return (
     <header className="h-16 border-b border-border bg-navy-950/80 backdrop-blur-md flex items-center justify-between px-4 sm:px-6 sticky top-0 z-30">
@@ -83,7 +84,9 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
             className="relative p-2 rounded-xl hover:bg-navy-800 transition-colors"
           >
             <Bell size={20} className="text-foreground-muted" />
-            <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-danger rounded-full animate-pulse-gold" />
+            {unreadCount > 0 && (
+              <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-danger rounded-full animate-pulse-gold" />
+            )}
           </button>
 
           {showNotif && (
@@ -92,19 +95,22 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
                 <h3 className="text-sm font-semibold text-foreground">
                   การแจ้งเตือน
                 </h3>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-gold-500/20 text-gold-400">
-                  2 ใหม่
-                </span>
+                {unreadCount > 0 && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-gold-500/20 text-gold-400">
+                    {unreadCount} ใหม่
+                  </span>
+                )}
               </div>
               <div className="max-h-72 overflow-y-auto">
-                {mockNotifications.map((n) => (
+                {notifications.slice(0, 5).map((n) => (
                   <div
                     key={n.id}
                     className={`px-4 py-3 border-b border-border/50 hover:bg-navy-800 transition-colors cursor-pointer ${
-                      n.unread ? "bg-gold-500/5" : ""
+                      !n.read ? "bg-gold-500/5" : ""
                     }`}
                   >
-                    <p className="text-sm text-foreground">{n.text}</p>
+                    <p className="text-sm text-foreground font-medium">{n.title}</p>
+                    <p className="text-xs text-foreground-muted mt-0.5">{n.message}</p>
                     <p className="text-[11px] text-foreground-muted mt-1">
                       {n.time}
                     </p>
@@ -130,9 +136,19 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
             <User size={16} className="text-navy-950" />
           </div>
           <div className="hidden sm:block">
-            <p className="text-sm font-medium text-foreground">คุณตั้ม</p>
-            <p className="text-[11px] text-foreground-muted">CEO</p>
+            <p className="text-sm font-medium text-foreground">
+              {user?.username || "Guest"}
+            </p>
+            <p className="text-[11px] text-foreground-muted">{roleLabel}</p>
           </div>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="text-[11px] px-2 py-1 rounded-lg border border-border text-foreground-muted hover:text-foreground hover:border-gold-500/50 transition-colors disabled:opacity-50"
+            disabled={loggingOut}
+          >
+            {loggingOut ? "..." : "Logout"}
+          </button>
           <ChevronDown size={14} className="text-foreground-muted" />
         </div>
       </div>

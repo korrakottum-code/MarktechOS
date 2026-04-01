@@ -1,12 +1,12 @@
 "use client";
 
+import type { Admin } from "@/lib/app-data-types";
 import {
-  Admin,
   getCommission,
   getTierLabel,
   getTierBg,
   formatCurrency,
-} from "@/lib/mock-data";
+} from "@/lib/app-utils";
 import { Download } from "lucide-react";
 
 interface Props {
@@ -52,7 +52,7 @@ export default function CommissionTable({ admins }: Props) {
             </tr>
           </thead>
           <tbody>
-            {sorted.map((admin, i) => {
+            {sorted.length > 0 ? sorted.map((admin, i) => {
               const commission = getCommission(admin.closeRate);
               const total = BASE_SALARY + commission;
               const isBelowThreshold = admin.closeRate < 30;
@@ -130,36 +130,44 @@ export default function CommissionTable({ admins }: Props) {
                   </td>
                 </tr>
               );
-            })}
+            }) : (
+              <tr>
+                <td colSpan={8} className="px-6 py-12 text-center text-foreground-muted bg-navy-900/50 italic">
+                  ยังไม่มีข้อมูลรายชื่อแอดมินในระบบ
+                </td>
+              </tr>
+            )}
           </tbody>
           {/* Footer */}
-          <tfoot>
-            <tr className="border-t-2 border-border bg-navy-800/50">
-              <td className="px-6 py-4" colSpan={4}>
-                <span className="font-semibold text-foreground">
-                  รวมทั้งหมด ({admins.length} คน)
-                </span>
-              </td>
-              <td className="px-6 py-4 text-right font-semibold text-foreground">
-                {formatCurrency(BASE_SALARY * admins.length)}
-              </td>
-              <td className="px-6 py-4 text-right font-semibold text-emerald-400">
-                +
-                {formatCurrency(
-                  admins.reduce((sum, a) => sum + getCommission(a.closeRate), 0)
-                )}
-              </td>
-              <td className="px-6 py-4 text-right font-bold text-gold-400 text-base">
-                {formatCurrency(
-                  admins.reduce(
-                    (sum, a) => sum + BASE_SALARY + getCommission(a.closeRate),
-                    0
-                  )
-                )}
-              </td>
-              <td className="px-6 py-4"></td>
-            </tr>
-          </tfoot>
+          {sorted.length > 0 && (
+            <tfoot>
+              <tr className="border-t-2 border-border bg-navy-800/50">
+                <td className="px-6 py-4" colSpan={4}>
+                  <span className="font-semibold text-foreground">
+                    รวมทั้งหมด ({admins.length} คน)
+                  </span>
+                </td>
+                <td className="px-6 py-4 text-right font-semibold text-foreground">
+                  {formatCurrency(BASE_SALARY * admins.length)}
+                </td>
+                <td className="px-6 py-4 text-right font-semibold text-emerald-400">
+                  +
+                  {formatCurrency(
+                    admins.reduce((sum, a) => sum + getCommission(a.closeRate), 0)
+                  )}
+                </td>
+                <td className="px-6 py-4 text-right font-bold text-gold-400 text-base">
+                  {formatCurrency(
+                    admins.reduce(
+                      (sum, a) => sum + BASE_SALARY + getCommission(a.closeRate),
+                      0
+                    )
+                  )}
+                </td>
+                <td className="px-6 py-4"></td>
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
     </div>

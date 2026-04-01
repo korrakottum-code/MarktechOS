@@ -10,11 +10,22 @@ import {
   ArrowDownRight,
   Zap,
 } from "lucide-react";
-import { getDashboardStats, formatCurrency, mockAdmins } from "@/lib/mock-data";
+import { formatCurrency } from "@/lib/app-utils";
 import Link from "next/link";
+import { useAppData } from "@/lib/use-app-data";
 
 export default function DashboardPage() {
-  const stats = getDashboardStats();
+  const { payload, loading, error } = useAppData();
+  const stats = payload?.stats.dashboard;
+  const admins = payload?.data.admins ?? [];
+
+  if (loading || !stats) {
+    return <div className="text-sm text-foreground-muted">กำลังโหลดข้อมูล...</div>;
+  }
+
+  if (error) {
+    return <div className="text-sm text-red-400">โหลดข้อมูลไม่สำเร็จ: {error}</div>;
+  }
 
   const statCards = [
     {
@@ -55,11 +66,11 @@ export default function DashboardPage() {
     },
   ];
 
-  const topAdmins = [...mockAdmins]
+  const topAdmins = [...admins]
     .sort((a, b) => b.closeRate - a.closeRate)
     .slice(0, 5);
 
-  const alertAdmins = mockAdmins.filter((a) => a.closeRate < 30);
+  const alertAdmins = admins.filter((a) => a.closeRate < 30);
 
   return (
     <div className="space-y-6">
@@ -213,28 +224,46 @@ export default function DashboardPage() {
                 ทางลัด
               </p>
               <Link
-                href="/admin-crm"
+                href="/sales"
                 className="block p-3 rounded-xl bg-navy-800 hover:bg-navy-700 transition-colors text-sm text-foreground"
               >
-                📊 Admin CRM Dashboard
+                🤝 Sales & Deal Pipeline (M1)
               </Link>
               <Link
                 href="/incentive"
                 className="block p-3 rounded-xl bg-navy-800 hover:bg-navy-700 transition-colors text-sm text-foreground"
               >
-                💰 คำนวณ Commission
+                💰 Billing & Finance (M2)
+              </Link>
+              <Link
+                href="/admin-crm"
+                className="block p-3 rounded-xl bg-navy-800 hover:bg-navy-700 transition-colors text-sm text-foreground"
+              >
+                💬 Admin CRM (Chat Execution) (M5)
+              </Link>
+              <Link
+                href="/operation"
+                className="block p-3 rounded-xl bg-navy-800 hover:bg-navy-700 transition-colors text-sm text-foreground"
+              >
+                ⚙️ Operation Hub (M4)
+              </Link>
+              <Link
+                href="/ticketing"
+                className="block p-3 rounded-xl bg-navy-800 hover:bg-navy-700 transition-colors text-sm text-foreground"
+              >
+                🚨 Crisis & Ticket (M6)
               </Link>
               <Link
                 href="/ai-brain"
                 className="block p-3 rounded-xl bg-navy-800 hover:bg-navy-700 transition-colors text-sm text-foreground"
               >
-                🧠 AI Brain — ถามได้ทุกเรื่อง
+                🧠 AI Brain (Insights)
               </Link>
               <Link
-                href="/timeline"
+                href="/platform-ops"
                 className="block p-3 rounded-xl bg-navy-800 hover:bg-navy-700 transition-colors text-sm text-foreground"
               >
-                📅 Timeline & Calendar
+                🛡️ Platform Ops (XL)
               </Link>
             </div>
           </div>

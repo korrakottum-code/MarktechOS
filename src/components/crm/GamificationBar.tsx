@@ -1,6 +1,7 @@
 "use client";
 
-import { Admin, getTier } from "@/lib/mock-data";
+import type { Admin } from "@/lib/app-data-types";
+import { getTier } from "@/lib/app-utils";
 
 interface Props {
   admins: Admin[];

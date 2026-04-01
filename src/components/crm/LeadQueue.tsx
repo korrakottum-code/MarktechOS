@@ -1,23 +1,24 @@
 "use client";
 
 import { useState } from "react";
+import type { Lead, Admin } from "@/lib/app-data-types";
 import {
-  Lead,
-  Admin,
   getChannelIcon,
   getStatusLabel,
   getStatusColor,
   timeAgo,
   formatCurrency,
-} from "@/lib/mock-data";
-import { Search, Filter } from "lucide-react";
+} from "@/lib/app-utils";
+import { Search, Filter, Plus } from "lucide-react";
 
 interface Props {
   leads: Lead[];
   admins: Admin[];
+  onCreateLead?: () => void;
+  onEditLead?: (lead: Lead) => void;
 }
 
-export default function LeadQueue({ leads, admins }: Props) {
+export default function LeadQueue({ leads, admins, onCreateLead, onEditLead }: Props) {
   const [statusFilter, setStatusFilter] = useState<Lead["status"] | "all">(
     "all"
   );
@@ -52,13 +53,24 @@ export default function LeadQueue({ leads, admins }: Props) {
     <div className="bg-navy-900 border border-border rounded-2xl overflow-hidden">
       <div className="px-6 py-4 border-b border-border">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">
-              📋 Lead Queue
-            </h2>
-            <p className="text-sm text-foreground-muted">
-              {filtered.length} รายการ
-            </p>
+          <div className="flex items-center gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">
+                📋 Lead Queue
+              </h2>
+              <p className="text-sm text-foreground-muted">
+                {filtered.length} รายการ
+              </p>
+            </div>
+            {onCreateLead && (
+              <button
+                onClick={onCreateLead}
+                className="flex items-center gap-1.5 px-3 py-2 bg-gold-500 text-navy-950 rounded-xl text-sm font-medium hover:bg-gold-400 transition-colors"
+              >
+                <Plus size={16} />
+                สร้าง Lead
+              </button>
+            )}
           </div>
           <div className="flex items-center gap-3">
             {/* Search */}
@@ -112,9 +124,10 @@ export default function LeadQueue({ leads, admins }: Props) {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((lead, i) => (
+            {filtered.map((lead) => (
               <tr
                 key={lead.id}
+                onClick={() => onEditLead?.(lead)}
                 className="border-b border-border/30 hover:bg-navy-800/50 transition-colors cursor-pointer"
               >
                 <td className="px-6 py-3 text-lg">

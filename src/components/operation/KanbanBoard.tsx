@@ -1,18 +1,24 @@
 "use client";
 
 import { useState } from "react";
-import {
-  OperationTask,
-  TaskStatus,
-  statusColumns,
-} from "@/lib/mock-operations";
+import type { OperationTask, TaskStatus } from "@/lib/app-data-types";
+import { statusColumns } from "@/lib/app-utils";
 import TaskCard from "./TaskCard";
+import { Plus } from "lucide-react";
 
 interface Props {
   tasks: OperationTask[];
+  onTaskStatusChange?: (taskId: string, newStatus: TaskStatus) => void;
+  onAddTask?: (status: TaskStatus) => void;
+  onEditTask?: (task: OperationTask) => void;
 }
 
-export default function KanbanBoard({ tasks: initialTasks }: Props) {
+export default function KanbanBoard({ 
+  tasks: initialTasks, 
+  onTaskStatusChange, 
+  onAddTask, 
+  onEditTask 
+}: Props) {
   const [tasks, setTasks] = useState(initialTasks);
   const [draggedTask, setDraggedTask] = useState<string | null>(null);
 
@@ -29,6 +35,7 @@ export default function KanbanBoard({ tasks: initialTasks }: Props) {
     setTasks((prev) =>
       prev.map((t) => (t.id === draggedTask ? { ...t, status } : t))
     );
+    onTaskStatusChange?.(draggedTask, status);
     setDraggedTask(null);
   };
 
@@ -54,35 +61,47 @@ export default function KanbanBoard({ tasks: initialTasks }: Props) {
               onDrop={() => handleDrop(col.key)}
             >
               {/* Column Header */}
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium text-foreground">
-                  {col.label}
-                </h3>
-                <span className="text-xs px-1.5 py-0.5 rounded bg-navy-700 text-foreground-muted">
-                  {colTasks.length}
-                </span>
+              <div className="flex items-center justify-between mb-3 px-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-medium text-foreground">
+                    {col.label}
+                  </h3>
+                  <span className="text-xs px-1.5 py-0.5 rounded bg-navy-700 text-foreground-muted">
+                    {colTasks.length}
+                  </span>
+                </div>
               </div>
 
               {/* Cards */}
-              <div className="space-y-3">
-                {colTasks.map((task) => (
-                  <div
-                    key={task.id}
-                    draggable
-                    onDragStart={() => handleDragStart(task.id)}
-                    className={`transition-opacity ${
-                      draggedTask === task.id ? "opacity-40" : "opacity-100"
-                    }`}
-                  >
-                    <TaskCard task={task} />
-                  </div>
-                ))}
-                {colTasks.length === 0 && (
-                  <div className="text-center py-8 text-foreground-muted/30">
-                    <p className="text-2xl mb-1">📭</p>
-                    <p className="text-xs">ไม่มีงาน</p>
+              <div className="space-y-3 pb-3">
+                {colTasks.length > 0 ? (
+                  colTasks.map((task) => (
+                    <div
+                      key={task.id}
+                      draggable
+                      onDragStart={() => handleDragStart(task.id)}
+                      className={`transition-opacity transition-transform hover:scale-[1.02] cursor-grab active:cursor-grabbing ${
+                        draggedTask === task.id ? "opacity-40" : "opacity-100"
+                      }`}
+                      onClick={() => onEditTask?.(task)}
+                    >
+                      <TaskCard task={task} />
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-6 flex flex-col items-center justify-center text-center opacity-30 select-none">
+                    <p className="text-[11px] text-foreground-muted">ยังไม่มีงานในส่วนนี้</p>
                   </div>
                 )}
+                
+                {/* Add Task Button at Bottom */}
+                <button
+                  onClick={() => onAddTask?.(col.key)}
+                  className="w-full py-3 border border-dashed border-border/50 rounded-xl flex items-center justify-center gap-2 text-xs text-foreground-muted hover:text-foreground hover:bg-navy-800 hover:border-gold-500/30 transition-all group"
+                >
+                  <Plus size={14} className="group-hover:text-gold-400" />
+                  <span>สร้างงานใหม่</span>
+                </button>
               </div>
             </div>
           );

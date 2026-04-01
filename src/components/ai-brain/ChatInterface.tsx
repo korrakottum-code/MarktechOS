@@ -2,7 +2,13 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Send, Bot, User } from "lucide-react";
-import { AIMessage, getAIResponse } from "@/lib/mock-ai-responses";
+
+export interface AIMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  timestamp: string;
+}
 
 interface ChatInterfaceProps {
   onSendMessage?: (message: string) => void;
@@ -58,18 +64,39 @@ export default function ChatInterface({
     setInput("");
     setIsTyping(true);
 
-    // Simulate AI response delay
-    setTimeout(() => {
-      const response = getAIResponse(message);
-      const aiMsg: AIMessage = {
-        id: `msg-${Date.now()}-ai`,
-        role: "assistant",
-        content: response,
-        timestamp: new Date().toISOString(),
-      };
-      setMessages((prev) => [...prev, aiMsg]);
-      setIsTyping(false);
-    }, 1200 + Math.random() * 800);
+    void (async () => {
+      try {
+        const response = await fetch("/api/ai-chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ message }),
+        });
+
+        const json = (await response.json()) as { answer?: string; error?: string };
+        const aiMsg: AIMessage = {
+          id: `msg-${Date.now()}-ai`,
+          role: "assistant",
+          content:
+            json.answer ||
+            json.error ||
+            "ไม่สามารถประมวลผลคำถามได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง",
+          timestamp: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, aiMsg]);
+      } catch {
+        const aiMsg: AIMessage = {
+          id: `msg-${Date.now()}-ai-error`,
+          role: "assistant",
+          content: "ระบบ AI ไม่พร้อมใช้งานชั่วคราว กรุณาลองใหม่ภายหลัง",
+          timestamp: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, aiMsg]);
+      } finally {
+        setIsTyping(false);
+      }
+    })();
   };
 
   return (
