@@ -195,7 +195,19 @@ export function getPlatformOpsStatsFromData(data: AppData) {
   const failedCount = data.backupLogs.filter((log) => log.status === "failed").length;
   const warningCount = data.backupLogs.filter((log) => log.status === "warning").length;
 
-  const latestReport = data.monthlyReports[0];
+  const latestReport = data.monthlyReports[0] || {
+    id: "placeholder",
+    monthLabel: "ไม่มีรายงาน",
+    generatedAt: new Date().toISOString(),
+    totalRevenue: 0,
+    netProfit: 0,
+    avgCloseRate: 0,
+    avgRoas: 0,
+    slaRate: 0,
+    recipients: [],
+    status: "draft" as const,
+    actionItems: [],
+  };
   const avgSlaRate =
     data.monthlyReports.length > 0
       ? Math.round(

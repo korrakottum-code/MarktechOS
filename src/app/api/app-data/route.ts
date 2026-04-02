@@ -41,7 +41,11 @@ export async function GET(request: NextRequest) {
     if (!session.ok) return session.response;
 
     const data = await getAppData();
-    return NextResponse.json(buildResponsePayload(data));
+    return NextResponse.json(buildResponsePayload(data), {
+      headers: {
+        'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
+      },
+    });
   } catch (error: any) {
     console.error("🏁 API Execution Error:", error);
     return NextResponse.json(
@@ -50,6 +54,8 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+export const revalidate = 30;
 
 export async function PUT(request: NextRequest) {
   const session = await requireSession(request, ["ceo", "admin", "finance"]);

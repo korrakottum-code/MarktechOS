@@ -24,6 +24,7 @@ import { createOnboardingTasks, createClientFromDeal } from "@/lib/integration-u
 // Duplicate import removed, OperationTask already imported above
 import MarkTechDatePicker from "@/components/ui/DatePicker";
 import { Filter, Calendar } from "lucide-react";
+import { DashboardLoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 
 export default function SalesPage() {
   const { payload, loading, error, setPayload } = useAppData();
@@ -39,7 +40,7 @@ export default function SalesPage() {
   const salesStats = payload?.stats.sales;
 
   if (loading || !salesStats) {
-    return <div className="text-sm text-foreground-muted">กำลังโหลดข้อมูล...</div>;
+    return <DashboardLoadingSkeleton />;
   }
 
   if (error) {
@@ -132,7 +133,7 @@ export default function SalesPage() {
       </div>
 
       {/* Global Filter Bar */}
-      <div className="bg-navy-900/50 border border-border/50 rounded-3xl p-4 flex flex-wrap items-center gap-6 shadow-xl backdrop-blur-md">
+      <div className="bg-navy-900/50 border border-border/50 rounded-3xl p-4 flex flex-wrap items-center gap-6 shadow-xl backdrop-blur-md relative z-50 isolate">
         <div className="flex items-center gap-2">
           <Filter size={14} className="text-gold-400" />
           <span className="text-[10px] font-bold text-foreground-muted uppercase tracking-widest">Pipeline Filters:</span>
@@ -145,7 +146,7 @@ export default function SalesPage() {
               mode="month" 
               value={filterMonth} 
               onChange={setFilterMonth} 
-              className="w-48"
+              className="w-48 relative z-[100]"
             />
           </div>
         </div>

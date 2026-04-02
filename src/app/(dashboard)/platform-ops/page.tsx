@@ -214,7 +214,7 @@ export default function PlatformOpsPage() {
       </div>
 
       {/* Global Filter Bar - Showcasing the 3 DatePicker Modes */}
-      <div className="bg-navy-900/50 border border-border/50 rounded-3xl p-4 flex flex-wrap items-center gap-6 shadow-xl backdrop-blur-md">
+      <div className="bg-navy-900/50 border border-border/50 rounded-3xl p-4 flex flex-wrap items-center gap-6 shadow-xl backdrop-blur-md relative z-50 isolate">
         <div className="flex items-center gap-2">
           <Filter size={14} className="text-gold-400" />
           <span className="text-[10px] font-bold text-foreground-muted uppercase tracking-widest">Global Filters:</span>
@@ -227,7 +227,7 @@ export default function PlatformOpsPage() {
               mode="month" 
               value={filterMonth} 
               onChange={setFilterMonth} 
-              className="w-48"
+              className="w-48 relative z-[100]"
             />
           </div>
           
@@ -238,7 +238,7 @@ export default function PlatformOpsPage() {
               value={filterRange} 
               onChange={setFilterRange} 
               placeholder="Select Date Range"
-              className="w-64"
+              className="w-64 relative z-[100]"
             />
           </div>
         </div>

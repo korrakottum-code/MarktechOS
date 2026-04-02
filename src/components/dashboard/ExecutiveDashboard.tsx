@@ -57,10 +57,7 @@ export default function ExecutiveDashboard({ leads, deals, tasks, stats }: Props
           <div className="relative z-10">
             <p className="text-sm text-foreground-muted mb-1">Total Revenue (Won)</p>
             <h3 className="text-3xl font-bold text-gold-400">{formatCurrency(stats.sales.wonValue)}</h3>
-            <div className="flex items-center gap-2 mt-4 text-xs text-emerald-400 bg-emerald-400/10 w-fit px-2 py-1 rounded-full">
-              <TrendingUp size={12} />
-              <span>+12.5% from last month</span>
-            </div>
+            <p className="text-xs text-foreground-muted mt-4">{stats.sales.wonDeals} deals closed</p>
           </div>
         </div>
 

@@ -215,7 +215,7 @@ export default function MarkTechDatePicker({ mode, value, onChange, placeholder,
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 mt-2 z-[999] bg-surface border border-border rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] animate-in fade-in slide-in-from-top-2 duration-200 backdrop-blur-xl">
+        <div className="absolute top-full left-0 mt-2 z-[9999] bg-surface border border-border rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] animate-in fade-in slide-in-from-top-2 duration-200 backdrop-blur-xl">
           {mode === "single" && renderSingle()}
           {mode === "range" && renderRange()}
           {mode === "month" && renderMonth()}

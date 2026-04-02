@@ -98,13 +98,13 @@ export default function IncentivePage() {
           <p className="text-foreground-muted">
             Payroll, Attendance Deductions, Ad Spend Routing และ Cashflow แบบรวมศูนย์
           </p>
-          <div className="flex items-center gap-3 bg-navy-900 border border-border/50 rounded-2xl px-4 py-2 shadow-xl backdrop-blur-sm">
+          <div className="flex items-center gap-3 bg-navy-900 border border-border/50 rounded-2xl px-4 py-2 shadow-xl backdrop-blur-sm relative z-50 isolate">
             <span className="text-[10px] font-bold text-foreground-muted uppercase tracking-widest">รอบบัญชี:</span>
             <MarkTechDatePicker 
               mode="month" 
               value={selectedMonth} 
               onChange={setSelectedMonth} 
-              className="w-48"
+              className="w-48 relative z-[100]"
             />
           </div>
         </div>
