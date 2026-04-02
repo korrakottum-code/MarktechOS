@@ -83,20 +83,33 @@ export function useAppData() {
     let mounted = true;
 
     async function load() {
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 8000);
+
       try {
+        setError(null);
         setLoading(true);
-        const response = await fetch("/api/app-data", { cache: "no-store" });
+        const response = await fetch("/api/app-data", {
+          cache: "no-store",
+          signal: controller.signal,
+        });
         if (!response.ok) {
-          throw new Error("โหลดข้อมูลไม่สำเร็จ");
+          throw new Error(`โหลดข้อมูลไม่สำเร็จ (${response.status})`);
         }
         const json = (await response.json()) as AppDataResponse;
         if (mounted) setPayload(json);
       } catch (err) {
         if (mounted) {
-          const message = err instanceof Error ? err.message : "เกิดข้อผิดพลาด";
+          const message =
+            err instanceof DOMException && err.name === "AbortError"
+              ? "ระบบตอบสนองช้าเกินเวลา กรุณาลองใหม่อีกครั้ง"
+              : err instanceof Error
+              ? err.message
+              : "เกิดข้อผิดพลาด";
           setError(message);
         }
       } finally {
+        window.clearTimeout(timeoutId);
         if (mounted) setLoading(false);
       }
     }

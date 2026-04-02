@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 
 import { useAuthSession } from "@/lib/use-auth-session";
 import { useAppData } from "@/lib/use-app-data";
+import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 interface TopBarProps {
   onMenuClick: () => void;
@@ -29,9 +30,8 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
 
     setLoggingOut(true);
     try {
-      await fetch("/api/auth/logout", {
-        method: "POST",
-      });
+      const supabase = getSupabaseBrowserClient();
+      await supabase.auth.signOut();
       router.push("/login");
       router.refresh();
     } finally {

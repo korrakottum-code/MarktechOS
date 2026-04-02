@@ -25,7 +25,156 @@
 
 ---
 
-## 2. 🛠️ System Modules (รายละเอียดระบบสำหรับทีม Dev)
+## 2. 🏗️ Technical Architecture (สถาปัตยกรรมระบบ)
+
+> **สถานะปัจจุบัน:** ระบบพัฒนาด้วย Next.js 15 (App Router), Supabase Postgres, Prisma ORM และ Deploy บน Vercel
+
+### 2.1 Tech Stack
+
+| Layer | Technology | Purpose |
+|---|---|---|
+| **Frontend** | Next.js 15 (App Router), React 19, TypeScript | Server-side rendering, React Server Components |
+| **Styling** | TailwindCSS, shadcn/ui | Modern UI components และ responsive design |
+| **Backend** | Next.js API Routes, Server Actions | API endpoints และ server-side logic |
+| **Database** | Supabase Postgres | Production database (cloud-hosted) |
+| **ORM** | Prisma Client | Type-safe database queries |
+| **Authentication** | Supabase Auth | Google OAuth + Phone OTP (Twilio SMS) |
+| **Deployment** | Vercel | Serverless deployment with edge functions |
+| **Icons** | Lucide React | Consistent icon library |
+
+### 2.2 Authentication & Authorization
+
+> **ไม่มี Mock Data หรือ Fallback Login ใน Production แล้ว** — ระบบใช้ Supabase Auth เต็มรูปแบบ
+
+| Feature | Implementation |
+|---|---|
+| **Google OAuth** | Supabase Auth Provider — Login ด้วย Google Account |
+| **Phone OTP** | Supabase Auth + Twilio SMS — รับ OTP ทาง SMS (รองรับเบอร์ไทย) |
+| **Session Management** | Supabase Session + App Session Cookie (HMAC-signed) |
+| **Role-Based Access Control (RBAC)** | User roles: `admin`, `content`, `ads`, `sale`, `am`, `ceo` |
+| **Protected Routes** | Middleware (`proxy.ts`) ตรวจสอบ session และ role ก่อนเข้าหน้า |
+| **Auto Phone Normalization** | แปลงเบอร์ไทย (08x-xxx-xxxx) เป็น E.164 (+66) อัตโนมัติ |
+
+**Authentication Flow:**
+
+```mermaid
+flowchart LR
+    A["User เข้า /login"] --> B{"เลือกวิธี Login"}
+    B -->|Google| C["Supabase OAuth"]
+    B -->|Phone OTP| D["ส่ง OTP ทาง SMS"]
+    C --> E["Supabase Session"]
+    D --> F["ยืนยัน OTP"]
+    F --> E
+    E --> G["สร้าง App Session Cookie"]
+    G --> H["Redirect ตาม Role"]
+    H -->|Admin| I["/admin-crm"]
+    H -->|Content| J["/operation"]
+    H -->|CEO| K["/client-hr"]
+```
+
+### 2.3 Database Architecture
+
+> **Production Database:** Supabase Postgres (Cloud) — ไม่มี Local SQLite หรือ Mock Data
+
+**Prisma Schema หลัก (22 Models):**
+
+| Model | Purpose | Key Relations |
+|---|---|---|
+| `Staff` | พนักงาน (Admin, Content, Ads, etc.) | → `Lead`, `HRAlert`, `AttendanceAdjustment` |
+| `Clinic` | ลูกค้าคลินิก | → `Lead`, `AdsMetric`, `ClientProfile`, `AdBudgetWallet` |
+| `Lead` | Lead จากโซเชียล | → `Staff` (assignedTo), `Clinic` |
+| `Service` | บริการของ Marktech (Performance Marketing, Content, Page Admin) | — |
+| `SalesDeal` | Sales Pipeline | — |
+| `OperationTask` | งาน Content/Graphic/Ads | → `Clinic` |
+| `AdsMetric` | ผลลัพธ์โฆษณา (CPL, ROAS, Impressions) | → `Clinic` |
+| `ClientProfile` | ข้อมูลลูกค้า + Onboarding/Offboarding Checklist | → `Clinic` |
+| `HRAlert` | แจ้งเตือนปัญหาพนักงาน | → `Staff` |
+| `AttendanceAdjustment` | การหักเงินจากมาสาย/ขาด/ลา | → `Staff` |
+| `AdBudgetWallet` | กระเป๋างบโฆษณาแต่ละคลินิก | → `Clinic` |
+| `CashflowEntry` | รายรับ-รายจ่าย | — |
+| `Ticket` | Ticketing System (HR, IT, Client Support) | — |
+| `CalendarEvent` | ปฏิทินงาน + Deadline | — |
+| `AppNotification` | Notification Hub (แจ้งเตือนตาม Role) | — |
+| `AIKnowledge` | Knowledge Base สำหรับ AI RAG | — |
+| `Invoice` | ใบแจ้งหนี้ + Billing Cycle | — |
+| `BackupJobLog` | Log การ Backup อัตโนมัติ | — |
+| `MonthlyExecutiveReport` | รายงานสรุปรายเดือน | — |
+| `RecipientConfig` | ตั้งค่าผู้รับรายงาน | — |
+| `AIQuickAction` | Quick Actions สำหรับ AI Chat | — |
+| `FinanceSettings` | ค่าคงที่ทางการเงิน (Singleton) | — |
+
+**Connection Pooling:**
+- `DATABASE_URL`: Supabase Pooler (Transaction mode) สำหรับ Serverless
+- `DIRECT_URL`: Direct connection สำหรับ Prisma Migrate
+
+### 2.4 Data Flow (ไม่มี Mock Data)
+
+> **สำคัญ:** ระบบไม่มี Mock Data หรือ Fallback Data แล้ว — ทุกข้อมูลดึงจาก Postgres จริง 100%
+
+```mermaid
+flowchart TB
+    subgraph "Client (Browser)"
+        UI["Dashboard UI"]
+    end
+
+    subgraph "Next.js Server"
+        API["API Routes\n/api/app-data"]
+        Guard["Auth Guard\nrequireSession()"]
+        Store["app-data-store.ts\ngetAppData()"]
+    end
+
+    subgraph "Database"
+        PG[("Supabase Postgres\n(Production)")]
+    end
+
+    UI -->|"fetch('/api/app-data')"| API
+    API --> Guard
+    Guard -->|"Authenticated"| Store
+    Store -->|"Prisma Queries"| PG
+    PG -->|"Real Data"| Store
+    Store -->|"JSON Response"| API
+    API -->|"AppDataResponse"| UI
+```
+
+**Key Points:**
+- ไม่มี `mock-data.ts` หรือ `fallback` ใดๆ
+- ทุก Dashboard ดึงข้อมูลจาก `/api/app-data` → `getAppData()` → Prisma → Postgres
+- หากฐานข้อมูลว่าง UI จะแสดง "ไม่มีข้อมูล" (ไม่ใช่ข้อมูลตัวอย่าง)
+
+### 2.5 Deployment Architecture
+
+```mermaid
+flowchart LR
+    subgraph "Vercel (Production)"
+        App["Next.js App\n(Serverless Functions)"]
+    end
+
+    subgraph "Supabase Cloud"
+        Auth["Supabase Auth\n(Google + Phone OTP)"]
+        DB[("Postgres Database\n(Pooler + Direct)")]
+    end
+
+    subgraph "External Services"
+        Twilio["Twilio SMS\n(OTP Delivery)"]
+        Google["Google OAuth"]
+    end
+
+    App <-->|"Prisma Client"| DB
+    App <-->|"Auth API"| Auth
+    Auth -->|"SMS OTP"| Twilio
+    Auth -->|"OAuth"| Google
+```
+
+**Environment Variables (Vercel):**
+- `DATABASE_URL`: Supabase Pooler connection string
+- `DIRECT_URL`: Supabase direct connection (for migrations)
+- `NEXT_PUBLIC_SUPABASE_URL`: Supabase project URL
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Supabase anonymous key
+- `AUTH_SESSION_SECRET`: HMAC secret for session cookies
+
+---
+
+## 3. 🛠️ System Modules (รายละเอียดระบบสำหรับทีม Dev)
 
 ระบบ Marktech OS ประกอบด้วย **7 โมดูลหลัก + 1 Cross-Module Platform Layer** ที่เชื่อมโยงข้อมูลถึงกัน (Data Integration):
 
@@ -494,7 +643,7 @@ flowchart LR
 
 ---
 
-## 3. 📍 Roadmap & Implementation Plan
+## 4. 📍 Roadmap & Implementation Plan
 
 เพื่อให้ระบบสามารถสร้าง Impact ต่อรายได้บริษัทได้เร็วที่สุด แบ่งเป็น **3 Phases**:
 
@@ -542,7 +691,7 @@ gantt
 
 ---
 
-## 4. 🏢 Company Overview & HR Audit (ภาพรวมองค์กร)
+## 5. 🏢 Company Overview & HR Audit (ภาพรวมองค์กร)
 
 ### 4.1 ข้อมูลธุรกิจ (Business Overview)
 
@@ -609,7 +758,7 @@ gantt
 
 ---
 
-## 5. บทสรุปจาก HR
+## 6. บทสรุปจาก HR
 
 > [!IMPORTANT]
 > **Marktech Media** เป็นบริษัทที่มีศักยภาพสูงในการหารายได้และมีฐานลูกค้าที่แข็งแกร่ง (คลินิกความงาม) แต่ปัจจุบันกำลังเผชิญกับ **"เพดานการบริหารจัดการ (Management Ceiling)"**
@@ -620,4 +769,12 @@ gantt
 
 ---
 
-*Document Version 1.4 — March 2026 (Updated: เพิ่ม Module 7 Finance & Invoice, Agency Flow v2, Admin Assignment Status, Billing & Overdue Escalation)*
+*Document Version 2.0 — April 2026*
+
+**Major Updates:**
+- ✅ เพิ่ม Technical Architecture (Tech Stack, Auth, Database, Deployment)
+- ✅ ลบ Mock Data ทั้งหมดออกจากระบบ — ใช้ Postgres จริง 100%
+- ✅ Implement Supabase Auth (Google OAuth + Phone OTP)
+- ✅ Deploy Production บน Vercel + Supabase Cloud
+- ✅ RBAC (Role-Based Access Control) ครบทุก Role
+- ✅ Connection Pooling สำหรับ Serverless Environment

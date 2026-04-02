@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { getDisplayNameFromSupabaseUser, getRoleFromSupabaseUser } from "@/lib/auth/user-role";
 import type { UserRole } from "@/lib/auth/permissions";
+import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 export interface AuthSessionUser {
   username: string;
@@ -16,22 +18,21 @@ export function useAuthSession() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/auth/session", { cache: "no-store" });
-      if (!response.ok) {
+      const supabase = getSupabaseBrowserClient();
+      const {
+        data: { user },
+        error,
+      } = await supabase.auth.getUser();
+
+      if (error || !user) {
         setUser(null);
         return;
       }
 
-      const payload = (await response.json()) as {
-        authenticated?: boolean;
-        user?: AuthSessionUser;
-      };
-
-      if (payload.authenticated && payload.user) {
-        setUser(payload.user);
-      } else {
-        setUser(null);
-      }
+      setUser({
+        username: getDisplayNameFromSupabaseUser(user),
+        role: getRoleFromSupabaseUser(user),
+      });
     } catch {
       setUser(null);
     } finally {
