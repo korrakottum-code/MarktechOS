@@ -504,25 +504,23 @@ export default function ClientFormModal({ client, admins, onSave, onDelete, onCl
               </div>
             </div>
           </section>
+          {/* Actions */}
+          <div className="pt-4 border-t border-border flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm text-foreground-muted hover:text-foreground transition-colors font-medium"
+            >
+              ยกเลิก
+            </button>
+            <button
+              type="submit"
+              className="px-8 py-2 bg-gold-400 text-navy-950 rounded-xl text-sm font-bold hover:bg-gold-500 transition-all shadow-lg shadow-gold-500/20"
+            >
+              {isEdit ? "บันทึกข้อมูล" : "สร้างโปรไฟล์ลูกค้า"}
+            </button>
+          </div>
         </form>
-
-        {/* Actions */}
-        <div className="px-6 py-4 border-t border-border flex items-center justify-end gap-3 bg-navy-900 shrink-0">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-sm text-foreground-muted hover:text-foreground transition-colors font-medium"
-          >
-            ยกเลิก
-          </button>
-          <button
-            type="submit"
-            onClick={handleSubmit}
-            className="px-8 py-2 bg-gold-400 text-navy-950 rounded-xl text-sm font-bold hover:bg-gold-500 transition-all shadow-lg shadow-gold-500/20"
-          >
-            {isEdit ? "บันทึกข้อมูล" : "สร้างโปรไฟล์ลูกค้า"}
-          </button>
-        </div>
       </div>
     </div>
   );
