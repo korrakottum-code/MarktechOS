@@ -1,4 +1,4 @@
-มัน"use client";
+"use client";
 
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
