@@ -329,7 +329,7 @@ export default function ClientFormModal({ client, admins, onSave, onDelete, onCl
                   onChange={(e) => setForm({ ...form, salesPersonId: e.target.value })}
                 >
                   <option value="">เลือกพนักงานขาย</option>
-                  {admins.map(admin => (
+                  {admins.filter(admin => admin.role === "sale").map(admin => (
                     <option key={admin.id} value={admin.id}>{admin.avatar} {admin.name}</option>
                   ))}
                 </select>
@@ -343,7 +343,7 @@ export default function ClientFormModal({ client, admins, onSave, onDelete, onCl
                   onChange={(e) => setForm({ ...form, opLeadId: e.target.value })}
                 >
                   <option value="">เลือก Ops Lead</option>
-                  {admins.map(admin => (
+                  {admins.filter(admin => admin.role === "operator").map(admin => (
                     <option key={admin.id} value={admin.id}>{admin.avatar} {admin.name}</option>
                   ))}
                 </select>

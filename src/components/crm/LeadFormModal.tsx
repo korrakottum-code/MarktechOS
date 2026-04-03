@@ -166,7 +166,8 @@ export default function LeadFormModal({ lead, admins, onSave, onDelete, onClose 
                 value={form.assignedTo}
                 onChange={(e) => setForm({ ...form, assignedTo: e.target.value })}
               >
-                {admins.map((a) => (
+                <option value="">เลือกแอดมิน</option>
+                {admins.filter(a => a.role === "sale" || a.role === "admin").map((a) => (
                   <option key={a.id} value={a.id}>{a.name}</option>
                 ))}
               </select>
