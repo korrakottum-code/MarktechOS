@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { AdsMetric } from "@/lib/app-data-types";
@@ -172,7 +172,15 @@ function timeAgo(iso: string | null): string {
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
-export default function FacebookAdsDashboard() {
+export default function FacebookAdsDashboardPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-[50vh]"><div className="text-foreground-muted">Loading...</div></div>}>
+      <FacebookAdsDashboard />
+    </Suspense>
+  );
+}
+
+function FacebookAdsDashboard() {
   const searchParams = useSearchParams();
   // Date range state — restore from URL if navigating back from detail page
   const [since, setSince] = useState(() => searchParams.get("since") || toISO(firstOfMonth()));
