@@ -100,8 +100,9 @@ export default function PageDetailPage() {
 
   const searchParams = useSearchParams();
 
-  const [since, setSince] = useState(() => searchParams.get("since") || toISO(firstOfMonth()));
-  const [until, setUntil] = useState(() => searchParams.get("until") || toISO(new Date()));
+  const yesterday = toISO(new Date(Date.now() - 864e5));
+  const [since, setSince] = useState(() => searchParams.get("since") || yesterday);
+  const [until, setUntil] = useState(() => searchParams.get("until") || yesterday);
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [adSort, setAdSort]   = useState<AdSort>("spend");

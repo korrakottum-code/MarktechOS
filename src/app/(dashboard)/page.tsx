@@ -182,9 +182,10 @@ export default function FacebookAdsDashboardPage() {
 
 function FacebookAdsDashboard() {
   const searchParams = useSearchParams();
-  // Date range state — restore from URL if navigating back from detail page
-  const [since, setSince] = useState(() => searchParams.get("since") || toISO(firstOfMonth()));
-  const [until, setUntil] = useState(() => searchParams.get("until") || toISO(new Date()));
+  // Date range state — default to yesterday, restore from URL if navigating back
+  const yesterday = toISO(new Date(Date.now() - 864e5));
+  const [since, setSince] = useState(() => searchParams.get("since") || yesterday);
+  const [until, setUntil] = useState(() => searchParams.get("until") || yesterday);
 
   const { metrics: raw, meta, loading, error, reload, isStale } = useAdsData(since, until);
 
