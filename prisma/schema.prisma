@@ -43,7 +43,6 @@ model Clinic {
   facebookAdAccountId String?         @unique
   facebookPageId      String?         @unique
   wallet              AdBudgetWallet?
-  adsMetrics          AdsMetric[]
   profile             ClientProfile?
   leads               Lead[]
   tasks               OperationTask[]
@@ -114,21 +113,97 @@ model OperationTask {
   clinic         Clinic    @relation(fields: [clinicName], references: [name])
 }
 
+// ── OLD: Will be removed after migration ─────────────────────────────────────
 model AdsMetric {
-  id          String   @id @default(cuid())
-  clinicName  String
+  id           String   @id
+  clinicName   String
+  pageName     String   @default("")
+  pageId       String   @default("")
+  adAccountId  String   @default("")
+  campaign     String
+  spend        Float    @default(0)
+  inbox        Int      @default(0)
+  leads        Int      @default(0)
+  cpl          Float    @default(0)
+  cpi          Float    @default(0)
+  roas         Float    @default(0)
+  impressions  Int      @default(0)
+  clicks       Int      @default(0)
+  ctr          Float    @default(0)
+  creative     String   @default("")
+  status       String   @default("active")
+  periodStart  String   @default("")
+  periodEnd    String   @default("")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// ── NEW: Daily granularity ads data ───────────────────────────────────────────
+model AdsMetricDaily {
+  campaignId  String
+  date        String      // "YYYY-MM-DD"
+  clinicName  String      // Ad account name
+  pageName    String      @default("")
+  pageId      String      @default("")
+  adAccountId String      @default("")
   campaign    String
-  spend       Float    @default(0)
-  leads       Int      @default(0)
-  cpl         Float    @default(0)
-  roas        Float    @default(0)
-  impressions Int      @default(0)
-  clicks      Int      @default(0)
-  ctr         Float    @default(0)
-  status      String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  clinic      Clinic   @relation(fields: [clinicName], references: [name])
+  spend       Float       @default(0)
+  inbox       Int         @default(0)
+  leads       Int         @default(0)
+  cpl         Float       @default(0)
+  cpi         Float       @default(0)
+  impressions Int         @default(0)
+  clicks      Int         @default(0)
+  ctr         Float       @default(0)
+  status      String      @default("active")
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@id([campaignId, date])
+  @@index([date])
+  @@index([adAccountId])
+  @@index([pageId])
+}
+
+// ── Ad-level daily data (creative + engagement) ───────────────────────────────
+model AdsContentDaily {
+  adId          String
+  date          String        // "YYYY-MM-DD"
+  campaignId    String
+  adAccountId   String        @default("")
+  pageId        String        @default("")
+  adName        String        @default("")
+  campaignName  String        @default("")
+  thumbnailUrl  String        @default("")   // Creative preview image URL
+  mediaType     String        @default("")   // "image" | "video" | ""
+  spend         Float         @default(0)
+  impressions   Int           @default(0)
+  clicks        Int           @default(0)
+  inbox         Int           @default(0)
+  leads         Int           @default(0)
+  cpi           Float         @default(0)
+  likes         Int           @default(0)
+  comments      Int           @default(0)
+  shares        Int           @default(0)
+  videoViews    Int           @default(0)
+  ctr           Float         @default(0)
+  status        String        @default("active")
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@id([adId, date])
+  @@index([campaignId])
+  @@index([pageId])
+  @@index([date])
+}
+
+// ── Page name cache (persistent) ──────────────────────────────────────────────
+model PageNameCache {
+  pageId    String   @id
+  pageName  String
+  source    String   @default("api")  // "api" | "scrape" | "manual"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model ClientProfile {

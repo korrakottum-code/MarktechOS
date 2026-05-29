@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X, Trash2 } from "lucide-react";
 import type { SalesDeal, DealStage } from "@/lib/app-data-types";
 import { 
@@ -36,6 +37,7 @@ const businessTypes = [
 
 export default function DealFormModal({ deal, onSave, onDelete, onClose }: Props) {
   const isEdit = !!deal;
+  const [mounted, setMounted] = useState(false);
   const [form, setForm] = useState({
     businessName: deal?.businessName ?? "",
     contactPerson: deal?.contactPerson ?? "",
@@ -49,6 +51,8 @@ export default function DealFormModal({ deal, onSave, onDelete, onClose }: Props
     expectedClose: deal?.expectedClose ? new Date(deal.expectedClose).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
     notes: deal?.notes ?? "",
   });
+
+  useEffect(() => { setMounted(true); }, []);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -73,8 +77,10 @@ export default function DealFormModal({ deal, onSave, onDelete, onClose }: Props
   const inputClass =
     "w-full bg-navy-800 border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-foreground-muted/50 focus:outline-none focus:border-gold-500/50";
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+  if (!mounted) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
       <div className="bg-navy-900 border border-border rounded-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
@@ -260,5 +266,5 @@ export default function DealFormModal({ deal, onSave, onDelete, onClose }: Props
         </form>
       </div>
     </div>
-  );
+  , document.body);
 }

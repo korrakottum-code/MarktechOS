@@ -28,7 +28,18 @@ import type {
 } from "@/lib/app-data-types";
 import { prisma } from "@/lib/server/prisma";
 
+// ---------- In-memory cache (30 s TTL) ----------
+interface CacheEntry { data: AppData; timestamp: number }
+let _cache: CacheEntry | null = null;
+const CACHE_TTL_MS = 30_000;
+export function invalidateAppDataCache() { _cache = null; }
+// -------------------------------------------------
+
 export async function getAppData(): Promise<AppData> {
+  const _now = Date.now();
+  if (_cache && _now - _cache.timestamp < CACHE_TTL_MS) {
+    return _cache.data;
+  }
   try {
     // Fetch all data from SQL tables in parallel for performance
     const [
@@ -61,7 +72,12 @@ export async function getAppData(): Promise<AppData> {
       prisma.service.findMany({ orderBy: { name: 'asc' } }),
       prisma.salesDeal.findMany({ orderBy: { createdAt: 'desc' } }),
       prisma.operationTask.findMany({ orderBy: { createdAt: 'desc' } }),
-      prisma.adsMetric.findMany({ orderBy: { clinicName: 'asc' } }),
+      prisma.adsMetricDaily.findMany({
+        where: {
+          date: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0,10) }
+        },
+        orderBy: { clinicName: 'asc' }
+      }),
       prisma.clientProfile.findMany(),
       prisma.hRAlert.findMany({ orderBy: { date: 'desc' } }),
       prisma.attendanceAdjustment.findMany(),
@@ -86,7 +102,7 @@ export async function getAppData(): Promise<AppData> {
     };
 
     // Map SQL models to AppData interface
-    return {
+    const result: AppData = {
       admins: staff.map(s => ({
         id: s.id,
         name: s.name,
@@ -172,19 +188,33 @@ export async function getAppData(): Promise<AppData> {
         createdAt: t.createdAt.toISOString(),
         tags: t.tags,
       })),
-      adsMetrics: adsMetrics.map(m => ({
-        id: m.id,
-        clinic: m.clinicName,
-        campaign: m.campaign,
-        spend: m.spend,
-        leads: m.leads,
-        cpl: m.cpl,
-        roas: m.roas,
-        impressions: m.impressions,
-        clicks: m.clicks,
-        ctr: m.ctr,
-        status: m.status as any,
-      })),
+      adsMetrics: (() => {
+        // Aggregate daily rows to campaign-level for backward compatibility
+        const campMap = new Map<string, any>();
+        for (const m of adsMetrics) {
+          const key = m.campaignId;
+          const e = campMap.get(key);
+          if (e) {
+            e.spend += m.spend; e.inbox += m.inbox; e.leads += m.leads;
+            e.impressions += m.impressions; e.clicks += m.clicks;
+          } else {
+            campMap.set(key, {
+              id: m.campaignId, clinic: m.clinicName, pageName: m.pageName,
+              pageId: m.pageId, adAccountId: m.adAccountId,
+              campaign: m.campaign, spend: m.spend, inbox: m.inbox,
+              leads: m.leads, impressions: m.impressions, clicks: m.clicks,
+              status: m.status, creative: '',
+            });
+          }
+        }
+        return [...campMap.values()].map(m => ({
+          ...m,
+          cpi: m.inbox > 0 ? m.spend / m.inbox : 0,
+          cpl: m.leads > 0 ? m.spend / m.leads : 0,
+          roas: 0,
+          ctr: m.impressions > 0 ? (m.clicks / m.impressions) * 100 : 0,
+        }));
+      })(),
       clients: clientProfiles.map(p => {
         const rawRequirements = (p.requirements as any) || [];
         return {
@@ -405,6 +435,8 @@ export async function getAppData(): Promise<AppData> {
         clinics: [] 
       },
     };
+    _cache = { data: result, timestamp: Date.now() };
+    return result;
   } catch (error) {
     console.error("❌ SQL Fetch Error:", error);
     throw new Error("ระบบไม่สามารถเชื่อมต่อฐานข้อมูลได้ในขณะนี้ กรุณาตรวจสอบ DATABASE_URL ใน Vercel");
@@ -412,8 +444,9 @@ export async function getAppData(): Promise<AppData> {
 }
 
 export async function saveAppData(data: AppData): Promise<void> {
+  _cache = null; // invalidate cache on any write
   console.log("💾 SQL Save: Synchronizing data to production tables...");
-  
+
   const transactions = [];
 
   // Staff
@@ -609,37 +642,8 @@ export async function saveAppData(data: AppData): Promise<void> {
     );
   }
 
-  // Ads Metrics
-  for (const metric of data.adsMetrics) {
-    transactions.push(
-      prisma.adsMetric.upsert({
-        where: { id: metric.id },
-        update: {
-          spend: metric.spend,
-          leads: metric.leads,
-          cpl: metric.cpl,
-          roas: metric.roas,
-          impressions: metric.impressions,
-          clicks: metric.clicks,
-          ctr: metric.ctr,
-          status: metric.status,
-        },
-        create: {
-          id: metric.id,
-          clinicName: metric.clinic,
-          campaign: metric.campaign,
-          spend: metric.spend,
-          leads: metric.leads,
-          cpl: metric.cpl,
-          roas: metric.roas,
-          impressions: metric.impressions,
-          clicks: metric.clicks,
-          ctr: metric.ctr,
-          status: metric.status,
-        }
-      })
-    );
-  }
+  // Ads Metrics — handled by sync route directly, no-op here
+  // (AdsMetricDaily is managed by /api/cron/sync-ads)
 
   // Attendance
   for (const adj of data.attendanceAdjustments) {
@@ -727,5 +731,7 @@ export async function patchAppData(
   const current = await getAppData();
   const next = updater(current);
   await saveAppData(next);
+  // Warm cache immediately after save — avoids a cold DB hit on next read
+  _cache = { data: next, timestamp: Date.now() };
   return next;
 }

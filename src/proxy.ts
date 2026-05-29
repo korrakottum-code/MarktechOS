@@ -58,7 +58,11 @@ export async function proxy(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     // Auth Protection Logic
-    if (!user && !isAuthPage) {
+    const isCronOrWebhook =
+      pathname.startsWith("/api/cron/") ||
+      pathname.startsWith("/api/webhooks/");
+
+    if (!user && !isAuthPage && !isCronOrWebhook) {
       const loginUrl = new URL("/login", request.url);
       if (pathname !== "/") {
         loginUrl.searchParams.set("next", pathname);

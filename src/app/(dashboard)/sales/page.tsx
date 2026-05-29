@@ -133,7 +133,7 @@ export default function SalesPage() {
       </div>
 
       {/* Global Filter Bar */}
-      <div className="bg-navy-900/50 border border-border/50 rounded-3xl p-4 flex flex-wrap items-center gap-6 shadow-xl backdrop-blur-md relative z-50 isolate">
+      <div className="bg-navy-900/50 border border-border/50 rounded-3xl p-4 flex flex-wrap items-center gap-6 shadow-xl backdrop-blur-md">
         <div className="flex items-center gap-2">
           <Filter size={14} className="text-gold-400" />
           <span className="text-[10px] font-bold text-foreground-muted uppercase tracking-widest">Pipeline Filters:</span>
@@ -146,7 +146,7 @@ export default function SalesPage() {
               mode="month" 
               value={filterMonth} 
               onChange={setFilterMonth} 
-              className="w-48 relative z-[100]"
+              className="w-48"
             />
           </div>
         </div>

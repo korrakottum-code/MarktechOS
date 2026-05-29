@@ -2,84 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  MessageSquare,
-  Layers,
-  BarChart3,
-  Wallet,
-  Brain,
-  Ticket,
-  Target,
-  CalendarDays,
-  Bell,
-  ShieldCheck,
-  ChevronLeft,
-  ChevronRight,
-  X,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useAuthSession } from "@/lib/use-auth-session";
 import { canAccessPath } from "@/lib/auth/permissions";
 
-const navItems = [
-  {
-    label: "ภาพรวม",
-    href: "/",
-    icon: LayoutDashboard,
-  },
-  {
-    label: "Sales & Deal Pipeline",
-    href: "/sales",
-    icon: Target,
-    badge: "M1",
-  },
-  {
-    label: "Accounting & Finance",
-    href: "/incentive",
-    icon: Wallet,
-    badge: "M2",
-  },
-  {
-    label: "Client Hub (Onboard)",
-    href: "/client-hr",
-    icon: BarChart3,
-    badge: "M3",
-  },
-  {
-    label: "Operation & Production",
-    href: "/operation",
-    icon: Layers,
-    badge: "M4",
-  },
-  {
-    label: "Admin CRM (Chat)",
-    href: "/admin-crm",
-    icon: MessageSquare,
-    badge: "M5",
-  },
-  {
-    label: "Ticketing & Crisis",
-    href: "/ticketing",
-    icon: Ticket,
-    badge: "M6",
-  },
-  {
-    label: "AI Brain (Insight)",
-    href: "/ai-brain",
-    icon: Brain,
-    badge: "XL",
-  },
-  {
-    label: "Timeline & Calendar",
-    href: "/timeline",
-    icon: CalendarDays,
-  },
-  {
-    label: "Platform Ops",
-    href: "/platform-ops",
-    icon: ShieldCheck,
-  },
-];
+
+const navItems: { label: string; href: string; icon: any; badge?: string }[] = [];
+// All modules hidden — single-page Facebook Ads Dashboard mode
+
 
 interface SidebarProps {
   collapsed: boolean;

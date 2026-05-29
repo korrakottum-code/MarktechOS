@@ -133,15 +133,21 @@ export interface OperationTask {
 
 export interface AdsMetric {
   id: string;
-  clinic: string;
+  clinic: string;       // Ad account name (fallback)
+  pageName: string;     // Facebook Page name (real)
+  pageId: string;       // Facebook Page ID
+  adAccountId: string;  // Facebook Ad Account ID
   campaign: string;
   spend: number;
+  inbox: number;
+  cpi: number;
   leads: number;
   cpl: number;
   roas: number;
   impressions: number;
   clicks: number;
   ctr: number;
+  creative: string;
   status: "active" | "paused" | "ended";
 }
 

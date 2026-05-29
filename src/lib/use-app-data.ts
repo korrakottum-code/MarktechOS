@@ -90,7 +90,6 @@ export function useAppData() {
         setError(null);
         setLoading(true);
         const response = await fetch("/api/app-data", {
-          cache: "no-store",
           signal: controller.signal,
         });
         if (!response.ok) {

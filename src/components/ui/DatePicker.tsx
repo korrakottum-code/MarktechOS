@@ -19,21 +19,33 @@ interface Props {
 export default function MarkTechDatePicker({ mode, value, onChange, placeholder, thai = true, className = "" }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [popupPos, setPopupPos] = useState({ top: 0, left: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
   const locale = thai ? th : enUS;
 
   // Handle click outside to close
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
+      const target = event.target as Node;
+      const insideButton = containerRef.current?.contains(target);
+      const insidePopup = popupRef.current?.contains(target);
+      if (!insideButton && !insidePopup) setIsOpen(false);
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const toggle = () => setIsOpen(!isOpen);
+  const toggle = () => {
+    if (!isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      // Clamp to right edge of viewport
+      const left = Math.min(rect.left, window.innerWidth - 300);
+      setPopupPos({ top: rect.bottom + 6, left });
+    }
+    setIsOpen((v) => !v);
+  };
 
   const renderSingle = () => {
     const days = eachDayOfInterval({
@@ -204,6 +216,7 @@ export default function MarkTechDatePicker({ mode, value, onChange, placeholder,
   return (
     <div className={`relative ${className}`} ref={containerRef}>
       <button
+        ref={buttonRef}
         type="button"
         onClick={toggle}
         className="w-full bg-navy-950 border border-border rounded-xl px-4 py-2.5 text-foreground flex items-center justify-between hover:border-gold-500/50 transition-all group"
@@ -215,7 +228,11 @@ export default function MarkTechDatePicker({ mode, value, onChange, placeholder,
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 mt-2 z-[9999] bg-surface border border-border rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] animate-in fade-in slide-in-from-top-2 duration-200 backdrop-blur-xl">
+        <div
+          ref={popupRef}
+          className="fixed z-[9999] bg-surface border border-border rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] animate-in fade-in slide-in-from-top-2 duration-200 backdrop-blur-xl"
+          style={{ top: popupPos.top, left: popupPos.left }}
+        >
           {mode === "single" && renderSingle()}
           {mode === "range" && renderRange()}
           {mode === "month" && renderMonth()}
