@@ -161,6 +161,18 @@ export default function PageDetailPage() {
 
   // ── KPIs ──────────────────────────────────────────────────────────────────
   const kpis = useMemo(() => {
+    if (serviceFilter) {
+      const s = sortedAds.reduce((a, c) => a + c.spend, 0);
+      const im = sortedAds.reduce((a, c) => a + c.impressions, 0);
+      const ib = sortedAds.reduce((a, c) => a + c.inbox, 0);
+      const ld = sortedAds.reduce((a, c) => a + c.leads, 0);
+      return {
+        spend: s, impressions: im, inbox: ib, leads: ld,
+        cpi: ib > 0 ? s / ib : 0,
+        cpl: ld > 0 ? s / ld : 0,
+        convRate: ib > 0 ? (ld / ib) * 100 : 0,
+      };
+    }
     const s  = campaigns.reduce((a, c) => a + c.spend, 0);
     const im = campaigns.reduce((a, c) => a + c.impressions, 0);
     const ib = campaigns.reduce((a, c) => a + c.inbox, 0);
@@ -171,7 +183,7 @@ export default function PageDetailPage() {
       cpl: ld > 0 ? s / ld : 0,
       convRate: ib > 0 ? (ld / ib) * 100 : 0,
     };
-  }, [campaigns]);
+  }, [campaigns, sortedAds, serviceFilter]);
 
   // ── Sorted ad content (filtered by service) ─────────────────────────────
   const sortedAds = useMemo(() => {
@@ -263,6 +275,7 @@ export default function PageDetailPage() {
               { label: "วันนี้",     s: toISO(new Date()), u: toISO(new Date()) },
               { label: "เมื่อวาน",   s: toISO(new Date(Date.now() - 864e5)), u: toISO(new Date(Date.now() - 864e5)) },
               { label: "7 วัน",      s: toISO(new Date(Date.now() - 6*864e5)), u: toISO(new Date()) },
+              { label: "14 วัน",     s: toISO(new Date(Date.now() - 13*864e5)), u: toISO(new Date()) },
               { label: "เดือนนี้",   s: toISO(firstOfMonth()), u: toISO(new Date()) },
               { label: "เดือนที่แล้ว", s: (() => { const d = new Date(); return toISO(new Date(d.getFullYear(), d.getMonth()-1, 1)); })(), u: (() => { const d = new Date(); return toISO(new Date(d.getFullYear(), d.getMonth(), 0)); })() },
             ].map(p => (

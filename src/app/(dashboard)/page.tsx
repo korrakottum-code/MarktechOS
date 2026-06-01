@@ -234,11 +234,56 @@ function FacebookAdsDashboard() {
   const [since, setSince] = useState(() => searchParams.get("since") || today);
   const [until, setUntil] = useState(() => searchParams.get("until") || today);
 
-  const { metrics: raw, meta, globalAdContent, globalAdByContent, loading, error, reload, isStale } = useAdsData(since, until);
+  const { metrics: raw, meta, globalAdContent: _globalAdContent, globalAdByContent: _globalAdByContent, loading, error, reload, isStale } = useAdsData(since, until);
 
   const [search, setSearch]   = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("spend");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  // ── Apply search filter to global content ────────────────────────────────────
+  const globalAdContent = useMemo(() => {
+    if (!search) return _globalAdContent;
+    return _globalAdContent.map(svc => {
+      if (!svc.pageBreakdown) return svc;
+      const filteredPB = svc.pageBreakdown.filter((pb: any) => 
+        pb.pageName.toLowerCase().includes(search.toLowerCase()) || (pb.adAccountId || "").includes(search)
+      );
+      if (filteredPB.length === 0) return null;
+      return {
+        ...svc,
+        pageBreakdown: filteredPB,
+        spend: filteredPB.reduce((s: number, p: any) => s + p.spend, 0),
+        inbox: filteredPB.reduce((s: number, p: any) => s + p.inbox, 0),
+        leads: filteredPB.reduce((s: number, p: any) => s + p.leads, 0),
+        impressions: filteredPB.reduce((s: number, p: any) => s + p.impressions, 0),
+        clicks: filteredPB.reduce((s: number, p: any) => s + p.clicks, 0),
+        cpi: filteredPB.reduce((s: number, p: any) => s + p.inbox, 0) > 0 ? filteredPB.reduce((s: number, p: any) => s + p.spend, 0) / filteredPB.reduce((s: number, p: any) => s + p.inbox, 0) : 0,
+        pageCount: filteredPB.length
+      };
+    }).filter(Boolean) as GlobalAdItem[];
+  }, [_globalAdContent, search]);
+
+  const globalAdByContent = useMemo(() => {
+    if (!search) return _globalAdByContent;
+    return _globalAdByContent.map(svc => {
+      if (!svc.pageBreakdown) return svc;
+      const filteredPB = svc.pageBreakdown.filter((pb: any) => 
+        pb.pageName.toLowerCase().includes(search.toLowerCase()) || (pb.adAccountId || "").includes(search)
+      );
+      if (filteredPB.length === 0) return null;
+      return {
+        ...svc,
+        pageBreakdown: filteredPB,
+        spend: filteredPB.reduce((s: number, p: any) => s + p.spend, 0),
+        inbox: filteredPB.reduce((s: number, p: any) => s + p.inbox, 0),
+        leads: filteredPB.reduce((s: number, p: any) => s + p.leads, 0),
+        impressions: filteredPB.reduce((s: number, p: any) => s + (p.impressions || 0), 0),
+        clicks: filteredPB.reduce((s: number, p: any) => s + (p.clicks || 0), 0),
+        cpi: filteredPB.reduce((s: number, p: any) => s + p.inbox, 0) > 0 ? filteredPB.reduce((s: number, p: any) => s + p.spend, 0) / filteredPB.reduce((s: number, p: any) => s + p.inbox, 0) : 0,
+        pageCount: filteredPB.length
+      };
+    }).filter(Boolean) as GlobalAdItem[];
+  }, [_globalAdByContent, search]);
   const [syncing, setSyncing] = useState(false);
   const syncingRef = useRef(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
@@ -282,22 +327,58 @@ function FacebookAdsDashboard() {
 
   // ── Aggregate & filter ───────────────────────────────────────────────────────
   const pages = useMemo(() => {
-    const grouped = groupByPage(raw);
-    return grouped
-      .filter(p => search === "" || p.pageName.toLowerCase().includes(search.toLowerCase()) || p.adAccountId.includes(search))
-      .sort((a, b) => {
-        const av = a[sortKey] as number;
-        const bv = b[sortKey] as number;
-        return sortDir === "desc" ? bv - av : av - bv;
-      });
-  }, [raw, search, sortKey, sortDir]);
+    let basePages: PageRow[] = [];
+    if (serviceFilter) {
+      const svc = globalAdContent.find(s => s.adName === serviceFilter);
+      if (svc && svc.pageBreakdown) {
+        basePages = svc.pageBreakdown.map((pb: any) => ({
+          pageName: pb.pageName,
+          pageId: pb.pageId,
+          adAccountId: pb.adAccountId,
+          spend: pb.spend,
+          inbox: pb.inbox,
+          leads: pb.leads,
+          cpi: pb.inbox > 0 ? pb.spend / pb.inbox : 0,
+          cpl: pb.leads > 0 ? pb.spend / pb.leads : 0,
+          leadInboxRatio: pb.inbox > 0 ? (pb.leads / pb.inbox) * 100 : 0,
+          activeCnt: pb.active || 0,
+          pausedCnt: pb.paused || 0,
+          totalCampaigns: (pb.active || 0) + (pb.paused || 0),
+          impressions: pb.impressions || 0,
+          clicks: pb.clicks || 0
+        } as PageRow));
+      }
+    } else {
+      basePages = groupByPage(raw);
+      basePages = basePages.filter(p => search === "" || p.pageName.toLowerCase().includes(search.toLowerCase()) || p.adAccountId.includes(search));
+    }
+    return basePages.sort((a, b) => {
+      const av = a[sortKey] as number;
+      const bv = b[sortKey] as number;
+      return sortDir === "desc" ? bv - av : av - bv;
+    });
+  }, [raw, globalAdContent, search, serviceFilter, sortKey, sortDir]);
 
   const kpis = useMemo(() => {
     const totalSpend = pages.reduce((s, p) => s + p.spend, 0);
     const totalInbox = pages.reduce((s, p) => s + p.inbox, 0);
     const totalLeads = pages.reduce((s, p) => s + p.leads, 0);
-    const totalImpressions = raw.reduce((s, m) => s + m.impressions, 0);
-    const totalClicks = raw.reduce((s, m) => s + m.clicks, 0);
+    
+    let totalImpressions = 0;
+    let totalClicks = 0;
+    let active = 0;
+    
+    if (serviceFilter) {
+      totalImpressions = pages.reduce((s, p) => s + ((p as any).impressions || 0), 0);
+      totalClicks = pages.reduce((s, p) => s + ((p as any).clicks || 0), 0);
+      active = pages.reduce((s, p) => s + p.activeCnt, 0);
+    } else {
+      const filteredRaw = raw.filter(m => search === "" || (m.pageName || m.clinic || "").toLowerCase().includes(search.toLowerCase()) || (m.adAccountId || "").includes(search));
+      totalImpressions = filteredRaw.reduce((s, m) => s + m.impressions, 0);
+      totalClicks = filteredRaw.reduce((s, m) => s + m.clicks, 0);
+      active = filteredRaw.filter(m => m.status === "active").length;
+    }
+
     return {
       totalSpend,
       totalInbox,
@@ -308,9 +389,9 @@ function FacebookAdsDashboard() {
       avgCPL:  totalLeads > 0 ? totalSpend / totalLeads : 0,
       ratio:   totalInbox > 0 ? (totalLeads / totalInbox) * 100 : 0,
       ctr:     totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0,
-      active:  raw.filter(m => m.status === "active").length,
+      active,
     };
-  }, [pages, raw]);
+  }, [pages, raw, search, serviceFilter]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir(d => d === "desc" ? "asc" : "desc");
@@ -476,7 +557,9 @@ function FacebookAdsDashboard() {
               { label: "วันนี้",     s: toISO(new Date()), u: toISO(new Date()) },
               { label: "เมื่อวาน",   s: toISO(new Date(Date.now() - 864e5)), u: toISO(new Date(Date.now() - 864e5)) },
               { label: "7 วัน",      s: toISO(new Date(Date.now() - 6*864e5)), u: toISO(new Date()) },
+              { label: "14 วัน",     s: toISO(new Date(Date.now() - 13*864e5)), u: toISO(new Date()) },
               { label: "เดือนนี้",   s: toISO(firstOfMonth()), u: toISO(new Date()) },
+              { label: "เดือนที่แล้ว", s: (() => { const d = new Date(); return toISO(new Date(d.getFullYear(), d.getMonth()-1, 1)); })(), u: (() => { const d = new Date(); return toISO(new Date(d.getFullYear(), d.getMonth(), 0)); })() },
             ].map(p => (
               <button key={p.label} disabled={syncing} onClick={() => {
                 setSince(p.s);

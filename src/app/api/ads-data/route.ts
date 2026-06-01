@@ -289,11 +289,16 @@ export async function GET(req: NextRequest) {
         adName: string; thumbnailUrl: string; mediaType: string;
         spend: number; impressions: number; clicks: number; inbox: number;
         leads: number; adIds: Set<string>; pageIds: Set<string>;
+        pageMetrics: Map<string, { pageName: string; pageId: string; adAccountId: string; spend: number; inbox: number; leads: number; impressions: number; clicks: number; active: number; paused: number }>;
       }>();
 
       for (const ad of globalAdRows) {
         const key = ad.adName || ad.adId;
         const e = svcMap.get(key);
+        const pn = pageNameMap.get(ad.pageId) ?? ad.pageId;
+        const isActive = ad.status === "active" ? 1 : 0;
+        const isPaused = ad.status === "paused" ? 1 : 0;
+
         if (e) {
           e.spend += ad.spend; e.impressions += ad.impressions; e.clicks += ad.clicks;
           e.inbox += ad.inbox; e.leads += ad.leads;
@@ -302,12 +307,22 @@ export async function GET(req: NextRequest) {
             e.thumbnailUrl = ad.thumbnailUrl;
           }
           if (!e.mediaType && ad.mediaType) e.mediaType = ad.mediaType;
+
+          const pm = e.pageMetrics.get(ad.pageId);
+          if (pm) {
+            pm.spend += ad.spend; pm.impressions += ad.impressions; pm.clicks += ad.clicks;
+            pm.inbox += ad.inbox; pm.leads += ad.leads;
+            pm.active += isActive; pm.paused += isPaused;
+          } else {
+            e.pageMetrics.set(ad.pageId, { pageName: pn, pageId: ad.pageId, adAccountId: ad.adAccountId, spend: ad.spend, impressions: ad.impressions, clicks: ad.clicks, inbox: ad.inbox, leads: ad.leads, active: isActive, paused: isPaused });
+          }
         } else {
           svcMap.set(key, {
             adName: ad.adName, thumbnailUrl: ad.thumbnailUrl, mediaType: ad.mediaType,
             spend: ad.spend, impressions: ad.impressions, clicks: ad.clicks,
             inbox: ad.inbox, leads: ad.leads,
             adIds: new Set([ad.adId]), pageIds: new Set([ad.pageId]),
+            pageMetrics: new Map([[ad.pageId, { pageName: pn, pageId: ad.pageId, adAccountId: ad.adAccountId, spend: ad.spend, impressions: ad.impressions, clicks: ad.clicks, inbox: ad.inbox, leads: ad.leads, active: isActive, paused: isPaused }]])
           });
         }
       }
@@ -325,6 +340,7 @@ export async function GET(req: NextRequest) {
           adCount: a.adIds.size,
           pageCount: a.pageIds.size,
           convRate: a.inbox > 0 ? (a.leads / a.inbox) * 100 : 0,
+          pageBreakdown: [...a.pageMetrics.values()],
         }))
         .sort((a, b) => b.spend - a.spend);
 
@@ -352,7 +368,7 @@ export async function GET(req: NextRequest) {
         adNames: Set<string>; thumbnailUrl: string; mediaType: string;
         spend: number; impressions: number; clicks: number; inbox: number;
         leads: number; adIds: Set<string>; pageIds: Set<string>; pageNamesSet: Set<string>;
-        pageMetrics: Map<string, { pageName: string; spend: number; inbox: number; leads: number }>;
+        pageMetrics: Map<string, { pageName: string; pageId: string; adAccountId: string; spend: number; inbox: number; leads: number; impressions: number; clicks: number; active: number; paused: number }>;
       }>();
 
       // Fuzzy pHash grouping — canonical list + per-hash cache.
@@ -395,6 +411,9 @@ export async function GET(req: NextRequest) {
         }
         const pn = pageNameMap.get(ad.pageId) ?? ad.pageId;
         const e = gThumbMap.get(key);
+        const isActive = ad.status === "active" ? 1 : 0;
+        const isPaused = ad.status === "paused" ? 1 : 0;
+
         if (e) {
           e.spend += ad.spend; e.impressions += ad.impressions; e.clicks += ad.clicks;
           e.inbox += ad.inbox; e.leads += ad.leads;
@@ -403,8 +422,12 @@ export async function GET(req: NextRequest) {
           e.pageNamesSet.add(pn);
           // Per-page accumulation
           const pm = e.pageMetrics.get(ad.pageId);
-          if (pm) { pm.spend += ad.spend; pm.inbox += ad.inbox; pm.leads += ad.leads; }
-          else { e.pageMetrics.set(ad.pageId, { pageName: pn, spend: ad.spend, inbox: ad.inbox, leads: ad.leads }); }
+          if (pm) { 
+            pm.spend += ad.spend; pm.inbox += ad.inbox; pm.leads += ad.leads; 
+            pm.impressions += ad.impressions; pm.clicks += ad.clicks;
+            pm.active += isActive; pm.paused += isPaused;
+          }
+          else { e.pageMetrics.set(ad.pageId, { pageName: pn, pageId: ad.pageId, adAccountId: ad.adAccountId, spend: ad.spend, inbox: ad.inbox, leads: ad.leads, impressions: ad.impressions, clicks: ad.clicks, active: isActive, paused: isPaused }); }
         } else {
           gThumbMap.set(key, {
             adNames: new Set([ad.adName || ad.adId]),
@@ -413,7 +436,7 @@ export async function GET(req: NextRequest) {
             inbox: ad.inbox, leads: ad.leads,
             adIds: new Set([ad.adId]), pageIds: new Set([ad.pageId]),
             pageNamesSet: new Set([pn]),
-            pageMetrics: new Map([[ad.pageId, { pageName: pn, spend: ad.spend, inbox: ad.inbox, leads: ad.leads }]]),
+            pageMetrics: new Map([[ad.pageId, { pageName: pn, pageId: ad.pageId, adAccountId: ad.adAccountId, spend: ad.spend, inbox: ad.inbox, leads: ad.leads, impressions: ad.impressions, clicks: ad.clicks, active: isActive, paused: isPaused }]]),
           });
         }
       }
