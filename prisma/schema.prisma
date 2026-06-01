@@ -187,6 +187,8 @@ model AdsContentDaily {
   shares        Int           @default(0)
   videoViews    Int           @default(0)
   ctr           Float         @default(0)
+  creativeId    String        @default("")   // Meta creative ID — same image = same ID
+  imageHash     String        @default("")   // MD5 hash of image content — same image bytes = same hash
   status        String        @default("active")
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt

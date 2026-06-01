@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/server/prisma";
+import { createHash } from "crypto";
 
 const API_VERSION = "v20.0";
 const BASE = `https://graph.facebook.com/${API_VERSION}`;
@@ -50,8 +51,9 @@ function decodeHtmlEntities(str: string): string {
 
 function isInvalidPageName(name: string): boolean {
   const lower = name.toLowerCase().trim();
-  const blocked = ["facebook", "log in", "login", "sign up", "เข้าสู่ระบบ", "สมัครสมาชิก", ""];
-  return blocked.includes(lower) || lower.length === 0;
+  if (lower.length === 0) return true;
+  const blocked = ["facebook", "log in", "login", "sign up", "sign in", "เข้าสู่ระบบ", "สมัครสมาชิก", "meta business"];
+  return blocked.some(b => lower.includes(b));
 }
 
 /** Manual fallback for pages that can't be resolved */
@@ -266,132 +268,132 @@ async function syncAccount(
     const adInsights: any[] = adInsightsRes.data ?? [];
     let adUpsertCount = 0;
 
-    // ── Batch-fetch HD images for ALL ad_ids from insights ────────────────
+    // ── Always fetch fresh thumbnails (Facebook CDN URLs expire ~1hr) ─────
     const thumbnailMap: Record<string, string> = {};
-    const uniqueAdIds = [...new Set(adInsights.map(r => r.ad_id).filter(Boolean))];
-    console.log(`🖼️ Fetching creatives for ${uniqueAdIds.length} unique ads`);
-
-    // Step 1: Get creative IDs from ads (batch /?ids= with only creative field)
-    const creativeIds: Record<string, string> = {}; // adId → creativeId
-    for (let b = 0; b < uniqueAdIds.length; b += 50) {
-      const batch = uniqueAdIds.slice(b, b + 50);
-      try {
-        const url = `${BASE}/?ids=${batch.join(",")}&fields=creative{id}&access_token=${getToken()}`;
-        const res = await fetch(url, { cache: "no-store" });
-        if (res.ok) {
-          const json = await res.json();
-          for (const adId of batch) {
-            const cid = json[adId]?.creative?.id;
-            if (cid) creativeIds[adId] = cid;
-          }
-        }
-      } catch { /* continue */ }
-    }
-    console.log(`🖼️ Got ${Object.keys(creativeIds).length} creative IDs`);
-
-    // Step 2: Fetch HD thumbnails from creatives (with thumbnail_width=1080)
-    const uniqueCreativeIds = [...new Set(Object.values(creativeIds))];
-    const creativeUrlMap: Record<string, string> = {}; // creativeId → hdUrl
-    const creativeTypeMap: Record<string, string> = {}; // creativeId → "image"|"video"
-    const creativeStoryMap: Record<string, string> = {}; // creativeId → storyId
-    for (let b = 0; b < uniqueCreativeIds.length; b += 50) {
-      const batch = uniqueCreativeIds.slice(b, b + 50);
-      try {
-        const url = `${BASE}/?ids=${batch.join(",")}&fields=thumbnail_url,effective_object_story_id,object_type,video_id&thumbnail_width=1080&thumbnail_height=1080&access_token=${getToken()}`;
-        const res = await fetch(url, { cache: "no-store" });
-        if (res.ok) {
-          const json = await res.json();
-          for (const cid of batch) {
-            const data = json[cid];
-            if (data?.thumbnail_url) {
-              creativeUrlMap[cid] = data.thumbnail_url;
-            }
-            // Determine media type
-            const objType = (data?.object_type || "").toUpperCase();
-            if (data?.video_id || objType === "VIDEO") {
-              creativeTypeMap[cid] = "video";
-            } else if (objType === "PHOTO" || objType === "SHARE") {
-              creativeTypeMap[cid] = "image";
-            }
-            // Page ID fallback from effective_object_story_id
-            const storyId = data?.effective_object_story_id || "";
-            if (typeof storyId === "string" && storyId.includes("_")) {
-              creativeStoryMap[cid] = storyId;
-              const adId = Object.keys(creativeIds).find(aid => creativeIds[aid] === cid);
-              if (adId) {
-                const row = adInsights.find(r => r.ad_id === adId);
-                if (row && !pgIdMap[row.campaign_id]) {
-                  pgIdMap[row.campaign_id] = storyId.split("_")[0];
-                }
-              }
-            }
-          }
-        }
-      } catch { /* continue */ }
-    }
-
-    // Map back: adId → HD URL + mediaType + storyId
     const mediaTypeMap: Record<string, string> = {};
-    const storyIdMap: Record<string, string> = {}; // adId → effective_object_story_id
-    for (const [adId, cid] of Object.entries(creativeIds)) {
-      if (creativeUrlMap[cid]) {
-        thumbnailMap[adId] = creativeUrlMap[cid];
+    const uniqueAdIds = [...new Set(adInsights.map(r => r.ad_id).filter(Boolean))];
+
+    // Pre-load mediaType from DB (doesn't expire, saves API calls for type detection)
+    try {
+      const cached = await prisma.adsContentDaily.findMany({
+        where: { adId: { in: uniqueAdIds }, mediaType: { not: "" } },
+        select: { adId: true, mediaType: true },
+        distinct: ["adId"],
+      });
+      for (const c of cached) {
+        if (c.mediaType) mediaTypeMap[c.adId] = c.mediaType;
       }
-      if (creativeTypeMap[cid]) {
-        mediaTypeMap[adId] = creativeTypeMap[cid];
+    } catch { /* non-critical */ }
+
+    console.log(`🖼️ Fetching fresh thumbnails for ${uniqueAdIds.length} ads`);
+
+    // ── Fetch fresh creative thumbnails for all ads ───────────────────────
+    const imageHashMap: Record<string, string> = {};
+    const creativeIds: Record<string, string> = {};
+    if (uniqueAdIds.length > 0) {
+      // Step 1: Get creative IDs (parallel batches of 50)
+      const step1Batches: string[][] = [];
+      for (let b = 0; b < uniqueAdIds.length; b += 50) {
+        step1Batches.push(uniqueAdIds.slice(b, b + 50));
       }
-    }
-    // Build storyIdMap from creatives (already collected in Step 2)
-    const adStoryIds: Record<string, string> = {}; // adId → storyId
-    for (const [adId, cid] of Object.entries(creativeIds)) {
-      if (creativeStoryMap[cid]) adStoryIds[adId] = creativeStoryMap[cid];
-    }
-
-    // pageTokens passed in from caller — reuse across all accounts
-    console.log(`🖼️ Using ${Object.keys(pageTokens).length} page tokens`);
-
-    // Group story IDs by page ID for batch fetching
-    const storyByPage = new Map<string, { storyId: string; adIds: string[] }[]>();
-    for (const [adId, storyId] of Object.entries(adStoryIds)) {
-      const pgId = storyId.split("_")[0];
-      if (!pageTokens[pgId]) continue; // skip if no token
-      const list = storyByPage.get(pgId) || [];
-      const existing = list.find(e => e.storyId === storyId);
-      if (existing) { existing.adIds.push(adId); }
-      else { list.push({ storyId, adIds: [adId] }); }
-      storyByPage.set(pgId, list);
-    }
-
-    // Batch-fetch full_picture per page
-    let fullPicCount = 0;
-    for (const [pgId, entries] of storyByPage) {
-      const pt = pageTokens[pgId];
-      for (let b = 0; b < entries.length; b += 50) {
-        const batch = entries.slice(b, b + 50);
-        const ids = batch.map(e => e.storyId);
+      await Promise.all(step1Batches.map(async batch => {
         try {
-          const url = `${BASE}/?ids=${ids.join(",")}&fields=full_picture&access_token=${pt}`;
+          const url = `${BASE}/?ids=${batch.join(",")}&fields=creative{id}&access_token=${getToken()}`;
           const res = await fetch(url, { cache: "no-store" });
           if (res.ok) {
             const json = await res.json();
-            for (const entry of batch) {
-              const fp = json[entry.storyId]?.full_picture;
-              if (fp) {
-                for (const adId of entry.adIds) {
-                  thumbnailMap[adId] = fp;
-                  fullPicCount++;
+            for (const adId of batch) {
+              const cid = json[adId]?.creative?.id;
+              if (cid) creativeIds[adId] = cid;
+            }
+          }
+        } catch { /* continue */ }
+      }));
+      console.log(`🖼️ Got ${Object.keys(creativeIds).length} creative IDs`);
+
+      // Step 2: Fetch thumbnails from creatives (parallel batches of 50)
+      const uniqueCreativeIds = [...new Set(Object.values(creativeIds))];
+      const creativeUrlMap: Record<string, string> = {};
+      const creativeTypeMap: Record<string, string> = {};
+      const creativeHashMap: Record<string, string> = {};
+
+      const step2Batches: string[][] = [];
+      for (let b = 0; b < uniqueCreativeIds.length; b += 50) {
+        step2Batches.push(uniqueCreativeIds.slice(b, b + 50));
+      }
+       await Promise.all(step2Batches.map(async batch => {
+        try {
+          const url = `${BASE}/?ids=${batch.join(",")}&fields=thumbnail_url,effective_object_story_id,object_type,video_id,image_hash&thumbnail_width=1080&thumbnail_height=1080&access_token=${getToken()}`;
+          const res = await fetch(url, { cache: "no-store" });
+          if (res.ok) {
+            const json = await res.json();
+            for (const cid of batch) {
+              const data = json[cid];
+              if (data?.thumbnail_url) creativeUrlMap[cid] = data.thumbnail_url;
+              if (data?.image_hash) creativeHashMap[cid] = data.image_hash;
+              const objType = (data?.object_type || "").toUpperCase();
+              if (data?.video_id || objType === "VIDEO") creativeTypeMap[cid] = "video";
+              else if (objType === "PHOTO" || objType === "SHARE") creativeTypeMap[cid] = "image";
+              // Page ID fallback from effective_object_story_id
+              const storyId = data?.effective_object_story_id || "";
+              if (typeof storyId === "string" && storyId.includes("_")) {
+                const adId = Object.keys(creativeIds).find(aid => creativeIds[aid] === cid);
+                if (adId) {
+                  const row = adInsights.find(r => r.ad_id === adId);
+                  if (row && !pgIdMap[row.campaign_id]) {
+                    pgIdMap[row.campaign_id] = storyId.split("_")[0];
+                  }
                 }
               }
             }
           }
         } catch { /* continue */ }
+      }));
+
+      // Map back: adId → URL + mediaType + imageHash
+      for (const [adId, cid] of Object.entries(creativeIds)) {
+        if (creativeUrlMap[cid]) thumbnailMap[adId] = creativeUrlMap[cid];
+        if (creativeTypeMap[cid]) mediaTypeMap[adId] = creativeTypeMap[cid];
+        if (creativeHashMap[cid]) imageHashMap[adId] = creativeHashMap[cid];
       }
+      console.log(`🖼️ Fetched ${Object.keys(creativeUrlMap).length} thumbnails, ${Object.keys(creativeHashMap).length} image_hashes`);
     }
 
-    console.log(`🖼️ Final: ${Object.keys(thumbnailMap).length}/${uniqueAdIds.length} ads have images (${fullPicCount} upgraded to full_picture)`);
+    console.log(`🖼️ Final: ${Object.keys(thumbnailMap).length}/${uniqueAdIds.length} ads have images`);
 
-    for (let i = 0; i < adInsights.length; i += UPSERT_BATCH) {
-      await Promise.all(adInsights.slice(i, i + UPSERT_BATCH).map(async row => {
+    // ── Compute perceptual hash for ALL images (unified format for fuzzy matching)
+    const needPHash = Object.entries(thumbnailMap).filter(([, url]) => url);
+    if (needPHash.length > 0) {
+      console.log(`🔑 Computing pHash for ${needPHash.length} images...`);
+      const sharp = (await import("sharp")).default;
+      async function pHash(buf: Buffer): Promise<string> {
+        const { data } = await sharp(buf).resize(16, 16, { fit: "fill" }).grayscale().raw().toBuffer({ resolveWithObject: true });
+        const avg = data.reduce((s, v) => s + v, 0) / data.length;
+        let hex = "";
+        for (let i = 0; i < data.length; i += 4) {
+          let nibble = 0;
+          for (let j = 0; j < 4 && i + j < data.length; j++) nibble = (nibble << 1) | (data[i + j] >= avg ? 1 : 0);
+          hex += nibble.toString(16);
+        }
+        return hex;
+      }
+      const PH_BATCH = 30;
+      for (let b = 0; b < needPHash.length; b += PH_BATCH) {
+        await Promise.all(needPHash.slice(b, b + PH_BATCH).map(async ([adId, url]) => {
+          try {
+            const res = await fetch(url, { cache: "no-store" });
+            if (!res.ok) return;
+            const buf = Buffer.from(await res.arrayBuffer());
+            imageHashMap[adId] = `ph:${await pHash(buf)}`;
+          } catch { /* skip */ }
+        }));
+      }
+      console.log(`🔑 Computed pHash for ${Object.keys(imageHashMap).filter(k => imageHashMap[k].startsWith("ph:")).length} images`);
+    }
+
+    const UPSERT_AD_BATCH = 50;
+    for (let i = 0; i < adInsights.length; i += UPSERT_AD_BATCH) {
+      await Promise.all(adInsights.slice(i, i + UPSERT_AD_BATCH).map(async row => {
         const actions     = row.actions ?? [];
         const spend       = parseFloat(row.spend ?? "0");
         const impressions = parseInt(row.impressions ?? "0", 10);
@@ -417,6 +419,8 @@ async function syncAccount(
         const pgId   = pgIdMap[row.campaign_id] ?? fallbackPageId;
         const thumb  = thumbnailMap[row.ad_id] ?? "";
         const mType  = mediaTypeMap[row.ad_id] ?? "";
+        const crtId  = creativeIds[row.ad_id] ?? "";
+        const imgHash = imageHashMap[row.ad_id] ?? "";
 
         await prisma.adsContentDaily.upsert({
           where: {
@@ -435,6 +439,8 @@ async function syncAccount(
             campaignName: row.campaign_name ?? "Untitled",
             thumbnailUrl: thumb,
             mediaType: mType,
+            creativeId: crtId,
+            imageHash: imgHash,
             spend, impressions, clicks, inbox, leads, cpi,
             likes, comments: cmts, shares, videoViews, ctr,
             status: statusMap[row.campaign_id] ?? "active",
@@ -445,8 +451,10 @@ async function syncAccount(
             pageId: pgId,
             adName: row.ad_name ?? "Untitled",
             campaignName: row.campaign_name ?? "Untitled",
-            thumbnailUrl: thumb,
-            mediaType: mType,
+            ...(thumb ? { thumbnailUrl: thumb } : {}),
+            ...(mType ? { mediaType: mType } : {}),
+            ...(crtId ? { creativeId: crtId } : {}),
+            ...(imgHash ? { imageHash: imgHash } : {}),
             spend, impressions, clicks, inbox, leads, cpi,
             likes, comments: cmts, shares, videoViews, ctr,
             status: statusMap[row.campaign_id] ?? "active",

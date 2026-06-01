@@ -269,6 +269,177 @@ export async function GET(req: NextRequest) {
       responseExtra.adByContent = adByContent;
     }
 
+    // ── Global ad content (when no pageId — for main dashboard) ──────────
+    if (!pageId && since && until) {
+      const globalAdRows = await prisma.adsContentDaily.findMany({
+        where: { date: { gte: since, lte: until } },
+        orderBy: [{ spend: "desc" }],
+      });
+
+      // Build pageId → pageName map from adsMetrics
+      const pageNameMap = new Map<string, string>();
+      for (const m of adsMetrics) {
+        if (m.pageId && m.pageName && m.pageName !== m.pageId) {
+          pageNameMap.set(m.pageId, m.pageName);
+        }
+      }
+
+      // Group by adName (service)
+      const svcMap = new Map<string, {
+        adName: string; thumbnailUrl: string; mediaType: string;
+        spend: number; impressions: number; clicks: number; inbox: number;
+        leads: number; adIds: Set<string>; pageIds: Set<string>;
+      }>();
+
+      for (const ad of globalAdRows) {
+        const key = ad.adName || ad.adId;
+        const e = svcMap.get(key);
+        if (e) {
+          e.spend += ad.spend; e.impressions += ad.impressions; e.clicks += ad.clicks;
+          e.inbox += ad.inbox; e.leads += ad.leads;
+          e.adIds.add(ad.adId); e.pageIds.add(ad.pageId);
+          if (ad.thumbnailUrl && (!e.thumbnailUrl || e.thumbnailUrl.includes("c0.5000x0.5000f"))) {
+            e.thumbnailUrl = ad.thumbnailUrl;
+          }
+          if (!e.mediaType && ad.mediaType) e.mediaType = ad.mediaType;
+        } else {
+          svcMap.set(key, {
+            adName: ad.adName, thumbnailUrl: ad.thumbnailUrl, mediaType: ad.mediaType,
+            spend: ad.spend, impressions: ad.impressions, clicks: ad.clicks,
+            inbox: ad.inbox, leads: ad.leads,
+            adIds: new Set([ad.adId]), pageIds: new Set([ad.pageId]),
+          });
+        }
+      }
+
+      responseExtra.globalAdContent = [...svcMap.values()]
+        .map(a => ({
+          adName: a.adName,
+          thumbnailUrl: a.thumbnailUrl,
+          mediaType: a.mediaType || "",
+          spend: a.spend, impressions: a.impressions, clicks: a.clicks,
+          inbox: a.inbox, leads: a.leads,
+          cpi: a.inbox > 0 ? a.spend / a.inbox : 0,
+          cpl: a.leads > 0 ? a.spend / a.leads : 0,
+          ctr: a.impressions > 0 ? (a.clicks / a.impressions) * 100 : 0,
+          adCount: a.adIds.size,
+          pageCount: a.pageIds.size,
+          convRate: a.inbox > 0 ? (a.leads / a.inbox) * 100 : 0,
+        }))
+        .sort((a, b) => b.spend - a.spend);
+
+      // Group by content — prefer creativeId (same across pages), fallback to thumbnail filename
+      function gThumbKey(url: string): string {
+        try {
+          const p = new URL(url).pathname;
+          const segs = p.split('/').filter(Boolean);
+          return `thumb:${segs[segs.length - 1] || p}`;
+        } catch { return `thumb:${url}`; }
+      }
+
+      // Hamming distance helper for perceptual hash fuzzy matching
+      function hammingDist(a: string, b: string): number {
+        if (a.length !== b.length) return 999;
+        let d = 0;
+        for (let i = 0; i < a.length; i++) {
+          const diff = parseInt(a[i], 16) ^ parseInt(b[i], 16);
+          d += diff.toString(2).replace(/0/g, "").length;
+        }
+        return d;
+      }
+
+      const gThumbMap = new Map<string, {
+        adNames: Set<string>; thumbnailUrl: string; mediaType: string;
+        spend: number; impressions: number; clicks: number; inbox: number;
+        leads: number; adIds: Set<string>; pageIds: Set<string>; pageNamesSet: Set<string>;
+        pageMetrics: Map<string, { pageName: string; spend: number; inbox: number; leads: number }>;
+      }>();
+
+      // Fuzzy pHash grouping — canonical list + per-hash cache.
+      // Distinct hashes ≪ rows, so this avoids the previous O(rows × keys) scan
+      // while preserving identical "first-match-wins" grouping behaviour.
+      const phCanonical: string[] = [];           // canonical pHash bodies (without "ph:" prefix)
+      const phKeyCache = new Map<string, string>(); // full imageHash ("ph:...") → resolved group key
+      function resolvePhKey(fullHash: string): string {
+        const cached = phKeyCache.get(fullHash);
+        if (cached) return cached;
+        const h = fullHash.slice(3); // remove "ph:" prefix
+        for (const c of phCanonical) {
+          if (hammingDist(h, c) <= 10) {
+            const k = `hash:ph:${c}`;
+            phKeyCache.set(fullHash, k);
+            return k;
+          }
+        }
+        phCanonical.push(h);
+        const k = `hash:ph:${h}`;
+        phKeyCache.set(fullHash, k);
+        return k;
+      }
+
+      for (const ad of globalAdRows) {
+        // Priority: imageHash (fuzzy pHash) > creativeId > thumbnail filename > adId
+        let key: string;
+        if (ad.imageHash) {
+          if (ad.imageHash.startsWith("ph:")) {
+            key = resolvePhKey(ad.imageHash);
+          } else {
+            key = `hash:${ad.imageHash}`;
+          }
+        } else if (ad.creativeId) {
+          key = `crt:${ad.creativeId}`;
+        } else if (ad.thumbnailUrl) {
+          key = gThumbKey(ad.thumbnailUrl);
+        } else {
+          key = `no-thumb-${ad.adId}`;
+        }
+        const pn = pageNameMap.get(ad.pageId) ?? ad.pageId;
+        const e = gThumbMap.get(key);
+        if (e) {
+          e.spend += ad.spend; e.impressions += ad.impressions; e.clicks += ad.clicks;
+          e.inbox += ad.inbox; e.leads += ad.leads;
+          e.adNames.add(ad.adName || ad.adId); e.adIds.add(ad.adId); e.pageIds.add(ad.pageId);
+          if (!e.mediaType && ad.mediaType) e.mediaType = ad.mediaType;
+          e.pageNamesSet.add(pn);
+          // Per-page accumulation
+          const pm = e.pageMetrics.get(ad.pageId);
+          if (pm) { pm.spend += ad.spend; pm.inbox += ad.inbox; pm.leads += ad.leads; }
+          else { e.pageMetrics.set(ad.pageId, { pageName: pn, spend: ad.spend, inbox: ad.inbox, leads: ad.leads }); }
+        } else {
+          gThumbMap.set(key, {
+            adNames: new Set([ad.adName || ad.adId]),
+            thumbnailUrl: ad.thumbnailUrl, mediaType: ad.mediaType,
+            spend: ad.spend, impressions: ad.impressions, clicks: ad.clicks,
+            inbox: ad.inbox, leads: ad.leads,
+            adIds: new Set([ad.adId]), pageIds: new Set([ad.pageId]),
+            pageNamesSet: new Set([pn]),
+            pageMetrics: new Map([[ad.pageId, { pageName: pn, spend: ad.spend, inbox: ad.inbox, leads: ad.leads }]]),
+          });
+        }
+      }
+
+      responseExtra.globalAdByContent = [...gThumbMap.values()]
+        .map(a => ({
+          adName: [...a.adNames].join(", "),
+          adNames: [...a.adNames],
+          thumbnailUrl: a.thumbnailUrl,
+          mediaType: a.mediaType || "",
+          spend: a.spend, impressions: a.impressions, clicks: a.clicks,
+          inbox: a.inbox, leads: a.leads,
+          cpi: a.inbox > 0 ? a.spend / a.inbox : 0,
+          cpl: a.leads > 0 ? a.spend / a.leads : 0,
+          ctr: a.impressions > 0 ? (a.clicks / a.impressions) * 100 : 0,
+          adCount: a.adIds.size,
+          pageCount: a.pageIds.size,
+          pageNames: [...a.pageNamesSet],
+          convRate: a.inbox > 0 ? (a.leads / a.inbox) * 100 : 0,
+          pageBreakdown: [...a.pageMetrics.values()]
+            .map(p => ({ ...p, cpi: p.inbox > 0 ? p.spend / p.inbox : 0 }))
+            .sort((x, y) => y.spend - x.spend),
+        }))
+        .sort((a, b) => b.spend - a.spend);
+    }
+
     return NextResponse.json(
       {
         adsMetrics,
