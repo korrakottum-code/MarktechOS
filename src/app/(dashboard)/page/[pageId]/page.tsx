@@ -160,6 +160,16 @@ export default function PageDetailPage() {
   }, [adContent]);
 
   // ── KPIs ──────────────────────────────────────────────────────────────────
+  // ── Sorted ad content (filtered by service) ─────────────────────────────
+  const sortedAds = useMemo(() => {
+    const filtered = serviceFilter ? adContent.filter(a => a.adName === serviceFilter) : adContent;
+    return [...filtered].sort((a, b) => {
+      const av = a[adSort] as number;
+      const bv = b[adSort] as number;
+      return bv - av;
+    });
+  }, [adContent, adSort, serviceFilter]);
+
   const kpis = useMemo(() => {
     if (serviceFilter) {
       const s = sortedAds.reduce((a, c) => a + c.spend, 0);
@@ -185,15 +195,7 @@ export default function PageDetailPage() {
     };
   }, [campaigns, sortedAds, serviceFilter]);
 
-  // ── Sorted ad content (filtered by service) ─────────────────────────────
-  const sortedAds = useMemo(() => {
-    const filtered = serviceFilter ? adContent.filter(a => a.adName === serviceFilter) : adContent;
-    return [...filtered].sort((a, b) => {
-      const av = a[adSort] as number;
-      const bv = b[adSort] as number;
-      return bv - av;
-    });
-  }, [adContent, adSort, serviceFilter]);
+
 
   const sortedContentAds = useMemo(() => {
     const filtered = serviceFilter

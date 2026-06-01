@@ -241,7 +241,7 @@ function FacebookAdsDashboard() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   // ── Apply search filter to global content ────────────────────────────────────
-  const globalAdContent = useMemo(() => {
+  const baseGlobalAdContent = useMemo(() => {
     if (!search) return _globalAdContent;
     return _globalAdContent.map(svc => {
       if (!svc.pageBreakdown) return svc;
@@ -263,7 +263,7 @@ function FacebookAdsDashboard() {
     }).filter(Boolean) as GlobalAdItem[];
   }, [_globalAdContent, search]);
 
-  const globalAdByContent = useMemo(() => {
+  const baseGlobalAdByContent = useMemo(() => {
     if (!search) return _globalAdByContent;
     return _globalAdByContent.map(svc => {
       if (!svc.pageBreakdown) return svc;
@@ -292,17 +292,29 @@ function FacebookAdsDashboard() {
   const [expandedServices, setExpandedServices] = useState<Set<string>>(new Set());
   const [lightbox, setLightbox] = useState<{ url: string; name: string; spend: number; inbox: number; cpi: number; mediaType?: string; pageNames?: string[] } | null>(null);
   const [view, setView] = useState<'overview' | 'pages' | 'service' | 'content'>('overview');
+  const [creativeTab, setCreativeTab] = useState<'inbox'|'leads'>('inbox');
   const [svcSort, setSvcSort] = useState<{ key: keyof GlobalAdItem; dir: 'asc' | 'desc' }>({ key: 'spend', dir: 'desc' });
 
   // ── Unique service names for cross filter ────────────────────────────────
   const serviceNames = useMemo(() => {
-    const names = [...new Set(globalAdContent.map(a => a.adName))].filter(Boolean);
+    const names = [...new Set(baseGlobalAdContent.map(a => a.adName))].filter(Boolean);
     return names.sort((a, b) => {
-      const sa = globalAdContent.find(c => c.adName === a)?.spend ?? 0;
-      const sb = globalAdContent.find(c => c.adName === b)?.spend ?? 0;
+      const sa = baseGlobalAdContent.find(c => c.adName === a)?.spend ?? 0;
+      const sb = baseGlobalAdContent.find(c => c.adName === b)?.spend ?? 0;
       return sb - sa;
     });
-  }, [globalAdContent]);
+  }, [baseGlobalAdContent]);
+
+  // ── Apply serviceFilter to global content ────────────────────────────────────
+  const globalAdContent = useMemo(() => {
+    if (!serviceFilter) return baseGlobalAdContent;
+    return baseGlobalAdContent.filter(s => s.adName === serviceFilter);
+  }, [baseGlobalAdContent, serviceFilter]);
+
+  const globalAdByContent = useMemo(() => {
+    if (!serviceFilter) return baseGlobalAdByContent;
+    return baseGlobalAdByContent.filter(ad => ad.adNames?.includes(serviceFilter));
+  }, [baseGlobalAdByContent, serviceFilter]);
 
   // ── Group content by service → top 3 each ───────────────────────────────
   const contentByService = useMemo(() => {
@@ -709,235 +721,277 @@ function FacebookAdsDashboard() {
           </div>
         )}
 
-      {/* ── Infographic Overview Dashboard ── */}
+      {/* ── Infographic Overview Dashboard (Compact Layout) ── */}
       {view === 'overview' && (
-        <div className="space-y-6">
+        <div className="space-y-4">
           
-          {/* Header Title Banner */}
-          <div className="bg-gradient-to-r from-navy-900 to-navy-800 rounded-3xl p-6 border border-white/5 flex flex-col md:flex-row items-center justify-between shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-gold-500/10 blur-3xl rounded-full -translate-y-1/2 translate-x-1/3" />
-            <div className="relative z-10 text-center md:text-left mb-4 md:mb-0">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gold-500/10 border border-gold-500/20 text-gold-400 text-[10px] font-bold uppercase tracking-widest mb-3">
-                <BarChart3 size={12} /> Executive Summary
+          {/* Row 1: Header & KPIs */}
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+            <div className="lg:col-span-1 bg-gradient-to-br from-navy-900 to-navy-800 rounded-3xl p-5 border border-white/5 flex flex-col justify-center shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-gold-500/10 blur-2xl rounded-full translate-x-1/3 -translate-y-1/3" />
+              <div className="relative z-10">
+                <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-gold-500/10 border border-gold-500/20 text-gold-400 text-[9px] font-bold uppercase tracking-wider mb-2">
+                  <BarChart3 size={10} /> Overview
+                </div>
+                <h2 className="text-xl font-black text-white tracking-tight mb-3">ผลการดำเนินงาน</h2>
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-[9px] text-white/50 font-bold uppercase mb-0.5">ยอดใช้จ่ายรวม (Spent)</p>
+                    <p className="text-xl font-black text-rose-400 leading-none">{thb(kpis.totalSpend)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] text-white/50 font-bold uppercase mb-0.5">ยอด Leads รวม</p>
+                    <p className="text-xl font-black text-emerald-400 leading-none">{num(kpis.totalLeads)} <span className="text-xs font-medium">คน</span></p>
+                  </div>
+                </div>
               </div>
-              <h2 className="text-3xl font-black text-white tracking-tight">ผลการดำเนินงานภาพรวม</h2>
-              <p className="text-foreground-muted text-sm mt-1">{pages.length} คลินิกที่ดูแล • ข้อมูล ณ {since} ถึง {until}</p>
             </div>
-            
-            {/* Quick Stats in Banner */}
-            <div className="relative z-10 flex gap-4 bg-navy-950/50 p-2 rounded-2xl border border-white/10 backdrop-blur-sm">
-              <div className="px-6 py-2 border-r border-white/10">
-                <p className="text-[10px] text-white/50 font-bold uppercase text-center mb-1">ยอดใช้จ่ายรวม (Spent)</p>
-                <p className="text-xl font-black text-rose-400 text-center">{thb(kpis.totalSpend)}</p>
-              </div>
-              <div className="px-6 py-2">
-                <p className="text-[10px] text-white/50 font-bold uppercase text-center mb-1">ยอด Leads รวม</p>
-                <p className="text-xl font-black text-emerald-400 text-center">{num(kpis.totalLeads)} <span className="text-xs font-medium">คน</span></p>
-              </div>
+
+            <div className="lg:col-span-4 grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {[
+                { title: "ต้นทุนต่อแชท (CPI)", value: thb(kpis.avgCPI), icon: MessageCircle, color: "text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/30" },
+                { title: "ต้นทุนต่อลีด (CPL)", value: thb(kpis.avgCPL), icon: Users, color: "text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/30" },
+                { title: "การเข้าถึง (Imp.)", value: num(kpis.totalImpressions), icon: Eye, color: "text-sky-400", bg: "bg-sky-500/10", border: "border-sky-500/30" },
+                { title: "จำนวนแชท (Inbox)", value: num(kpis.totalInbox), icon: MessageSquare, color: "text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/30" },
+              ].map((stat, i) => (
+                <div key={i} className={`rounded-3xl bg-navy-900 border ${stat.border} p-5 flex flex-col items-center justify-center text-center relative overflow-hidden shadow-xl`}>
+                  <div className={`absolute -top-4 -right-4 w-16 h-16 rounded-full ${stat.bg} blur-xl`} />
+                  <stat.icon size={24} className={`${stat.color} mb-3 relative z-10`} />
+                  <p className={`text-2xl lg:text-3xl font-black tracking-tight ${stat.color} relative z-10 mb-1`}>{stat.value}</p>
+                  <p className="text-[10px] font-bold text-white/60 uppercase relative z-10">{stat.title}</p>
+                </div>
+              ))}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            
-            {/* Left Column: Metrics & Funnel (7 cols) */}
-            <div className="lg:col-span-7 space-y-6">
-              
-              {/* Infographic KPI Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {[
-                  { title: "ต้นทุนต่อแชท (CPI)", value: thb(kpis.avgCPI), icon: MessageCircle, color: "text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/30" },
-                  { title: "ต้นทุนต่อลีด (CPL)", value: thb(kpis.avgCPL), icon: Users, color: "text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/30" },
-                  { title: "การเข้าถึง (Imp.)", value: num(kpis.totalImpressions), icon: Eye, color: "text-sky-400", bg: "bg-sky-500/10", border: "border-sky-500/30" },
-                  { title: "จำนวนแชท (Inbox)", value: num(kpis.totalInbox), icon: MessageSquare, color: "text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/30" },
-                ].map((stat, i) => (
-                  <div key={i} className={`rounded-2xl bg-navy-900 border ${stat.border} p-4 flex flex-col items-center justify-center text-center relative overflow-hidden shadow-lg`}>
-                    <div className={`absolute -top-4 -right-4 w-16 h-16 rounded-full ${stat.bg} blur-xl`} />
-                    <stat.icon size={20} className={`${stat.color} mb-2 relative z-10`} />
-                    <p className={`text-xl font-black tracking-tight ${stat.color} relative z-10`}>{stat.value}</p>
-                    <p className="text-[10px] font-bold text-white/60 uppercase mt-1 relative z-10">{stat.title}</p>
-                  </div>
-                ))}
+          {/* Row 2: Horizontal Funnel & Versus Block */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            {/* Horizontal Funnel */}
+            <div className="lg:col-span-8 bg-navy-900 border border-white/5 rounded-3xl overflow-hidden shadow-xl flex flex-col">
+              <div className="bg-navy-950/50 border-b border-white/5 p-3 flex items-center justify-center gap-2">
+                <Filter size={14} className="text-emerald-400" />
+                <h3 className="text-[11px] font-black text-white uppercase tracking-wider">ประสิทธิภาพแต่ละขั้นตอน (Funnel)</h3>
               </div>
-
-              {/* Conversion Funnel Box */}
-              <div className="bg-navy-900 border border-white/5 rounded-3xl overflow-hidden shadow-xl">
-                <div className="bg-navy-950/50 border-b border-white/5 p-4 flex items-center justify-center gap-2">
-                  <Filter size={16} className="text-emerald-400" />
-                  <h3 className="text-sm font-black text-white uppercase tracking-wider">ประสิทธิภาพแต่ละขั้นตอน (Funnel)</h3>
-                </div>
-                <div className="p-6">
-                  <div className="flex flex-col gap-3 relative">
-                    <div className="absolute left-[38px] top-4 bottom-4 w-1 bg-white/5 rounded-full" />
-                    {[
-                      { step: 1, label: "เห็นโฆษณา (Impressions)", value: num(kpis.totalImpressions), drop: null, color: "text-sky-400", bg: "bg-sky-500" },
-                      { step: 2, label: "คลิกโฆษณา (Clicks)", value: num(kpis.totalClicks), drop: kpis.totalImpressions ? pct(kpis.totalClicks/kpis.totalImpressions*100) : "0%", color: "text-blue-400", bg: "bg-blue-500" },
-                      { step: 3, label: "ทักแชท (Inbox)", value: num(kpis.totalInbox), drop: kpis.totalClicks ? pct(kpis.totalInbox/kpis.totalClicks*100) : "0%", color: "text-purple-400", bg: "bg-purple-500" },
-                      { step: 4, label: "เป็นลูกค้า (Leads)", value: num(kpis.totalLeads), drop: kpis.totalInbox ? pct(kpis.totalLeads/kpis.totalInbox*100) : "0%", color: "text-emerald-400", bg: "bg-emerald-500" },
-                    ].map(s => (
-                      <div key={s.step} className="flex items-center gap-4 relative z-10">
-                        <div className={`w-20 h-20 rounded-2xl bg-navy-950 border border-white/10 flex flex-col items-center justify-center shrink-0 shadow-lg`}>
-                          <span className="text-[10px] font-bold text-white/40 mb-1">STEP</span>
-                          <span className={`text-2xl font-black ${s.color}`}>{s.step}</span>
+              <div className="p-4 flex-1 flex items-center justify-center bg-gradient-to-b from-navy-900 to-navy-950/30">
+                <div className="grid grid-cols-4 gap-2 w-full relative">
+                  <div className="absolute top-6 left-[10%] right-[10%] h-0 border-t-2 border-dashed border-white/10 z-0" />
+                  {[
+                    { step: 1, label: "Impressions", value: num(kpis.totalImpressions), drop: null, color: "text-sky-400", bg: "bg-sky-500" },
+                    { step: 2, label: "Clicks", value: num(kpis.totalClicks), drop: kpis.totalImpressions ? pct(kpis.totalClicks/kpis.totalImpressions*100) : "0%", color: "text-blue-400", bg: "bg-blue-500" },
+                    { step: 3, label: "Inbox", value: num(kpis.totalInbox), drop: kpis.totalClicks ? pct(kpis.totalInbox/kpis.totalClicks*100) : "0%", color: "text-purple-400", bg: "bg-purple-500" },
+                    { step: 4, label: "Leads", value: num(kpis.totalLeads), drop: kpis.totalInbox ? pct(kpis.totalLeads/kpis.totalInbox*100) : "0%", color: "text-emerald-400", bg: "bg-emerald-500" },
+                  ].map((s, i) => (
+                    <div key={s.step} className="relative flex flex-col items-center text-center group">
+                      <div className={`w-12 h-12 rounded-2xl bg-navy-950 border border-white/10 flex flex-col items-center justify-center shadow-lg mb-3 relative z-10 transition-transform group-hover:scale-110 group-hover:border-${s.bg}/50`}>
+                        <span className={`text-xl font-black ${s.color}`}>{s.step}</span>
+                      </div>
+                      <p className="text-[10px] font-bold text-white/70 mb-1 leading-tight h-6 flex items-end">{s.label}</p>
+                      <p className={`text-base font-black ${s.color} mb-2`}>{s.value}</p>
+                      
+                      {s.drop && (
+                        <div className={`mt-auto px-2 py-0.5 rounded-md ${s.bg}/20 border border-${s.bg}/30 text-white font-black text-[10px]`}>
+                          {s.drop}
                         </div>
-                        <div className="flex-1 bg-gradient-to-r from-navy-950 to-navy-900 border border-white/5 rounded-2xl p-4 flex items-center justify-between group hover:border-white/20 transition-colors">
-                          <div>
-                            <p className="text-xs font-bold text-white/70 mb-1">{s.label}</p>
-                            <p className={`text-2xl font-black ${s.color}`}>{s.value}</p>
-                          </div>
-                          {s.drop && (
-                            <div className="text-right">
-                              <p className="text-[9px] font-bold text-white/40 uppercase mb-1">อัตราไปต่อ</p>
-                              <div className={`px-3 py-1 rounded-lg ${s.bg}/20 border border-${s.bg}/30 text-white font-black text-sm`}>
-                                {s.drop}
-                              </div>
-                            </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Versus Block */}
+            <div className="lg:col-span-4 bg-navy-900 border border-white/5 rounded-3xl overflow-hidden shadow-xl flex flex-col">
+              <div className="bg-navy-950/50 border-b border-white/5 p-3 flex items-center justify-center gap-2">
+                <Activity size={14} className="text-gold-400" />
+                <h3 className="text-[11px] font-black text-white uppercase tracking-wider">{serviceFilter ? 'Top vs Bottom Ads (CPI)' : 'Top vs Bottom Services (CPI)'}</h3>
+              </div>
+              <div className="p-4 flex-1 flex flex-col justify-center relative">
+                <div className="absolute left-1/2 top-12 bottom-8 w-px bg-white/10 -translate-x-1/2" />
+                <div className="absolute left-1/2 top-1/2 w-8 h-8 bg-navy-950 border border-white/10 rounded-full flex items-center justify-center -translate-x-1/2 -translate-y-1/2 text-white text-[10px] font-black italic shadow-xl z-10">VS</div>
+                
+                {(() => {
+                  const dataSrc = serviceFilter ? globalAdByContent : globalAdContent;
+                  const validSvcs = [...dataSrc].filter(s => s.inbox > 5 && s.spend > 1000).sort((a,b) => a.cpi - b.cpi);
+                  let best = validSvcs[0] || dataSrc[0];
+                  let worst = validSvcs[validSvcs.length - 1] || dataSrc[dataSrc.length - 1];
+                  
+                  if (best && worst && best.adName === worst.adName && validSvcs.length > 1) {
+                    const diffWorst = [...validSvcs].reverse().find(s => s.adName !== best.adName);
+                    if (diffWorst) {
+                      worst = diffWorst;
+                    } else {
+                      return <div className="text-center text-white/50 text-[10px] py-4 w-full h-full flex items-center justify-center">เปรียบเทียบไม่ได้</div>;
+                    }
+                  }
+                  
+                  if (!best || !worst) return <div className="text-center text-white/50 text-[10px] py-4 w-full h-full flex items-center justify-center">ไม่มีข้อมูลพอเปรียบเทียบ</div>;
+
+                  return (
+                    <div className="flex justify-between items-center gap-4">
+                      {/* Best */}
+                      <div className="flex-1 text-center">
+                        <div className="inline-block px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-[9px] font-bold rounded-md mb-2">ถูกที่สุด</div>
+                        <div 
+                          onClick={() => best.thumbnailUrl && setLightbox({ url: best.thumbnailUrl, name: best.adName, spend: best.spend, inbox: best.inbox, cpi: best.cpi, mediaType: best.mediaType })}
+                          className={`w-12 h-12 mx-auto bg-navy-950 rounded-xl border border-emerald-500/30 flex items-center justify-center mb-2 overflow-hidden shadow-md relative group ${best.thumbnailUrl ? 'cursor-pointer hover:border-emerald-500/50 hover:scale-105' : ''} transition-transform`}
+                        >
+                          {best.thumbnailUrl ? (
+                            <>
+                              <img src={best.thumbnailUrl} alt="" className="absolute inset-0 w-full h-full object-cover blur-sm opacity-40 scale-125" />
+                              <img src={best.thumbnailUrl} alt={best.adName} loading="lazy" className="absolute inset-0 w-full h-full object-contain z-10 drop-shadow-md" />
+                            </>
+                          ) : (
+                            <Image size={16} className="text-emerald-400 opacity-50" />
                           )}
                         </div>
+                        <p className="text-[10px] font-bold text-white truncate max-w-[80px] mx-auto mb-1">{best.adName}</p>
+                        <p className="text-base font-black text-emerald-400 leading-none">{thb(best.cpi)}</p>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-            </div>
-
-            {/* Right Column: Top Services & Comparison (5 cols) */}
-            <div className="lg:col-span-5 space-y-6">
-              
-              {/* Versus Block (Best vs Worst CPI) */}
-              <div className="bg-navy-900 border border-white/5 rounded-3xl overflow-hidden shadow-xl">
-                <div className="bg-navy-950/50 border-b border-white/5 p-4 flex items-center justify-center gap-2">
-                  <Activity size={16} className="text-gold-400" />
-                  <h3 className="text-sm font-black text-white uppercase tracking-wider">Top vs Bottom Services (CPI)</h3>
-                </div>
-                
-                <div className="p-6 relative">
-                  <div className="absolute left-1/2 top-10 bottom-10 w-px bg-white/10 -translate-x-1/2" />
-                  <div className="absolute left-1/2 top-1/2 w-10 h-10 bg-navy-950 border-2 border-white/10 rounded-full flex items-center justify-center -translate-x-1/2 -translate-y-1/2 text-white font-black italic shadow-xl z-10">VS</div>
-                  
-                  {(() => {
-                    const validSvcs = [...globalAdContent].filter(s => s.inbox > 5 && s.spend > 1000).sort((a,b) => a.cpi - b.cpi);
-                    const best = validSvcs[0] || globalAdContent[0];
-                    const worst = validSvcs[validSvcs.length - 1] || globalAdContent[globalAdContent.length - 1];
-                    
-                    if (!best || !worst) return <div className="text-center text-white/50 text-sm py-8">ไม่มีข้อมูลพอเปรียบเทียบ</div>;
-
-                    return (
-                      <div className="flex justify-between items-center gap-8">
-                        {/* Best */}
-                        <div className="flex-1 text-center">
-                          <div className="inline-block px-3 py-1 bg-emerald-500/20 text-emerald-400 text-[10px] font-bold rounded-lg mb-4 border border-emerald-500/30">ถูกที่สุด</div>
-                          <div className="w-16 h-16 mx-auto bg-navy-950 rounded-2xl border border-emerald-500/30 flex items-center justify-center mb-3">
-                            <Image size={24} className="text-emerald-400" />
-                          </div>
-                          <p className="text-xs font-bold text-white truncate max-w-[120px] mx-auto mb-2" title={best.adName}>{best.adName}</p>
-                          <p className="text-2xl font-black text-emerald-400">{thb(best.cpi)}</p>
-                          <p className="text-[9px] text-white/50 uppercase mt-1">/ Inbox</p>
-                        </div>
-                        
-                        {/* Worst */}
-                        <div className="flex-1 text-center">
-                          <div className="inline-block px-3 py-1 bg-rose-500/20 text-rose-400 text-[10px] font-bold rounded-lg mb-4 border border-rose-500/30">แพงที่สุด</div>
-                          <div className="w-16 h-16 mx-auto bg-navy-950 rounded-2xl border border-rose-500/30 flex items-center justify-center mb-3">
-                            <Image size={24} className="text-rose-400" />
-                          </div>
-                          <p className="text-xs font-bold text-white truncate max-w-[120px] mx-auto mb-2" title={worst.adName}>{worst.adName}</p>
-                          <p className="text-2xl font-black text-rose-400">{thb(worst.cpi)}</p>
-                          <p className="text-[9px] text-white/50 uppercase mt-1">/ Inbox</p>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-              </div>
-
-              {/* Top 3 Services Leaderboard */}
-              <div className="bg-navy-900 border border-white/5 rounded-3xl overflow-hidden shadow-xl">
-                <div className="bg-navy-950/50 border-b border-white/5 p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Trophy size={16} className="text-gold-400" />
-                    <h3 className="text-sm font-black text-white uppercase tracking-wider">3 อันดับบริการยอดฮิต</h3>
-                  </div>
-                  <button onClick={() => setView('service')} className="text-[10px] text-gold-400 hover:underline">ดูทั้งหมด</button>
-                </div>
-                <div className="p-5 space-y-4">
-                  {[...globalAdContent].sort((a,b) => b.leads - a.leads).slice(0, 3).map((svc, i) => {
-                    const colors = [
-                      "from-gold-500 to-amber-600 text-gold-400 bg-gold-500/10 border-gold-500/30",
-                      "from-slate-300 to-slate-400 text-slate-300 bg-slate-500/10 border-slate-500/30",
-                      "from-amber-700 to-amber-800 text-amber-600 bg-amber-700/10 border-amber-700/30"
-                    ];
-                    const [grad, textC, bg, border] = colors[i].split(" ");
-                    return (
-                      <div key={svc.adName} className={`flex items-center gap-4 p-3 rounded-2xl border ${border} ${bg}`}>
-                        <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${grad} flex items-center justify-center text-navy-950 font-black text-sm shadow-lg`}>
-                          {i+1}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-white truncate">{svc.adName}</p>
-                          <p className="text-[10px] text-white/60">Spend: {thb(svc.spend)}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className={`text-lg font-black ${textC}`}>{svc.leads}</p>
-                          <p className="text-[9px] text-white/50 uppercase font-bold">Leads</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-            </div>
-          </div>
-
-          {/* Winning Creatives Gallery */}
-          <div className="bg-navy-900 border border-white/5 rounded-3xl overflow-hidden shadow-xl">
-            <div className="bg-navy-950/50 border-b border-white/5 p-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Award size={16} className="text-rose-400" />
-                <h3 className="text-sm font-black text-white uppercase tracking-wider">🏆 Winning Creatives (Top 4)</h3>
-              </div>
-              <button onClick={() => setView('content')} className="text-[10px] font-bold text-gold-400 border border-gold-500/30 px-3 py-1 rounded-lg hover:bg-gold-500/10 transition-colors">
-                ดูโฆษณาทั้งหมด
-              </button>
-            </div>
-
-            <div className="p-5 sm:p-6 bg-gradient-to-b from-navy-900 to-navy-950/80">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                {[...globalAdByContent]
-                  .filter(ad => ad.thumbnailUrl)
-                  .sort((a,b) => b.leads - a.leads)
-                  .slice(0, 4)
-                  .map((ad, i) => (
-                  <div key={ad.adName+i} className="group relative rounded-2xl overflow-hidden border border-white/10 bg-black aspect-[3/4] flex flex-col justify-end shadow-2xl">
-                    <img src={ad.thumbnailUrl} alt={ad.adName} loading="lazy" className="absolute inset-0 w-full h-full object-cover opacity-70 group-hover:scale-110 group-hover:opacity-90 transition-all duration-700" />
-                    
-                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
-                    
-                    <div className="absolute top-3 left-3 bg-gradient-to-r from-rose-500 to-orange-500 text-white text-[10px] font-black px-3 py-1 rounded-lg shadow-lg border border-white/20">
-                      RANK #{i+1}
-                    </div>
-
-                    <div className="relative z-10 p-4 w-full">
-                      <p className="text-xs font-bold text-white mb-3 line-clamp-2 leading-snug drop-shadow-md">{ad.adName}</p>
                       
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="bg-black/40 backdrop-blur-md rounded-xl p-2.5 border border-white/10 text-center">
-                          <p className="text-[9px] text-white/50 font-bold uppercase mb-0.5">Leads</p>
-                          <p className="text-base font-black text-emerald-400">{ad.leads}</p>
+                      {/* Worst */}
+                      <div className="flex-1 text-center">
+                        <div className="inline-block px-2 py-0.5 bg-rose-500/20 text-rose-400 text-[9px] font-bold rounded-md mb-2">แพงที่สุด</div>
+                        <div 
+                          onClick={() => worst.thumbnailUrl && setLightbox({ url: worst.thumbnailUrl, name: worst.adName, spend: worst.spend, inbox: worst.inbox, cpi: worst.cpi, mediaType: worst.mediaType })}
+                          className={`w-12 h-12 mx-auto bg-navy-950 rounded-xl border border-rose-500/30 flex items-center justify-center mb-2 overflow-hidden shadow-md relative group ${worst.thumbnailUrl ? 'cursor-pointer hover:border-rose-500/50 hover:scale-105' : ''} transition-transform`}
+                        >
+                          {worst.thumbnailUrl ? (
+                            <>
+                              <img src={worst.thumbnailUrl} alt="" className="absolute inset-0 w-full h-full object-cover blur-sm opacity-40 scale-125" />
+                              <img src={worst.thumbnailUrl} alt={worst.adName} loading="lazy" className="absolute inset-0 w-full h-full object-contain z-10 drop-shadow-md" />
+                            </>
+                          ) : (
+                            <Image size={16} className="text-rose-400 opacity-50" />
+                          )}
                         </div>
-                        <div className="bg-black/40 backdrop-blur-md rounded-xl p-2.5 border border-white/10 text-center">
-                          <p className="text-[9px] text-white/50 font-bold uppercase mb-0.5">CPL</p>
-                          <p className="text-base font-black text-orange-400">{thb(ad.cpl)}</p>
-                        </div>
+                        <p className="text-[10px] font-bold text-white truncate max-w-[80px] mx-auto mb-1">{worst.adName}</p>
+                        <p className="text-base font-black text-rose-400 leading-none">{thb(worst.cpi)}</p>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })()}
               </div>
             </div>
           </div>
 
+          {/* Row 3: Winning Creatives (Tabs) & Summary Table */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            
+            {/* Winning Creatives (Top 4) */}
+            <div className="lg:col-span-7 bg-navy-900 border border-white/5 rounded-3xl overflow-hidden shadow-xl flex flex-col">
+              <div className="bg-navy-950/50 border-b border-white/5 p-3 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Award size={14} className="text-gold-400" />
+                  <div className="flex bg-navy-950 rounded-lg p-0.5 border border-white/5">
+                    <button 
+                      onClick={() => setCreativeTab('inbox')}
+                      className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${creativeTab === 'inbox' ? 'bg-purple-500/20 text-purple-400' : 'text-white/50 hover:text-white'}`}
+                    >
+                      TOP 4 INBOX
+                    </button>
+                    <button 
+                      onClick={() => setCreativeTab('leads')}
+                      className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${creativeTab === 'leads' ? 'bg-emerald-500/20 text-emerald-400' : 'text-white/50 hover:text-white'}`}
+                    >
+                      TOP 4 LEADS
+                    </button>
+                  </div>
+                </div>
+                <button onClick={() => setView('content')} className="text-[9px] text-gold-400 hover:underline">ดูโฆษณาทั้งหมด</button>
+              </div>
+              
+              <div className="p-4 flex-1 bg-gradient-to-b from-navy-900 to-navy-950/50 flex flex-col justify-center">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[...globalAdByContent]
+                    .filter(ad => ad.thumbnailUrl)
+                    .sort((a,b) => creativeTab === 'inbox' ? b.inbox - a.inbox : b.leads - a.leads)
+                    .reduce((acc, ad) => {
+                      if (!acc.find(x => x.adName === ad.adName)) acc.push(ad);
+                      return acc;
+                    }, [] as typeof globalAdByContent)
+                    .slice(0, 4)
+                    .map((ad, i) => (
+                      <div 
+                        key={ad.adName+i} 
+                        onClick={() => ad.thumbnailUrl && setLightbox({ url: ad.thumbnailUrl, name: ad.adName, spend: ad.spend, inbox: ad.inbox, cpi: ad.cpi, mediaType: ad.mediaType, pageNames: ad.pageNames })}
+                        className="group relative rounded-xl overflow-hidden border border-white/10 bg-black aspect-[4/5] flex flex-col justify-end shadow-xl cursor-pointer hover:border-white/20 hover:scale-[1.02] transition-all"
+                      >
+                        <img src={ad.thumbnailUrl} alt="" className="absolute inset-0 w-full h-full object-cover blur-xl opacity-40 scale-125 pointer-events-none" />
+                        <img src={ad.thumbnailUrl} alt={ad.adName} loading="lazy" className="absolute inset-0 w-full h-full object-contain opacity-90 group-hover:scale-105 group-hover:opacity-100 transition-all duration-500" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent pointer-events-none" />
+                        
+                        <div className={`absolute top-2 left-2 text-white text-[9px] font-black px-2 py-0.5 rounded shadow-lg border border-white/20 ${creativeTab === 'inbox' ? 'bg-gradient-to-r from-purple-600 to-blue-500' : 'bg-gradient-to-r from-emerald-500 to-teal-500'}`}>
+                          #{i+1}
+                        </div>
+
+                        <div className="relative z-10 p-2 w-full">
+                          <p className="text-[10px] font-bold text-white mb-1.5 truncate drop-shadow-md">{ad.adName}</p>
+                          <div className="bg-black/60 backdrop-blur-sm rounded-lg p-1.5 border border-white/10 flex justify-between items-end">
+                            <div>
+                              <p className="text-[8px] text-white/50 font-bold uppercase mb-0.5">{creativeTab === 'inbox' ? 'Inbox' : 'Leads'}</p>
+                              <p className={`text-[11px] font-black leading-none ${creativeTab === 'inbox' ? 'text-purple-400' : 'text-emerald-400'}`}>{creativeTab === 'inbox' ? ad.inbox : ad.leads}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-[8px] text-white/50 font-bold uppercase mb-0.5">{creativeTab === 'inbox' ? 'CPI' : 'CPL'}</p>
+                              <p className={`text-[11px] font-black leading-none ${creativeTab === 'inbox' ? 'text-blue-400' : 'text-orange-400'}`}>{creativeTab === 'inbox' ? thb(ad.cpi) : thb(ad.cpl)}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Summary Data Table */}
+            <div className="lg:col-span-5 bg-navy-900 border border-white/5 rounded-3xl overflow-hidden shadow-xl flex flex-col">
+              <div className="bg-navy-950/50 border-b border-white/5 p-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <BarChart3 size={14} className="text-blue-400" />
+                  <h3 className="text-[11px] font-black text-white uppercase tracking-wider">
+                    {serviceFilter ? `คลินิกยอดฮิต (Top 5)` : `บริการยอดฮิต (Top 5)`}
+                  </h3>
+                </div>
+                <button onClick={() => setView(serviceFilter ? 'pages' : 'service')} className="text-[9px] text-gold-400 hover:underline">
+                  ดูทั้งหมด
+                </button>
+              </div>
+              <div className="overflow-x-auto flex-1 bg-navy-900/50 flex flex-col justify-center">
+                <table className="w-full text-sm">
+                  <thead className="bg-navy-950/40">
+                    <tr className="border-b border-white/10">
+                      <th className="px-3 py-2 text-left text-[10px] font-bold text-foreground-muted uppercase">{serviceFilter ? 'Clinic' : 'Service'}</th>
+                      <th className="px-2 py-2 text-right text-[10px] font-bold text-foreground-muted uppercase">Spend</th>
+                      <th className="px-2 py-2 text-right text-[10px] font-bold text-foreground-muted uppercase">CPI</th>
+                      <th className="px-2 py-2 text-right text-[10px] font-bold text-foreground-muted uppercase">Inbox</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {serviceFilter ? (
+                      [...pages].slice(0, 5).map((p, i) => (
+                        <tr key={p.pageId} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                          <td className="px-3 py-2.5 text-[11px] font-semibold text-white truncate max-w-[120px]">{p.pageName}</td>
+                          <td className="px-2 py-2.5 text-right text-[11px] font-bold text-rose-400">{thb(p.spend)}</td>
+                          <td className="px-2 py-2.5 text-right text-[11px] text-cyan-400">{thb(p.cpi)}</td>
+                          <td className="px-2 py-2.5 text-right text-[11px] font-bold text-blue-400">{num(p.inbox)}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      [...globalAdContent].sort((a,b) => b.spend - a.spend).slice(0, 5).map((svc, i) => (
+                        <tr key={svc.adName} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                          <td className="px-3 py-2.5 text-[11px] font-semibold text-white truncate max-w-[120px]">{svc.adName}</td>
+                          <td className="px-2 py-2.5 text-right text-[11px] font-bold text-rose-400">{thb(svc.spend)}</td>
+                          <td className="px-2 py-2.5 text-right text-[11px] text-cyan-400">{thb(svc.cpi)}</td>
+                          <td className="px-2 py-2.5 text-right text-[11px] font-bold text-blue-400">{num(svc.inbox)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
         </div>
       )}
 
