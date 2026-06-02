@@ -306,47 +306,66 @@ export async function GET(req: NextRequest) {
       adCreativeMap.set(t.adId, { thumbnailUrl: t.thumbnailUrl, storyPageId: "" });
     }
 
-    // Collect unique ad_ids NOT already cached
+    // Collect unique ad_ids NOT already cached, grouped by token
     const newAdIds = [...new Set(allInsights.map(r => r.adId))].filter(id => !adCreativeMap.has(id));
     console.log(`🖼️ ${newAdIds.length} new ads need creative info (${existingThumbs.length} cached)`);
 
     if (newAdIds.length > 0) {
-      // Batch 50 IDs per request, 10 concurrent batches
-      const BATCH_SIZE = 50;
-      const CONCURRENCY = 10;
-      const batches: string[][] = [];
-      for (let i = 0; i < newAdIds.length; i += BATCH_SIZE) {
-        batches.push(newAdIds.slice(i, i + BATCH_SIZE));
+      // Group ad IDs by token (based on which account they belong to)
+      const adIdToToken = new Map<string, string>();
+      for (const row of allInsights) {
+        if (!adCreativeMap.has(row.adId) && !adIdToToken.has(row.adId)) {
+          const entry = accountTokenMap.get(row.accountId);
+          if (entry) adIdToToken.set(row.adId, entry.token);
+        }
       }
 
-      // Use first available token for batch API
-      const batchToken = tokens[0];
-      for (let c = 0; c < batches.length; c += CONCURRENCY) {
-        const chunk = batches.slice(c, c + CONCURRENCY);
-        await Promise.allSettled(chunk.map(async (ids) => {
-          try {
-            const res = await fetch(
-              `${BASE}/?ids=${ids.join(",")}&fields=creative{thumbnail_url,effective_object_story_id}&access_token=${batchToken}`,
-              { cache: "no-store" }
-            );
-            if (!res.ok) return;
-            const json = await res.json();
-            for (const [adId, data] of Object.entries(json) as [string, any][]) {
-              const creative = data.creative || {};
-              const thumbUrl = creative.thumbnail_url || "";
-              let storyPageId = "";
-              if (creative.effective_object_story_id) {
-                const parts = creative.effective_object_story_id.split("_");
-                if (parts.length >= 2 && /^\d+$/.test(parts[0])) {
-                  storyPageId = parts[0];
+      // Group by token
+      const tokenGroups = new Map<string, string[]>();
+      for (const [adId, token] of adIdToToken) {
+        const group = tokenGroups.get(token) || [];
+        group.push(adId);
+        tokenGroups.set(token, group);
+      }
+
+      // Batch 50 IDs per request, 10 concurrent batches — per token
+      const BATCH_SIZE = 50;
+      const CONCURRENCY = 10;
+
+      for (const [token, adIds] of tokenGroups) {
+        const batches: string[][] = [];
+        for (let i = 0; i < adIds.length; i += BATCH_SIZE) {
+          batches.push(adIds.slice(i, i + BATCH_SIZE));
+        }
+
+        for (let c = 0; c < batches.length; c += CONCURRENCY) {
+          const chunk = batches.slice(c, c + CONCURRENCY);
+          await Promise.allSettled(chunk.map(async (ids) => {
+            try {
+              const res = await fetch(
+                `${BASE}/?ids=${ids.join(",")}&fields=creative{image_url,thumbnail_url,effective_object_story_id}&access_token=${token}`,
+                { cache: "no-store" }
+              );
+              if (!res.ok) return;
+              const json = await res.json();
+              for (const [adId, data] of Object.entries(json) as [string, any][]) {
+                const creative = data.creative || {};
+                // Prefer image_url (full res) over thumbnail_url (64x64 blurry)
+                const thumbUrl = creative.image_url || creative.thumbnail_url || "";
+                let storyPageId = "";
+                if (creative.effective_object_story_id) {
+                  const parts = creative.effective_object_story_id.split("_");
+                  if (parts.length >= 2 && /^\d+$/.test(parts[0])) {
+                    storyPageId = parts[0];
+                  }
+                }
+                if (thumbUrl || storyPageId) {
+                  adCreativeMap.set(adId, { thumbnailUrl: thumbUrl, storyPageId });
                 }
               }
-              if (thumbUrl || storyPageId) {
-                adCreativeMap.set(adId, { thumbnailUrl: thumbUrl, storyPageId });
-              }
-            }
-          } catch { /* non-critical */ }
-        }));
+            } catch { /* non-critical */ }
+          }));
+        }
       }
     }
     console.log(`🖼️ Total creative info: ${adCreativeMap.size} ads`);
