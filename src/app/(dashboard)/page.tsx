@@ -8,8 +8,10 @@ import {
   DollarSign, Users, MessageCircle, Target,
   Activity, Search, RefreshCw, ChevronUp, ChevronDown,
   ChevronLeft, ChevronRight, Zap, AlertCircle, Calendar,
-  Image, Filter, X, ZoomIn, Play, Trophy, TrendingDown, MousePointerClick, Award, BarChart3, ArrowRight, Eye, MessageSquare
+  Image, Filter, X, ZoomIn, Play, Trophy, TrendingDown, MousePointerClick, Award, BarChart3, ArrowRight, Eye, MessageSquare, Download
 } from "lucide-react";
+import * as htmlToImage from "html-to-image";
+import { jsPDF } from "jspdf";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function toISO(d: Date) { return d.toISOString().slice(0, 10); }
@@ -294,6 +296,8 @@ function FacebookAdsDashboard() {
   const [view, setView] = useState<'overview' | 'pages' | 'service' | 'content'>('overview');
   const [creativeTab, setCreativeTab] = useState<'inbox'|'leads'>('inbox');
   const [svcSort, setSvcSort] = useState<{ key: keyof GlobalAdItem; dir: 'asc' | 'desc' }>({ key: 'spend', dir: 'desc' });
+  const [isExporting, setIsExporting] = useState(false);
+  const [contentZoom, setContentZoom] = useState<'x1' | 'x1.5' | 'x2'>('x1');
 
   // ── Unique service names for cross filter ────────────────────────────────
   const serviceNames = useMemo(() => {
@@ -506,6 +510,57 @@ function FacebookAdsDashboard() {
     </div>
   );
 
+  const handleExportPDFs = async () => {
+    setIsExporting(true);
+    const originalView = view;
+    
+    try {
+      const container = document.getElementById("export-container");
+      if (!container) throw new Error("ไม่พบ Container");
+      
+      const opts = { 
+        quality: 0.95, 
+        backgroundColor: '#060b13',
+        imagePlaceholder: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==',
+        pixelRatio: 1.5,
+        skipFonts: true
+      };
+
+      // Page 1: Overview
+      setView('overview');
+      await new Promise(r => setTimeout(r, 800)); // wait for render and animations
+      
+      const imgData1 = await htmlToImage.toJpeg(container, opts);
+      const tempPdf = new jsPDF("p", "px", "a4");
+      const imgProps1 = tempPdf.getImageProperties(imgData1);
+      
+      const finalPdf = new jsPDF({
+        orientation: imgProps1.width > imgProps1.height ? "l" : "p",
+        unit: "px",
+        format: [imgProps1.width, imgProps1.height]
+      });
+      finalPdf.addImage(imgData1, "JPEG", 0, 0, imgProps1.width, imgProps1.height);
+      
+      // Page 2: Content
+      setView('content');
+      await new Promise(r => setTimeout(r, 800)); // wait for render
+      
+      const imgData2 = await htmlToImage.toJpeg(container, opts);
+      const imgProps2 = finalPdf.getImageProperties(imgData2);
+      
+      finalPdf.addPage([imgProps2.width, imgProps2.height], imgProps2.width > imgProps2.height ? "l" : "p");
+      finalPdf.addImage(imgData2, "JPEG", 0, 0, imgProps2.width, imgProps2.height);
+      
+      finalPdf.save(`Dashboard_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
+    } catch (err: any) {
+      console.error("Export failed", err);
+      alert("เกิดข้อผิดพลาดในการโหลด PDF: " + (err.message || err.name || String(err)));
+    } finally {
+      setView(originalView);
+      setIsExporting(false);
+    }
+  };
+
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6 pt-4 sm:pt-6 max-w-7xl mx-auto pb-12">
@@ -594,11 +649,18 @@ function FacebookAdsDashboard() {
           <button onClick={handleSync} disabled={syncing}
             className="flex items-center gap-2 px-4 py-1.5 bg-gold-500 text-navy-950 rounded-xl text-sm font-bold hover:bg-gold-400 transition-all shadow-lg shadow-gold-500/20 disabled:opacity-60 ml-1">
             <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />
-            {syncing ? "Syncing..." : "Sync"}
+            {syncing ? "Syncing" : "Sync"}
+          </button>
+          
+          <button onClick={handleExportPDFs} disabled={isExporting}
+            className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-500 transition-all shadow-lg shadow-blue-500/20 disabled:opacity-60 ml-1">
+            <Download size={14} />
+            {isExporting ? "Exporting..." : "Export PDF"}
           </button>
         </div>
       </div>
 
+      <div id="export-container" className="space-y-6 w-full p-4 bg-[#0b111a] rounded-[2rem]">
       {syncMsg && (
         <div className={`px-4 py-3 rounded-2xl text-sm font-medium shadow-lg animate-fade-in ${
           syncMsg.startsWith("⚠️") || syncMsg.startsWith("❌") || syncMsg.startsWith("⏱")
@@ -964,6 +1026,7 @@ function FacebookAdsDashboard() {
                       <th className="px-2 py-2 text-right text-[10px] font-bold text-foreground-muted uppercase">Spend</th>
                       <th className="px-2 py-2 text-right text-[10px] font-bold text-foreground-muted uppercase">CPI</th>
                       <th className="px-2 py-2 text-right text-[10px] font-bold text-foreground-muted uppercase">Inbox</th>
+                      <th className="px-2 py-2 text-right text-[10px] font-bold text-foreground-muted uppercase">Lead</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -974,6 +1037,7 @@ function FacebookAdsDashboard() {
                           <td className="px-2 py-2.5 text-right text-[11px] font-bold text-rose-400">{thb(p.spend)}</td>
                           <td className="px-2 py-2.5 text-right text-[11px] text-cyan-400">{thb(p.cpi)}</td>
                           <td className="px-2 py-2.5 text-right text-[11px] font-bold text-blue-400">{num(p.inbox)}</td>
+                          <td className="px-2 py-2.5 text-right text-[11px] font-bold text-purple-400">{num(p.leads)}</td>
                         </tr>
                       ))
                     ) : (
@@ -983,6 +1047,7 @@ function FacebookAdsDashboard() {
                           <td className="px-2 py-2.5 text-right text-[11px] font-bold text-rose-400">{thb(svc.spend)}</td>
                           <td className="px-2 py-2.5 text-right text-[11px] text-cyan-400">{thb(svc.cpi)}</td>
                           <td className="px-2 py-2.5 text-right text-[11px] font-bold text-blue-400">{num(svc.inbox)}</td>
+                          <td className="px-2 py-2.5 text-right text-[11px] font-bold text-purple-400">{num(svc.leads)}</td>
                         </tr>
                       ))
                     )}
@@ -1184,20 +1249,30 @@ function FacebookAdsDashboard() {
       {/* ── Performance by Content (grouped by service, Top 3 each) ── */}
       {view === 'content' && globalAdByContent.length > 0 && (
           <div className="overflow-x-auto">
-            <div className="flex items-center gap-1 justify-end px-4 py-2 border-b border-white/5 bg-navy-950/20">
-              <span className="text-[9px] text-foreground-muted mr-1">Sort Content:</span>
-              {(['spend', 'inbox', 'cpi', 'leads'] as const).map(k => (
-                <button key={k}
-                  onClick={() => setSvcSort(prev => ({ key: k, dir: prev.key === k && prev.dir === 'desc' ? 'asc' : 'desc' }))}
-                  className={`px-2 py-1 rounded text-[10px] font-medium transition-all ${
-                    svcSort.key === k
-                      ? 'bg-gold-500/20 text-gold-400'
-                      : 'text-foreground-muted hover:text-foreground hover:bg-white/5'
-                  }`}>
-                  {k === 'spend' ? 'Spent' : k === 'inbox' ? 'Inbox' : k === 'cpi' ? 'CPI' : 'Lead'}
-                  {svcSort.key === k && (svcSort.dir === 'desc' ? ' ↓' : ' ↑')}
-                </button>
-              ))}
+            <div className="flex items-center gap-4 justify-end px-4 py-2 border-b border-white/5 bg-navy-950/20">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-foreground-muted">Zoom:</span>
+                <div className="flex bg-navy-950 rounded border border-white/5 p-0.5">
+                  {(['x1', 'x1.5', 'x2'] as const).map(z => (
+                    <button key={z} onClick={() => setContentZoom(z)} className={`px-2 py-0.5 text-[10px] rounded transition-all ${contentZoom === z ? 'bg-white/10 text-white font-bold' : 'text-white/50 hover:text-white'}`}>{z}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-[9px] text-foreground-muted mr-1">Sort Content:</span>
+                {(['spend', 'inbox', 'cpi', 'leads'] as const).map(k => (
+                  <button key={k}
+                    onClick={() => setSvcSort(prev => ({ key: k, dir: prev.key === k && prev.dir === 'desc' ? 'asc' : 'desc' }))}
+                    className={`px-2 py-1 rounded text-[10px] font-medium transition-all ${
+                      svcSort.key === k
+                        ? 'bg-gold-500/20 text-gold-400'
+                        : 'text-foreground-muted hover:text-foreground hover:bg-white/5'
+                    }`}>
+                    {k === 'spend' ? 'Spent' : k === 'inbox' ? 'Inbox' : k === 'cpi' ? 'CPI' : 'Lead'}
+                    {svcSort.key === k && (svcSort.dir === 'desc' ? ' ↓' : ' ↑')}
+                  </button>
+                ))}
+              </div>
             </div>
             
             <table className="w-full text-sm">
@@ -1259,75 +1334,98 @@ function FacebookAdsDashboard() {
                   </td>
                 </tr>
                 {/* Content data rows */}
-                {displayItems.map((ad, i) => (
-                  <tr key={`${svcName}-${i}`} className="border-b border-white/5 hover:bg-white/5 transition-colors group/row">
-                    <td className="px-4 py-2 w-14">
-                      <div
-                        onClick={() => ad.thumbnailUrl && setLightbox({ url: ad.thumbnailUrl, name: ad.adName, spend: ad.spend, inbox: ad.inbox, cpi: ad.cpi, mediaType: ad.mediaType, pageNames: ad.pageNames })}
-                        className={`w-12 h-12 rounded-xl bg-navy-950/50 border border-white/5 overflow-hidden flex items-center justify-center group/thumb relative shadow-inner ${
-                          ad.thumbnailUrl ? "cursor-pointer hover:border-gold-500/50 hover:shadow-gold-500/20" : ""
-                        }`}>
-                        {ad.thumbnailUrl ? (
-                          <>
-                            <img src={ad.thumbnailUrl} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover peer"
-                              onError={(e) => {
-                                e.currentTarget.style.display = "none";
-                                const fb = e.currentTarget.parentElement?.querySelector('[data-fallback]');
-                                if (fb) (fb as HTMLElement).style.display = "flex";
-                              }} />
-                            <div data-fallback style={{ display: "none" }} className="absolute inset-0 items-center justify-center">
-                              <Image size={14} className="text-foreground-muted/40" />
-                            </div>
-                            <div className="absolute inset-0 bg-black/0 group-hover/thumb:bg-black/40 transition-all flex items-center justify-center">
-                              <ZoomIn size={14} className="text-white opacity-0 group-hover/thumb:opacity-100 transition-opacity drop-shadow-md" />
-                            </div>
-                            {ad.mediaType === "video" && (
-                              <div className="absolute bottom-1 right-1 bg-black/70 backdrop-blur-sm rounded px-1 py-0.5 shadow-sm">
-                                <Play size={8} className="text-white fill-white" />
+                {(() => {
+                  const zc = {
+                    'x1': {
+                      imgC: 'w-12 h-12 rounded-xl', tdW: 'w-14 px-4 py-2',
+                      tag: 'text-[9px] px-1.5 py-0.5 rounded-md', tagT: 'text-[10px]',
+                      bdT: 'text-[10px]', bdW: [140, 45, 28, 55, 28], bdG: '6px',
+                      mT: 'text-sm', cT: 'text-xs', cTag: 'text-[10px] px-2 py-1 rounded-md', ic: 14
+                    },
+                    'x1.5': {
+                      imgC: 'w-16 h-16 rounded-xl', tdW: 'w-20 px-4 py-2',
+                      tag: 'text-[11px] px-2 py-0.5 rounded-md', tagT: 'text-[12px]',
+                      bdT: 'text-[12px]', bdW: [180, 60, 36, 70, 36], bdG: '8px',
+                      mT: 'text-base', cT: 'text-sm', cTag: 'text-[12px] px-2 py-1 rounded-md', ic: 18
+                    },
+                    'x2': {
+                      imgC: 'w-24 h-24 rounded-2xl', tdW: 'w-28 px-4 py-2',
+                      tag: 'text-[14px] px-2 py-1 rounded-lg', tagT: 'text-[16px]',
+                      bdT: 'text-[16px]', bdW: [250, 80, 50, 100, 50], bdG: '12px',
+                      mT: 'text-xl', cT: 'text-lg', cTag: 'text-[16px] px-3 py-1.5 rounded-lg', ic: 24
+                    }
+                  }[contentZoom];
+                  
+                  return displayItems.map((ad, i) => (
+                    <tr key={`${svcName}-${i}`} className="border-b border-white/5 hover:bg-white/5 transition-colors group/row">
+                      <td className={zc.tdW}>
+                        <div
+                          onClick={() => ad.thumbnailUrl && setLightbox({ url: ad.thumbnailUrl, name: ad.adName, spend: ad.spend, inbox: ad.inbox, cpi: ad.cpi, mediaType: ad.mediaType, pageNames: ad.pageNames })}
+                          className={`${zc.imgC} bg-navy-950/50 border border-white/5 overflow-hidden flex items-center justify-center group/thumb relative shadow-inner ${
+                            ad.thumbnailUrl ? "cursor-pointer hover:border-gold-500/50 hover:shadow-gold-500/20" : ""
+                          }`}>
+                          {ad.thumbnailUrl ? (
+                            <>
+                              <img src={ad.thumbnailUrl} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover peer"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = "none";
+                                  const fb = e.currentTarget.parentElement?.querySelector('[data-fallback]');
+                                  if (fb) (fb as HTMLElement).style.display = "flex";
+                                }} />
+                              <div data-fallback style={{ display: "none" }} className="absolute inset-0 items-center justify-center">
+                                <Image size={zc.ic} className="text-foreground-muted/40" />
                               </div>
-                            )}
-                          </>
-                        ) : (
-                          <Image size={14} className="text-foreground-muted/20" />
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-2 py-3 min-w-[200px]">
-                      <div className="flex flex-col gap-1.5">
-                        <div className="flex items-center gap-1.5">
-                          {ad.mediaType && (
-                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${
-                              ad.mediaType === "video" ? "bg-cyan-500/15 text-cyan-400" : "bg-indigo-500/15 text-indigo-400"
-                            }`}>{ad.mediaType === "video" ? "VDO" : "IMG"}</span>
-                          )}
-                          <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-white/5 text-foreground-muted">{ad.adCount} ads</span>
-                          {(ad.pageBreakdown ?? []).length > 1 && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">{ad.pageBreakdown!.length} เพจ</span>
+                              <div className="absolute inset-0 bg-black/0 group-hover/thumb:bg-black/40 transition-all flex items-center justify-center">
+                                <ZoomIn size={zc.ic} className="text-white opacity-0 group-hover/thumb:opacity-100 transition-opacity drop-shadow-md" />
+                              </div>
+                              {ad.mediaType === "video" && (
+                                <div className="absolute bottom-1 right-1 bg-black/70 backdrop-blur-sm rounded px-1 py-0.5 shadow-sm">
+                                  <Play size={zc.ic === 14 ? 8 : zc.ic === 18 ? 10 : 12} className="text-white fill-white" />
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <Image size={zc.ic} className="text-foreground-muted/20" />
                           )}
                         </div>
-                        {/* Per-page breakdown */}
-                        {(ad.pageBreakdown ?? []).map((pg, pi) => (
-                          <div key={pi} className="flex items-center text-[10px] bg-navy-950/30 px-2 py-1 rounded w-fit border border-white/5" style={{ gap: "6px" }}>
-                            <span className="text-foreground-muted/80 truncate font-medium" style={{ width: 140, flexShrink: 0 }}>{pg.pageName}</span>
-                            <span className="text-rose-400/90 font-bold tabular-nums" style={{ width: 45, textAlign: "right", flexShrink: 0 }}>{thb(pg.spend)}</span>
-                            <span className="text-blue-400/90 font-bold tabular-nums" style={{ width: 28, textAlign: "right", flexShrink: 0 }}>{num(pg.inbox)}<span className="text-[8px] ml-0.5 opacity-60">ib</span></span>
-                            <span className="text-cyan-400/80 font-medium tabular-nums" style={{ width: 55, textAlign: "right", flexShrink: 0 }}><span className="text-[8px] opacity-60 mr-1">CPI</span>{pg.inbox > 0 ? thb(pg.spend / pg.inbox) : "—"}</span>
-                            <span className="text-purple-400/90 font-bold tabular-nums" style={{ width: 28, textAlign: "right", flexShrink: 0 }}>{pg.leads}<span className="text-[8px] ml-0.5 opacity-60">ld</span></span>
+                      </td>
+                      <td className="px-2 py-3">
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center gap-2">
+                            {ad.mediaType && (
+                              <span className={`${zc.tag} font-bold ${
+                                ad.mediaType === "video" ? "bg-cyan-500/15 text-cyan-400" : "bg-indigo-500/15 text-indigo-400"
+                              }`}>{ad.mediaType === "video" ? "VDO" : "IMG"}</span>
+                            )}
+                            <span className={`${zc.tagT} px-2 py-1 rounded-lg bg-white/5 text-foreground-muted`}>{ad.adCount} ads</span>
+                            {(ad.pageBreakdown ?? []).length > 1 && (
+                              <span className={`${zc.tag} bg-emerald-500/10 text-emerald-400 border border-emerald-500/20`}>{ad.pageBreakdown!.length} เพจ</span>
+                            )}
                           </div>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-3 py-3 text-right font-bold text-rose-400 whitespace-nowrap text-sm">{thb(ad.spend)}</td>
-                    <td className="px-3 py-3 text-right font-bold text-blue-400 whitespace-nowrap text-sm">{ad.inbox}</td>
-                    <td className="px-3 py-3 text-right font-medium text-cyan-400/80 whitespace-nowrap text-xs">{thb(ad.cpi)}</td>
-                    <td className="px-3 py-3 text-right font-bold text-purple-400 whitespace-nowrap text-sm">{ad.leads || "—"}</td>
-                    <td className="px-3 py-3 text-right whitespace-nowrap text-xs">
-                      {ad.convRate > 0 ? (
-                        <span className="text-[10px] px-2 py-1 rounded-md bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20">{pct(ad.convRate)}</span>
-                      ) : <span className="text-foreground-muted/30">—</span>}
-                    </td>
-                  </tr>
-                ))}
+                          {/* Per-page breakdown */}
+                          {(ad.pageBreakdown ?? []).map((pg, pi) => (
+                            <div key={pi} className={`${zc.bdT} flex items-center bg-navy-950/30 px-3 py-2 rounded-lg w-fit border border-white/5`} style={{ gap: zc.bdG }}>
+                              <span className="text-foreground-muted/80 truncate font-medium" style={{ width: zc.bdW[0], flexShrink: 0 }}>{pg.pageName}</span>
+                              <span className="text-rose-400/90 font-bold tabular-nums" style={{ width: zc.bdW[1], textAlign: "right", flexShrink: 0 }}>{thb(pg.spend)}</span>
+                              <span className="text-blue-400/90 font-bold tabular-nums" style={{ width: zc.bdW[2], textAlign: "right", flexShrink: 0 }}>{num(pg.inbox)}<span className="text-[0.75em] ml-1 opacity-60">ib</span></span>
+                              <span className="text-cyan-400/80 font-medium tabular-nums" style={{ width: zc.bdW[3], textAlign: "right", flexShrink: 0 }}><span className="text-[0.75em] opacity-60 mr-1">CPI</span>{pg.inbox > 0 ? thb(pg.spend / pg.inbox) : "—"}</span>
+                              <span className="text-purple-400/90 font-bold tabular-nums" style={{ width: zc.bdW[4], textAlign: "right", flexShrink: 0 }}>{pg.leads}<span className="text-[0.75em] ml-1 opacity-60">ld</span></span>
+                            </div>
+                          ))}
+                        </div>
+                      </td>
+                      <td className={`px-3 py-3 text-right font-bold text-rose-400 whitespace-nowrap ${zc.mT}`}>{thb(ad.spend)}</td>
+                      <td className={`px-3 py-3 text-right font-bold text-blue-400 whitespace-nowrap ${zc.mT}`}>{ad.inbox}</td>
+                      <td className={`px-3 py-3 text-right font-medium text-cyan-400/80 whitespace-nowrap ${zc.cT}`}>{thb(ad.cpi)}</td>
+                      <td className={`px-3 py-3 text-right font-bold text-purple-400 whitespace-nowrap ${zc.mT}`}>{ad.leads || "—"}</td>
+                      <td className={`px-3 py-3 text-right whitespace-nowrap ${zc.cT}`}>
+                        {ad.convRate > 0 ? (
+                          <span className={`${zc.cTag} bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20`}>{pct(ad.convRate)}</span>
+                        ) : <span className="text-foreground-muted/30">—</span>}
+                      </td>
+                    </tr>
+                  ));
+                })()}
               </Fragment>
             );
           })}
@@ -1336,6 +1434,7 @@ function FacebookAdsDashboard() {
           </div>
       )}
 
+      </div>
       </div>{/* End Main Content Area */}
 
       {/* ── Lightbox Modal ── */}
