@@ -295,22 +295,45 @@ export async function GET(req: NextRequest) {
     console.log(`⚡ Fetched ${allInsights.length} rows from ${allAccountEntries.length} accounts in ${fetchElapsed}s`);
 
     // ── Step 2.5: Fetch ad creative info (thumbnails + page_id) ─────────
-    // Fetch act_{id}/ads for each account to get creative thumbnails and page_id from story_id
-    const adCreativeMap = new Map<string, { thumbnailUrl: string; storyPageId: string }>(); // adId → creative info
+    // Use batch IDs API — only fetch creative for ads in insights (not all ads in account)
+    const adCreativeMap = new Map<string, { thumbnailUrl: string; storyPageId: string }>();
 
-    await Promise.allSettled(
-      allAccountEntries.map(async ({ acc, token }) => {
-        try {
-          let url: string | null = `${BASE}/act_${acc.account_id}/ads?fields=id,creative{thumbnail_url,effective_object_story_id}&limit=500&access_token=${token}`;
-          let pages = 0;
-          while (url && pages < 5) {
-            const res: Response = await fetch(url, { cache: "no-store" });
-            if (!res.ok) break;
+    // Pre-load existing thumbnails from DB to skip already-cached ads
+    const existingThumbs = await prisma.$queryRaw<{ adId: string; thumbnailUrl: string }[]>(
+      Prisma.sql`SELECT DISTINCT "adId", "thumbnailUrl" FROM "AdsContentDaily" WHERE "thumbnailUrl" IS NOT NULL AND "thumbnailUrl" != ''`
+    );
+    for (const t of existingThumbs) {
+      adCreativeMap.set(t.adId, { thumbnailUrl: t.thumbnailUrl, storyPageId: "" });
+    }
+
+    // Collect unique ad_ids NOT already cached
+    const newAdIds = [...new Set(allInsights.map(r => r.adId))].filter(id => !adCreativeMap.has(id));
+    console.log(`🖼️ ${newAdIds.length} new ads need creative info (${existingThumbs.length} cached)`);
+
+    if (newAdIds.length > 0) {
+      // Batch 50 IDs per request, 10 concurrent batches
+      const BATCH_SIZE = 50;
+      const CONCURRENCY = 10;
+      const batches: string[][] = [];
+      for (let i = 0; i < newAdIds.length; i += BATCH_SIZE) {
+        batches.push(newAdIds.slice(i, i + BATCH_SIZE));
+      }
+
+      // Use first available token for batch API
+      const batchToken = tokens[0];
+      for (let c = 0; c < batches.length; c += CONCURRENCY) {
+        const chunk = batches.slice(c, c + CONCURRENCY);
+        await Promise.allSettled(chunk.map(async (ids) => {
+          try {
+            const res = await fetch(
+              `${BASE}/?ids=${ids.join(",")}&fields=creative{thumbnail_url,effective_object_story_id}&access_token=${batchToken}`,
+              { cache: "no-store" }
+            );
+            if (!res.ok) return;
             const json = await res.json();
-            for (const ad of json.data ?? []) {
-              const creative = ad.creative || {};
+            for (const [adId, data] of Object.entries(json) as [string, any][]) {
+              const creative = data.creative || {};
               const thumbUrl = creative.thumbnail_url || "";
-              // Extract pageId from effective_object_story_id (format: "pageId_postId")
               let storyPageId = "";
               if (creative.effective_object_story_id) {
                 const parts = creative.effective_object_story_id.split("_");
@@ -319,16 +342,14 @@ export async function GET(req: NextRequest) {
                 }
               }
               if (thumbUrl || storyPageId) {
-                adCreativeMap.set(ad.id, { thumbnailUrl: thumbUrl, storyPageId });
+                adCreativeMap.set(adId, { thumbnailUrl: thumbUrl, storyPageId });
               }
             }
-            url = json.paging?.next || null;
-            pages++;
-          }
-        } catch { /* non-critical */ }
-      })
-    );
-    console.log(`🖼️ Fetched creative info for ${adCreativeMap.size} ads`);
+          } catch { /* non-critical */ }
+        }));
+      }
+    }
+    console.log(`🖼️ Total creative info: ${adCreativeMap.size} ads`);
 
     // Merge creative page_id into pgIdMap (for campaigns without adset page_id)
     for (const row of allInsights) {
@@ -426,9 +447,11 @@ export async function GET(req: NextRequest) {
     // ── Step 4.5: Scrape fallback for pages API couldn't resolve ─────────
     const stillUnknown = uniquePageIds.filter(id => !pageNameMap.has(id));
     if (stillUnknown.length > 0) {
-      console.log(`🔍 Scraping ${stillUnknown.length} page names from Facebook...`);
+      // Limit to 5 per sync to keep it fast — rest will be scraped next sync
+      const toScrape = stillUnknown.slice(0, 5);
+      console.log(`🔍 Scraping ${toScrape.length}/${stillUnknown.length} page names from Facebook...`);
       const scrapeResults = await Promise.allSettled(
-        stillUnknown.map(async (id) => {
+        toScrape.map(async (id) => {
           const name = await scrapePageName(id);
           if (name) {
             pageNameMap.set(id, name);
