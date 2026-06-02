@@ -40,6 +40,24 @@ async function metaFetch(path: string) {
   return json;
 }
 
+/** Fetch ALL pages of a paginated Meta API endpoint */
+async function metaFetchAll(path: string, maxPages = 20): Promise<any[]> {
+  const first = await metaFetch(path);
+  const all: any[] = first.data ?? [];
+  let nextUrl: string | null = first.paging?.next ?? null;
+  let page = 1;
+  while (nextUrl && page < maxPages) {
+    const res = await fetch(nextUrl, { cache: "no-store" });
+    if (!res.ok) break;
+    const json = await res.json();
+    if (json.error) break;
+    all.push(...(json.data ?? []));
+    nextUrl = json.paging?.next ?? null;
+    page++;
+  }
+  return all;
+}
+
 /** Decode HTML entities */
 function decodeHtmlEntities(str: string): string {
   return str
@@ -168,11 +186,11 @@ async function syncAccount(
     const adFields  = "ad_id,ad_name,campaign_id,campaign_name,spend,impressions,clicks,ctr,actions";
     const timeRange = encodeURIComponent(JSON.stringify({ since, until }));
 
-    const [campaignsRes, adsetsRes, insightsRes, adInsightsRes] = await Promise.all([
+    const [campaignsRes, adsetsRes, insights, adInsights] = await Promise.all([
       metaFetch(`${actId}/campaigns?fields=id,status&limit=200`),
       metaFetch(`${actId}/adsets?fields=campaign_id,promoted_object{page_id}&limit=500`),
-      metaFetch(`${actId}/insights?level=campaign&time_increment=1&fields=${fields}&time_range=${timeRange}&limit=500`),
-      metaFetch(`${actId}/insights?level=ad&time_increment=1&fields=${adFields}&time_range=${timeRange}&limit=500`),
+      metaFetchAll(`${actId}/insights?level=campaign&time_increment=1&fields=${fields}&time_range=${timeRange}&limit=500`),
+      metaFetchAll(`${actId}/insights?level=ad&time_increment=1&fields=${adFields}&time_range=${timeRange}&limit=500`),
     ]);
 
     // ── Campaign status map ──────────────────────────────────────────────
@@ -182,7 +200,7 @@ async function syncAccount(
       statusMap[c.id] = s === "active" ? "active" : s === "paused" ? "paused" : "ended";
     }
 
-    const insights: any[] = insightsRes.data ?? [];
+    // insights & adInsights are already flat arrays from metaFetchAll
 
     // ── Build campaign → page_id map ─────────────────────────────────────
     const pgIdMap: Record<string, string> = {};
@@ -203,6 +221,7 @@ async function syncAccount(
     if (insights.length === 0) {
       return { name: accountName, rows: 0, adRows: 0, status: "✅" };
     }
+    console.log(`📊 ${accountName}: ${insights.length} campaign rows, ${adInsights.length} ad rows`);
 
     // ── Upsert CAMPAIGN-LEVEL daily rows ─────────────────────────────────
     const UPSERT_BATCH = 30;
@@ -268,7 +287,7 @@ async function syncAccount(
     }
 
     // ── Upsert AD-LEVEL daily rows (creative + engagement) ───────────────
-    const adInsights: any[] = adInsightsRes.data ?? [];
+    // adInsights is already a flat array from metaFetchAll
     let adUpsertCount = 0;
 
     // ── Always fetch fresh thumbnails (Facebook CDN URLs expire ~1hr) ─────
