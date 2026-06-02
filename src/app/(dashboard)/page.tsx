@@ -10,7 +10,7 @@ import {
   ChevronLeft, ChevronRight, Zap, AlertCircle, Calendar,
   Image, Filter, X, ZoomIn, Play, Trophy, TrendingDown, MousePointerClick, Award, BarChart3, ArrowRight, Eye, MessageSquare, Download
 } from "lucide-react";
-import * as htmlToImage from "html-to-image";
+import html2canvas from "html2canvas-pro";
 import { jsPDF } from "jspdf";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -587,61 +587,54 @@ function FacebookAdsDashboard() {
       const container = document.getElementById("export-container");
       if (!container) throw new Error("ไม่พบ Container");
 
-      // Fix for html-to-image cutoff when scrolled
       originalScroll = window.scrollY;
       window.scrollTo(0, 0);
       document.body.classList.add('exporting-pdf');
 
-      const baseOpts = { 
-        quality: 0.92, 
-        backgroundColor: '#060b13',
-        pixelRatio: 1,
-        imagePlaceholder: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==',
-        filter: (node: any) => {
-          if (node?.className && typeof node.className === 'string' && node.className.includes('no-export')) return false;
-          if (node?.tagName === 'IMG') {
-            if (node?.style?.display === 'none') return false;
-            if (!node.complete || node.naturalHeight === 0) return false;
-          }
-          return true;
-        }
-      };
-
-      // Helper: capture current view
+      // Capture a view: html2canvas-pro renders by painting computed styles to canvas
+      // scale:2 = retina sharpness, supports oklab/oklch colors, respects CSS Grid
       const captureView = async () => {
-        const w = container.scrollWidth;
-        const h = container.scrollHeight;
-        return htmlToImage.toJpeg(container, { 
-          ...baseOpts, 
-          width: w, 
-          height: h 
+        await new Promise(r => setTimeout(r, 1500));
+        const canvas = await html2canvas(container, {
+          backgroundColor: '#060b13',
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          logging: false,
+          ignoreElements: (el: Element) => {
+            if (el.classList?.contains('no-export')) return true;
+            if (el.tagName === 'IMG') {
+              const img = el as HTMLImageElement;
+              if (!img.complete || img.naturalHeight === 0) return true;
+            }
+            return false;
+          }
         });
+        // Convert to JPEG data URL
+        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+        // PDF page = actual DOM size (not 2x), image stretches to fill = sharp at 100%
+        const pageW = container.scrollWidth;
+        const pageH = container.scrollHeight;
+        return { imgData, pageW, pageH };
       };
 
       // Page 1: Overview
       setView('overview');
-      await new Promise(r => setTimeout(r, 1500));
-      
-      const imgData1 = await captureView();
-      const tempPdf = new jsPDF("p", "px", "a4");
-      const imgProps1 = tempPdf.getImageProperties(imgData1);
+      const p1 = await captureView();
       
       const finalPdf = new jsPDF({
-        orientation: imgProps1.width > imgProps1.height ? "l" : "p",
+        orientation: p1.pageW > p1.pageH ? "l" : "p",
         unit: "px",
-        format: [imgProps1.width, imgProps1.height]
+        format: [p1.pageW, p1.pageH]
       });
-      finalPdf.addImage(imgData1, "JPEG", 0, 0, imgProps1.width, imgProps1.height);
+      finalPdf.addImage(p1.imgData, "JPEG", 0, 0, p1.pageW, p1.pageH);
       
       // Page 2: Content
       setView('content');
-      await new Promise(r => setTimeout(r, 1500));
+      const p2 = await captureView();
       
-      const imgData2 = await captureView();
-      const imgProps2 = finalPdf.getImageProperties(imgData2);
-      
-      finalPdf.addPage([imgProps2.width, imgProps2.height], imgProps2.width > imgProps2.height ? "l" : "p");
-      finalPdf.addImage(imgData2, "JPEG", 0, 0, imgProps2.width, imgProps2.height);
+      finalPdf.addPage([p2.pageW, p2.pageH], p2.pageW > p2.pageH ? "l" : "p");
+      finalPdf.addImage(p2.imgData, "JPEG", 0, 0, p2.pageW, p2.pageH);
       
       finalPdf.save(`Dashboard_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
     } catch (err: any) {
