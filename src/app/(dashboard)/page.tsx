@@ -586,28 +586,15 @@ function FacebookAdsDashboard() {
     try {
       const container = document.getElementById("export-container");
       if (!container) throw new Error("ไม่พบ Container");
-      
-      const width = container.offsetWidth;
-      const height = container.offsetHeight;
 
       // Fix for html-to-image cutoff when scrolled
       originalScroll = window.scrollY;
       window.scrollTo(0, 0);
       document.body.classList.add('exporting-pdf');
 
-      const opts = { 
+      const baseOpts = { 
         quality: 1, 
         backgroundColor: '#060b13',
-        width: width,
-        height: height,
-        canvasWidth: width * 2, // 2x resolution for sharpness
-        canvasHeight: height * 2,
-        style: {
-          width: `${width}px`,
-          height: `${height}px`,
-          transform: 'scale(1)',
-          transformOrigin: 'top left'
-        },
         imagePlaceholder: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==',
         filter: (node: any) => {
           if (node?.className && typeof node.className === 'string' && node.className.includes('no-export')) return false;
@@ -622,9 +609,19 @@ function FacebookAdsDashboard() {
 
       // Page 1: Overview
       setView('overview');
-      await new Promise(r => setTimeout(r, 800)); // wait for render and animations
+      await new Promise(r => setTimeout(r, 1200)); // wait for render and animations
       
-      const imgData1 = await htmlToImage.toJpeg(container, opts);
+      // Measure AFTER view switch so we get the correct height for this view
+      const w1 = container.scrollWidth;
+      const h1 = container.scrollHeight;
+      const opts1 = { 
+        ...baseOpts, 
+        width: w1, height: h1, 
+        canvasWidth: w1 * 2, canvasHeight: h1 * 2,
+        style: { width: `${w1}px`, height: `${h1}px` }
+      };
+      
+      const imgData1 = await htmlToImage.toJpeg(container, opts1);
       const tempPdf = new jsPDF("p", "px", "a4");
       const imgProps1 = tempPdf.getImageProperties(imgData1);
       
@@ -637,9 +634,19 @@ function FacebookAdsDashboard() {
       
       // Page 2: Content
       setView('content');
-      await new Promise(r => setTimeout(r, 800)); // wait for render
+      await new Promise(r => setTimeout(r, 1200)); // wait for render
       
-      const imgData2 = await htmlToImage.toJpeg(container, opts);
+      // Re-measure for content view (may have very different height)
+      const w2 = container.scrollWidth;
+      const h2 = container.scrollHeight;
+      const opts2 = { 
+        ...baseOpts, 
+        width: w2, height: h2, 
+        canvasWidth: w2 * 2, canvasHeight: h2 * 2,
+        style: { width: `${w2}px`, height: `${h2}px` }
+      };
+      
+      const imgData2 = await htmlToImage.toJpeg(container, opts2);
       const imgProps2 = finalPdf.getImageProperties(imgData2);
       
       finalPdf.addPage([imgProps2.width, imgProps2.height], imgProps2.width > imgProps2.height ? "l" : "p");
