@@ -125,6 +125,29 @@ async function fetchInsightsForAccount(
   return insights;
 }
 
+// ── Scrape page name from Facebook mobile (fallback when API fails) ─────────
+async function scrapePageName(pageId: string): Promise<string | null> {
+  try {
+    const res = await fetch(`https://www.facebook.com/${pageId}`, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1",
+      },
+      redirect: "follow",
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const html = await res.text();
+    const match = html.match(/<title>([^<]+)<\/title>/);
+    if (!match) return null;
+    // Clean: remove " | City" suffix and "Facebook" generic title
+    let name = match[1].trim();
+    if (name === "Facebook" || name === "Log in to Facebook" || !name) return null;
+    // Remove " | City" suffix (e.g. "Keep Clinic | Nakhon Ratchasima")
+    name = name.replace(/\s*\|.*$/, "").trim();
+    return name || null;
+  } catch { return null; }
+}
+
 // ── Bulk Upsert helpers ─────────────────────────────────────────────────────
 function escSql(v: any): string {
   if (v === null || v === undefined) return "NULL";
@@ -350,6 +373,33 @@ export async function GET(req: NextRequest) {
           }
         } catch { /* non-critical */ }
       }
+    }
+
+    // ── Step 4.5: Scrape fallback for pages API couldn't resolve ─────────
+    const stillUnknown = uniquePageIds.filter(id => !pageNameMap.has(id));
+    if (stillUnknown.length > 0) {
+      console.log(`🔍 Scraping ${stillUnknown.length} page names from Facebook...`);
+      const scrapeResults = await Promise.allSettled(
+        stillUnknown.map(async (id) => {
+          const name = await scrapePageName(id);
+          if (name) {
+            pageNameMap.set(id, name);
+            // Persist to cache
+            try {
+              await prisma.$executeRawUnsafe(
+                `INSERT INTO "PageNameCache" ("pageId","pageName","source","createdAt","updatedAt")
+                 VALUES ($1,$2,'scrape',NOW(),NOW())
+                 ON CONFLICT ("pageId") DO UPDATE SET "pageName"=$2,"source"='scrape',"updatedAt"=NOW()`,
+                id, name
+              );
+            } catch { /* non-critical */ }
+            return { id, name };
+          }
+          return null;
+        })
+      );
+      const scraped = scrapeResults.filter(r => r.status === "fulfilled" && r.value).length;
+      console.log(`📛 Scraped ${scraped}/${stillUnknown.length} page names`);
     }
 
     // ── Step 5: Aggregate campaign-level data from ad insights ───────────
