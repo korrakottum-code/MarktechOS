@@ -636,7 +636,16 @@ function FacebookAdsDashboard() {
       finalPdf.addPage([p2.pageW, p2.pageH], p2.pageW > p2.pageH ? "l" : "p");
       finalPdf.addImage(p2.imgData, "JPEG", 0, 0, p2.pageW, p2.pageH);
       
-      finalPdf.save(`Dashboard_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
+      // Build filename: PageName_1-31May2026.pdf
+      const pagePart = selectedPages.size > 0 
+        ? [...selectedPages].join('_').replace(/[^a-zA-Z0-9ก-๙_\- ]/g, '').substring(0, 60)
+        : 'AllPages';
+      const fmt = (d: string) => {
+        const dt = new Date(d + 'T00:00:00');
+        return `${dt.getDate()}${dt.toLocaleString('en', { month: 'short' })}${dt.getFullYear().toString().slice(-2)}`;
+      };
+      const periodPart = `${fmt(since)}-${fmt(until)}`;
+      finalPdf.save(`${pagePart}_${periodPart}.pdf`);
     } catch (err: any) {
       console.error("Export failed", err);
       alert("เกิดข้อผิดพลาดในการโหลด PDF: " + (err.message || err.name || String(err)));
