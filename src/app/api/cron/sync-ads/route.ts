@@ -306,7 +306,7 @@ export async function GET(req: NextRequest) {
       // Group ad IDs by token (based on which account they belong to)
       const adIdToToken = new Map<string, string>();
       for (const row of allInsights) {
-        if (!adCreativeMap.has(row.adId) && !adIdToToken.has(row.adId)) {
+        if (!adIdToToken.has(row.adId)) {
           const entry = accountTokenMap.get(row.accountId);
           if (entry) adIdToToken.set(row.adId, entry.token);
         }
@@ -320,39 +320,65 @@ export async function GET(req: NextRequest) {
         tokenGroups.set(token, group);
       }
 
-      // Batch 50 IDs per request, 10 concurrent batches — per token
       const BATCH_SIZE = 50;
       const CONCURRENCY = 10;
 
       for (const [token, adIds] of tokenGroups) {
-        const batches: string[][] = [];
-        for (let i = 0; i < adIds.length; i += BATCH_SIZE) {
-          batches.push(adIds.slice(i, i + BATCH_SIZE));
-        }
+        // Step A: Get creative IDs + story IDs from ads (nested fields ok)
+        const adCreativeIds = new Map<string, { creativeId: string; storyPageId: string }>();
+        const batches1: string[][] = [];
+        for (let i = 0; i < adIds.length; i += BATCH_SIZE) batches1.push(adIds.slice(i, i + BATCH_SIZE));
 
-        for (let c = 0; c < batches.length; c += CONCURRENCY) {
-          const chunk = batches.slice(c, c + CONCURRENCY);
-          await Promise.allSettled(chunk.map(async (ids) => {
+        for (let c = 0; c < batches1.length; c += CONCURRENCY) {
+          await Promise.allSettled(batches1.slice(c, c + CONCURRENCY).map(async (ids) => {
             try {
               const res = await fetch(
-                `${BASE}/?ids=${ids.join(",")}&fields=creative{image_url,thumbnail_url,effective_object_story_id}&access_token=${token}`,
+                `${BASE}/?ids=${ids.join(",")}&fields=creative{id,effective_object_story_id}&access_token=${token}`,
                 { cache: "no-store" }
               );
               if (!res.ok) return;
               const json = await res.json();
               for (const [adId, data] of Object.entries(json) as [string, any][]) {
                 const creative = data.creative || {};
-                // Prefer image_url (full res) over thumbnail_url (64x64 blurry)
-                const thumbUrl = creative.image_url || creative.thumbnail_url || "";
                 let storyPageId = "";
                 if (creative.effective_object_story_id) {
                   const parts = creative.effective_object_story_id.split("_");
-                  if (parts.length >= 2 && /^\d+$/.test(parts[0])) {
-                    storyPageId = parts[0];
-                  }
+                  if (parts.length >= 2 && /^\d+$/.test(parts[0])) storyPageId = parts[0];
                 }
-                if (thumbUrl || storyPageId) {
-                  adCreativeMap.set(adId, { thumbnailUrl: thumbUrl, storyPageId });
+                if (creative.id) {
+                  adCreativeIds.set(adId, { creativeId: creative.id, storyPageId });
+                }
+              }
+            } catch { /* non-critical */ }
+          }));
+        }
+
+        // Step B: Batch fetch creative objects with thumbnail_width=480 for HD images
+        const creativeIdToAdIds = new Map<string, string[]>();
+        for (const [adId, info] of adCreativeIds) {
+          const list = creativeIdToAdIds.get(info.creativeId) || [];
+          list.push(adId);
+          creativeIdToAdIds.set(info.creativeId, list);
+        }
+        const uniqueCreativeIds = [...creativeIdToAdIds.keys()];
+        const batches2: string[][] = [];
+        for (let i = 0; i < uniqueCreativeIds.length; i += BATCH_SIZE) batches2.push(uniqueCreativeIds.slice(i, i + BATCH_SIZE));
+
+        for (let c = 0; c < batches2.length; c += CONCURRENCY) {
+          await Promise.allSettled(batches2.slice(c, c + CONCURRENCY).map(async (ids) => {
+            try {
+              const res = await fetch(
+                `${BASE}/?ids=${ids.join(",")}&fields=thumbnail_url&thumbnail_width=480&thumbnail_height=480&access_token=${token}`,
+                { cache: "no-store" }
+              );
+              if (!res.ok) return;
+              const json = await res.json();
+              for (const [creativeId, data] of Object.entries(json) as [string, any][]) {
+                const thumbUrl = (data as any).thumbnail_url || "";
+                const relatedAdIds = creativeIdToAdIds.get(creativeId) || [];
+                for (const adId of relatedAdIds) {
+                  const info = adCreativeIds.get(adId);
+                  adCreativeMap.set(adId, { thumbnailUrl: thumbUrl, storyPageId: info?.storyPageId || "" });
                 }
               }
             } catch { /* non-critical */ }
