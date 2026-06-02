@@ -14,7 +14,10 @@ import * as htmlToImage from "html-to-image";
 import { jsPDF } from "jspdf";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function toISO(d: Date) { return d.toISOString().slice(0, 10); }
+function toISO(d: Date) { 
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
 function firstOfMonth() {
   const d = new Date();
   return new Date(d.getFullYear(), d.getMonth(), 1);
@@ -36,7 +39,7 @@ interface GlobalAdItem {
   leads: number; cpi: number; cpl: number; ctr: number;
   adCount: number; pageCount: number; convRate: number;
   adNames?: string[]; pageNames?: string[];
-  pageBreakdown?: { pageName: string; spend: number; inbox: number; leads: number; cpi: number }[];
+  pageBreakdown?: { pageName: string; spend: number; inbox: number; leads: number; cpi: number; thumbnailUrl?: string; }[];
 }
 
 interface AdsDataPayload {
@@ -161,11 +164,12 @@ function groupByPage(metrics: AdsMetric[]): PageRow[] {
     pageId: string; adAccountId: string;
     spend: number; inbox: number; leads: number;
     active: number; paused: number; count: number;
+    impressions: number; clicks: number;
   }>();
 
   for (const m of metrics) {
     const key = m.pageName || m.clinic;
-    const e   = map.get(key) ?? { pageId: "", adAccountId: "", spend: 0, inbox: 0, leads: 0, active: 0, paused: 0, count: 0 };
+    const e   = map.get(key) ?? { pageId: "", adAccountId: "", spend: 0, inbox: 0, leads: 0, active: 0, paused: 0, count: 0, impressions: 0, clicks: 0 };
     map.set(key, {
       pageId:      m.pageId      || e.pageId,
       adAccountId: m.adAccountId || e.adAccountId,
@@ -175,6 +179,8 @@ function groupByPage(metrics: AdsMetric[]): PageRow[] {
       active: e.active + (m.status === "active" ? 1 : 0),
       paused: e.paused + (m.status === "paused" ? 1 : 0),
       count:  e.count  + 1,
+      impressions: e.impressions + (m.impressions || 0),
+      clicks: e.clicks + (m.clicks || 0),
     });
   }
 
@@ -191,6 +197,8 @@ function groupByPage(metrics: AdsMetric[]): PageRow[] {
     activeCnt:      d.active,
     pausedCnt:      d.paused,
     totalCampaigns: d.count,
+    impressions:    d.impressions,
+    clicks:         d.clicks,
   }));
 }
 
@@ -291,6 +299,19 @@ function FacebookAdsDashboard() {
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [showExtraCols, setShowExtraCols] = useState(false);
   const [serviceFilter, setServiceFilter] = useState<string | null>(null);
+  const [selectedPages, setSelectedPages] = useState<Set<string>>(new Set());
+  const [isPageFilterOpen, setIsPageFilterOpen] = useState(false);
+  const filterDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target as Node)) {
+        setIsPageFilterOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
   const [expandedServices, setExpandedServices] = useState<Set<string>>(new Set());
   const [lightbox, setLightbox] = useState<{ url: string; name: string; spend: number; inbox: number; cpi: number; mediaType?: string; pageNames?: string[] } | null>(null);
   const [view, setView] = useState<'overview' | 'pages' | 'service' | 'content'>('overview');
@@ -309,16 +330,60 @@ function FacebookAdsDashboard() {
     });
   }, [baseGlobalAdContent]);
 
+  const allUniquePages = useMemo(() => {
+    return Array.from(new Map(raw.flatMap(a => a.pageName ? [[a.pageName, { id: a.pageName, name: a.pageName }]] : [])).values())
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [raw]);
+
   // ── Apply serviceFilter to global content ────────────────────────────────────
   const globalAdContent = useMemo(() => {
-    if (!serviceFilter) return baseGlobalAdContent;
-    return baseGlobalAdContent.filter(s => s.adName === serviceFilter);
-  }, [baseGlobalAdContent, serviceFilter]);
+    let filtered = baseGlobalAdContent;
+    if (serviceFilter) filtered = filtered.filter(s => s.adName === serviceFilter);
+    if (selectedPages.size > 0) {
+        filtered = filtered.map(svc => {
+            if (!svc.pageBreakdown) return svc;
+            const pbFiltered = svc.pageBreakdown.filter(pb => selectedPages.has(pb.pageName));
+            if (pbFiltered.length === 0) return null;
+            return {
+                ...svc,
+                thumbnailUrl: pbFiltered.find((p: any) => p.thumbnailUrl)?.thumbnailUrl || svc.thumbnailUrl,
+                pageBreakdown: pbFiltered,
+                spend: pbFiltered.reduce((s: number, p: any) => s + p.spend, 0),
+                inbox: pbFiltered.reduce((s: number, p: any) => s + p.inbox, 0),
+                leads: pbFiltered.reduce((s: number, p: any) => s + p.leads, 0),
+                impressions: pbFiltered.reduce((s: number, p: any) => s + (p.impressions || 0), 0),
+                clicks: pbFiltered.reduce((s: number, p: any) => s + (p.clicks || 0), 0),
+                cpi: pbFiltered.reduce((s: number, p: any) => s + p.inbox, 0) > 0 ? pbFiltered.reduce((s: number, p: any) => s + p.spend, 0) / pbFiltered.reduce((s: number, p: any) => s + p.inbox, 0) : 0,
+                pageCount: pbFiltered.length
+            };
+        }).filter(Boolean) as GlobalAdItem[];
+    }
+    return filtered;
+  }, [baseGlobalAdContent, serviceFilter, selectedPages]);
 
   const globalAdByContent = useMemo(() => {
-    if (!serviceFilter) return baseGlobalAdByContent;
-    return baseGlobalAdByContent.filter(ad => ad.adNames?.includes(serviceFilter));
-  }, [baseGlobalAdByContent, serviceFilter]);
+    let filtered = baseGlobalAdByContent;
+    if (serviceFilter) filtered = filtered.filter(ad => ad.adNames?.includes(serviceFilter));
+    if (selectedPages.size > 0) {
+        filtered = filtered.map(ad => {
+            if (!ad.pageBreakdown) return ad;
+            const pbFiltered = ad.pageBreakdown.filter(pb => selectedPages.has(pb.pageName));
+            if (pbFiltered.length === 0) return null;
+            return {
+                ...ad,
+                pageBreakdown: pbFiltered,
+                spend: pbFiltered.reduce((s: number, p: any) => s + p.spend, 0),
+                inbox: pbFiltered.reduce((s: number, p: any) => s + p.inbox, 0),
+                leads: pbFiltered.reduce((s: number, p: any) => s + p.leads, 0),
+                impressions: pbFiltered.reduce((s: number, p: any) => s + (p.impressions || 0), 0),
+                clicks: pbFiltered.reduce((s: number, p: any) => s + (p.clicks || 0), 0),
+                cpi: pbFiltered.reduce((s: number, p: any) => s + p.inbox, 0) > 0 ? pbFiltered.reduce((s: number, p: any) => s + p.spend, 0) / pbFiltered.reduce((s: number, p: any) => s + p.inbox, 0) : 0,
+                pageCount: pbFiltered.length
+            };
+        }).filter(Boolean) as GlobalAdItem[];
+    }
+    return filtered;
+  }, [baseGlobalAdByContent, serviceFilter, selectedPages]);
 
   // ── Group content by service → top 3 each ───────────────────────────────
   const contentByService = useMemo(() => {
@@ -368,12 +433,15 @@ function FacebookAdsDashboard() {
       basePages = groupByPage(raw);
       basePages = basePages.filter(p => search === "" || p.pageName.toLowerCase().includes(search.toLowerCase()) || p.adAccountId.includes(search));
     }
+    if (selectedPages.size > 0) {
+        basePages = basePages.filter(p => selectedPages.has(p.pageName));
+    }
     return basePages.sort((a, b) => {
       const av = a[sortKey] as number;
       const bv = b[sortKey] as number;
       return sortDir === "desc" ? bv - av : av - bv;
     });
-  }, [raw, globalAdContent, search, serviceFilter, sortKey, sortDir]);
+  }, [raw, globalAdContent, search, serviceFilter, selectedPages, sortKey, sortDir]);
 
   const kpis = useMemo(() => {
     const totalSpend = pages.reduce((s, p) => s + p.spend, 0);
@@ -384,7 +452,7 @@ function FacebookAdsDashboard() {
     let totalClicks = 0;
     let active = 0;
     
-    if (serviceFilter) {
+    if (serviceFilter || selectedPages.size > 0) {
       totalImpressions = pages.reduce((s, p) => s + ((p as any).impressions || 0), 0);
       totalClicks = pages.reduce((s, p) => s + ((p as any).clicks || 0), 0);
       active = pages.reduce((s, p) => s + p.activeCnt, 0);
@@ -407,7 +475,7 @@ function FacebookAdsDashboard() {
       ctr:     totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0,
       active,
     };
-  }, [pages, raw, search, serviceFilter]);
+  }, [pages, raw, search, serviceFilter, selectedPages]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir(d => d === "desc" ? "asc" : "desc");
@@ -439,7 +507,7 @@ function FacebookAdsDashboard() {
     };
 
     // Fire the sync request (don't await — proxy may drop long connections)
-    fetch(`/api/cron/sync-ads?since=${since}&until=${until}`)
+    fetch(`/api/cron/sync-ads?since=${since}&until=${until}&t=${Date.now()}`, { cache: 'no-store' })
       .then(async (res) => {
         if (done) return;
         try {
@@ -463,7 +531,7 @@ function FacebookAdsDashboard() {
       if (done) { if (syncIntervalRef.current) clearInterval(syncIntervalRef.current); return; }
       pollCount++;
       try {
-        const res = await fetch("/api/app-data");
+        const res = await fetch(`/api/app-data?t=${Date.now()}`, { cache: "no-store" });
         const data = await res.json();
         const newSyncedAt = data?.meta?.lastSyncedAt ?? null;
 
@@ -513,17 +581,43 @@ function FacebookAdsDashboard() {
   const handleExportPDFs = async () => {
     setIsExporting(true);
     const originalView = view;
+    let originalScroll = 0;
     
     try {
       const container = document.getElementById("export-container");
       if (!container) throw new Error("ไม่พบ Container");
       
+      const width = container.offsetWidth;
+      const height = container.offsetHeight;
+
+      // Fix for html-to-image cutoff when scrolled
+      originalScroll = window.scrollY;
+      window.scrollTo(0, 0);
+      document.body.classList.add('exporting-pdf');
+
       const opts = { 
-        quality: 0.95, 
+        quality: 1, 
         backgroundColor: '#060b13',
+        width: width,
+        height: height,
+        canvasWidth: width * 2, // 2x resolution for sharpness
+        canvasHeight: height * 2,
+        style: {
+          width: `${width}px`,
+          height: `${height}px`,
+          transform: 'scale(1)',
+          transformOrigin: 'top left'
+        },
         imagePlaceholder: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==',
-        pixelRatio: 1.5,
-        skipFonts: true
+        filter: (node: any) => {
+          if (node?.className && typeof node.className === 'string' && node.className.includes('no-export')) return false;
+          if (node?.tagName === 'IMG') {
+            if (node?.style?.display === 'none') return false;
+            // Exclude broken or still-loading images to prevent [object Event] crashes
+            if (!node.complete || node.naturalHeight === 0) return false;
+          }
+          return true;
+        }
       };
 
       // Page 1: Overview
@@ -556,16 +650,18 @@ function FacebookAdsDashboard() {
       console.error("Export failed", err);
       alert("เกิดข้อผิดพลาดในการโหลด PDF: " + (err.message || err.name || String(err)));
     } finally {
+      document.body.classList.remove('exporting-pdf');
       setView(originalView);
       setIsExporting(false);
+      window.scrollTo(0, originalScroll);
     }
   };
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-6 pt-4 sm:pt-6 max-w-7xl mx-auto pb-12">
+    <div className="relative z-0 space-y-6 pt-4 sm:pt-6 max-w-7xl mx-auto pb-12">
       {/* ── Header & Date Filters ── */}
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 animate-fade-in">
+      <div className="relative z-[9999] flex flex-col lg:flex-row lg:items-end justify-between gap-4 animate-fade-in">
         <div className="space-y-1">
           <div className="flex items-center gap-2 mb-2">
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
@@ -587,7 +683,7 @@ function FacebookAdsDashboard() {
         </div>
 
         {/* Filters Group (Floating Island style) */}
-        <div className="flex flex-wrap items-center gap-2 bg-navy-900/80 backdrop-blur-xl p-1.5 rounded-2xl border border-white/5 shadow-xl">
+        <div className="relative z-50 flex flex-wrap items-center gap-2 bg-navy-900/80 backdrop-blur-xl p-1.5 rounded-2xl border border-white/5 shadow-xl">
           <div className="flex items-center gap-2 px-3 py-1.5 bg-navy-950/50 rounded-xl">
             <Calendar size={14} className="text-gold-400 shrink-0" />
             <input
@@ -616,6 +712,8 @@ function FacebookAdsDashboard() {
               className={`bg-transparent text-xs font-medium text-foreground focus:outline-none w-28 ${syncing ? 'opacity-40 cursor-not-allowed' : ''}`}
             />
           </div>
+
+          <div className="w-px h-6 bg-white/10 mx-1 hidden sm:block" />
 
           <div className="w-px h-6 bg-white/10 mx-1 hidden sm:block" />
 
@@ -652,7 +750,46 @@ function FacebookAdsDashboard() {
             {syncing ? "Syncing" : "Sync"}
           </button>
           
-          <button onClick={handleExportPDFs} disabled={isExporting}
+          {/* Page Filter Dropdown */}
+          <div className="relative" ref={filterDropdownRef}>
+            <button 
+              onClick={() => setIsPageFilterOpen(!isPageFilterOpen)}
+              className="flex items-center gap-2 px-3 py-1.5 bg-navy-950/50 rounded-xl border border-white/5 hover:bg-white/5 transition-colors text-xs font-medium text-foreground h-full"
+            >
+              <Filter size={14} className="text-foreground-muted" />
+              {selectedPages.size === 0 ? "ทุกสาขา" : `${selectedPages.size} สาขา`}
+            </button>
+            
+            {isPageFilterOpen && (
+              <div className="absolute right-0 top-full mt-2 w-64 bg-navy-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden">
+                <div className="p-2 border-b border-white/5 flex justify-between items-center bg-navy-950/50">
+                  <span className="text-xs font-bold text-foreground">เลือกสาขา / เพจ</span>
+                  <button onClick={() => setSelectedPages(new Set())} className="text-[10px] text-blue-400 hover:underline">เคลียร์</button>
+                </div>
+                <div className="max-h-60 overflow-y-auto p-2 flex flex-col gap-1">
+                  {allUniquePages.map(p => (
+                    <label key={p.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-white/5 rounded-xl cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={selectedPages.has(p.id)}
+                        onChange={(e) => {
+                          const next = new Set(selectedPages);
+                          if (e.target.checked) next.add(p.id); else next.delete(p.id);
+                          setSelectedPages(next);
+                        }}
+                        className="rounded border-white/10 bg-navy-950 text-blue-500 focus:ring-0"
+                      />
+                      <span className="text-xs text-foreground truncate">{p.name}</span>
+                    </label>
+                  ))}
+                  {allUniquePages.length === 0 && <div className="p-2 text-xs text-foreground-muted text-center">ไม่มีข้อมูล</div>}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={handleExportPDFs} disabled={isExporting}
             className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-500 transition-all shadow-lg shadow-blue-500/20 disabled:opacity-60 ml-1">
             <Download size={14} />
             {isExporting ? "Exporting..." : "Export PDF"}
@@ -660,9 +797,9 @@ function FacebookAdsDashboard() {
         </div>
       </div>
 
-      <div id="export-container" className="space-y-6 w-full p-4 bg-[#0b111a] rounded-[2rem]">
+      <div id="export-container" className="w-full p-4 bg-[#0b111a] rounded-[2rem]">
       {syncMsg && (
-        <div className={`px-4 py-3 rounded-2xl text-sm font-medium shadow-lg animate-fade-in ${
+        <div className={`mb-6 px-4 py-3 rounded-2xl text-sm font-medium shadow-lg animate-fade-in ${
           syncMsg.startsWith("⚠️") || syncMsg.startsWith("❌") || syncMsg.startsWith("⏱")
             ? "bg-amber-500/10 border border-amber-500/20 text-amber-400"
             : "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
@@ -673,7 +810,7 @@ function FacebookAdsDashboard() {
 
       {/* Stale data banner */}
       {isStale && !syncing && !syncMsg && (
-        <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 animate-fade-in shadow-lg">
+        <div className="mb-6 flex items-center gap-3 px-4 py-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 animate-fade-in shadow-lg">
           <AlertCircle size={16} className="text-amber-400 shrink-0" />
           <p className="text-sm text-amber-400 flex-1 font-medium">
             ข้อมูลเก่ากว่า 1 ชม. ({timeAgo(meta?.lastSyncedAt ?? null)}) — กด Sync เพื่ออัปเดตจาก Meta
@@ -687,7 +824,7 @@ function FacebookAdsDashboard() {
       )}
 
       {/* ── KPI Grid (Modern Cards) ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 shrink-0 mb-6">
         {[
           { label: "Spent",  value: thb(kpis.totalSpend), icon: DollarSign,  color: "text-rose-400",   bg: "bg-rose-500/10",   border: "border-rose-500/20", glow: "from-rose-500/20" },
           { label: "Inbox",  value: num(kpis.totalInbox), icon: MessageCircle,color: "text-blue-400",   bg: "bg-blue-500/10",   border: "border-blue-500/20", glow: "from-blue-500/20" },
@@ -717,7 +854,7 @@ function FacebookAdsDashboard() {
       </div>
 
       {/* ── Main Content Area (Tabs + Tables) ── */}
-      <div className="bg-navy-900/80 backdrop-blur-xl border border-white/5 rounded-[2rem] overflow-hidden shadow-2xl animate-fade-in" style={{ animationDelay: '300ms' }}>
+      <div className="bg-navy-900/80 backdrop-blur-xl border border-white/5 rounded-[2rem] overflow-hidden shadow-2xl animate-fade-in shrink-0" style={{ animationDelay: '300ms' }}>
         
         {/* Header Control Bar */}
         <div className="p-4 sm:p-5 border-b border-white/5 bg-navy-950/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -873,12 +1010,20 @@ function FacebookAdsDashboard() {
                 
                 {(() => {
                   const dataSrc = serviceFilter ? globalAdByContent : globalAdContent;
-                  const validSvcs = [...dataSrc].filter(s => s.inbox > 5 && s.spend > 1000).sort((a,b) => a.cpi - b.cpi);
-                  let best = validSvcs[0] || dataSrc[0];
-                  let worst = validSvcs[validSvcs.length - 1] || dataSrc[dataSrc.length - 1];
+                  // Treat CPI 0 (0 inbox) as Infinity so it doesn't show up as 'Best'
+                  const sortedData = [...dataSrc]
+                    .filter(s => s.inbox > 0) // Only compare services that actually have inbox
+                    .sort((a, b) => a.cpi - b.cpi);
+                    
+                  // If nothing has inbox, fallback to default unsorted data
+                  const safeSorted = sortedData.length > 0 ? sortedData : [...dataSrc];
                   
-                  if (best && worst && best.adName === worst.adName && validSvcs.length > 1) {
-                    const diffWorst = [...validSvcs].reverse().find(s => s.adName !== best.adName);
+                  const validSvcs = safeSorted.filter(s => s.inbox > 5 && s.spend > 1000);
+                  let best = validSvcs[0] || safeSorted[0];
+                  let worst = validSvcs[validSvcs.length - 1] || safeSorted[safeSorted.length - 1];
+                  
+                  if (best && worst && best.adName === worst.adName) {
+                    const diffWorst = [...safeSorted].reverse().find(s => s.adName !== best.adName);
                     if (diffWorst) {
                       worst = diffWorst;
                     } else {
@@ -900,7 +1045,7 @@ function FacebookAdsDashboard() {
                           {best.thumbnailUrl ? (
                             <>
                               <img src={best.thumbnailUrl} alt="" className="absolute inset-0 w-full h-full object-cover blur-sm opacity-40 scale-125" />
-                              <img src={best.thumbnailUrl} alt={best.adName} loading="lazy" className="absolute inset-0 w-full h-full object-contain z-10 drop-shadow-md" />
+                              <img src={best.thumbnailUrl} alt={best.adName} loading={isExporting ? "eager" : "lazy"} className="absolute inset-0 w-full h-full object-contain z-10 drop-shadow-md" />
                             </>
                           ) : (
                             <Image size={16} className="text-emerald-400 opacity-50" />
@@ -920,7 +1065,7 @@ function FacebookAdsDashboard() {
                           {worst.thumbnailUrl ? (
                             <>
                               <img src={worst.thumbnailUrl} alt="" className="absolute inset-0 w-full h-full object-cover blur-sm opacity-40 scale-125" />
-                              <img src={worst.thumbnailUrl} alt={worst.adName} loading="lazy" className="absolute inset-0 w-full h-full object-contain z-10 drop-shadow-md" />
+                              <img src={worst.thumbnailUrl} alt={worst.adName} loading={isExporting ? "eager" : "lazy"} className="absolute inset-0 w-full h-full object-contain z-10 drop-shadow-md" />
                             </>
                           ) : (
                             <Image size={16} className="text-rose-400 opacity-50" />
@@ -979,7 +1124,7 @@ function FacebookAdsDashboard() {
                         className="group relative rounded-xl overflow-hidden border border-white/10 bg-black aspect-[4/5] flex flex-col justify-end shadow-xl cursor-pointer hover:border-white/20 hover:scale-[1.02] transition-all"
                       >
                         <img src={ad.thumbnailUrl} alt="" className="absolute inset-0 w-full h-full object-cover blur-xl opacity-40 scale-125 pointer-events-none" />
-                        <img src={ad.thumbnailUrl} alt={ad.adName} loading="lazy" className="absolute inset-0 w-full h-full object-contain opacity-90 group-hover:scale-105 group-hover:opacity-100 transition-all duration-500" />
+                        <img src={ad.thumbnailUrl} alt={ad.adName} loading={isExporting ? "eager" : "lazy"} className="absolute inset-0 w-full h-full object-contain opacity-90 group-hover:scale-105 group-hover:opacity-100 transition-all duration-500" />
                         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent pointer-events-none" />
                         
                         <div className={`absolute top-2 left-2 text-white text-[9px] font-black px-2 py-0.5 rounded shadow-lg border border-white/20 ${creativeTab === 'inbox' ? 'bg-gradient-to-r from-purple-600 to-blue-500' : 'bg-gradient-to-r from-emerald-500 to-teal-500'}`}>
@@ -1027,6 +1172,7 @@ function FacebookAdsDashboard() {
                       <th className="px-2 py-2 text-right text-[10px] font-bold text-foreground-muted uppercase">CPI</th>
                       <th className="px-2 py-2 text-right text-[10px] font-bold text-foreground-muted uppercase">Inbox</th>
                       <th className="px-2 py-2 text-right text-[10px] font-bold text-foreground-muted uppercase">Lead</th>
+                      <th className="px-2 py-2 text-right text-[10px] font-bold text-foreground-muted uppercase">% L/I</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1038,6 +1184,7 @@ function FacebookAdsDashboard() {
                           <td className="px-2 py-2.5 text-right text-[11px] text-cyan-400">{thb(p.cpi)}</td>
                           <td className="px-2 py-2.5 text-right text-[11px] font-bold text-blue-400">{num(p.inbox)}</td>
                           <td className="px-2 py-2.5 text-right text-[11px] font-bold text-purple-400">{num(p.leads)}</td>
+                          <td className="px-2 py-2.5 text-right text-[11px] font-bold text-emerald-400">{pct(p.inbox > 0 ? (p.leads / p.inbox) * 100 : 0)}</td>
                         </tr>
                       ))
                     ) : (
@@ -1048,6 +1195,7 @@ function FacebookAdsDashboard() {
                           <td className="px-2 py-2.5 text-right text-[11px] text-cyan-400">{thb(svc.cpi)}</td>
                           <td className="px-2 py-2.5 text-right text-[11px] font-bold text-blue-400">{num(svc.inbox)}</td>
                           <td className="px-2 py-2.5 text-right text-[11px] font-bold text-purple-400">{num(svc.leads)}</td>
+                          <td className="px-2 py-2.5 text-right text-[11px] font-bold text-emerald-400">{pct(svc.inbox > 0 ? (svc.leads / svc.inbox) * 100 : 0)}</td>
                         </tr>
                       ))
                     )}
@@ -1366,7 +1514,7 @@ function FacebookAdsDashboard() {
                           }`}>
                           {ad.thumbnailUrl ? (
                             <>
-                              <img src={ad.thumbnailUrl} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover peer"
+                              <img src={ad.thumbnailUrl} alt="" loading={isExporting ? "eager" : "lazy"} decoding="async" className="w-full h-full object-cover peer"
                                 onError={(e) => {
                                   e.currentTarget.style.display = "none";
                                   const fb = e.currentTarget.parentElement?.querySelector('[data-fallback]');
