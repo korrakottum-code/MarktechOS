@@ -184,15 +184,16 @@ async function bulkUpsertContentDaily(rows: any[]) {
   for (let i = 0; i < rows.length; i += BATCH) {
     const batch = rows.slice(i, i + BATCH);
     const values = batch.map(r =>
-      `(${escSql(r.adId)},${escSql(r.date)},${escSql(r.campaignId)},${escSql(r.adAccountId)},${escSql(r.pageId)},${escSql(r.adName)},${escSql(r.campaignName)},${r.spend},${r.impressions},${r.clicks},${r.inbox},${r.leads},${r.cpi},${r.likes},${r.comments},${r.shares},${r.videoViews},${r.ctr},${escSql(r.status)},NOW(),NOW())`
+      `(${escSql(r.adId)},${escSql(r.date)},${escSql(r.campaignId)},${escSql(r.adAccountId)},${escSql(r.pageId)},${escSql(r.adName)},${escSql(r.campaignName)},${escSql(r.thumbnailUrl || '')},${r.spend},${r.impressions},${r.clicks},${r.inbox},${r.leads},${r.cpi},${r.likes},${r.comments},${r.shares},${r.videoViews},${r.ctr},${escSql(r.status)},NOW(),NOW())`
     ).join(",\n");
 
     await prisma.$executeRawUnsafe(`
-      INSERT INTO "AdsContentDaily" ("adId","date","campaignId","adAccountId","pageId","adName","campaignName","spend","impressions","clicks","inbox","leads","cpi","likes","comments","shares","videoViews","ctr","status","createdAt","updatedAt")
+      INSERT INTO "AdsContentDaily" ("adId","date","campaignId","adAccountId","pageId","adName","campaignName","thumbnailUrl","spend","impressions","clicks","inbox","leads","cpi","likes","comments","shares","videoViews","ctr","status","createdAt","updatedAt")
       VALUES ${values}
       ON CONFLICT ("adId","date") DO UPDATE SET
         "campaignId"=EXCLUDED."campaignId","adAccountId"=EXCLUDED."adAccountId","pageId"=EXCLUDED."pageId",
         "adName"=EXCLUDED."adName","campaignName"=EXCLUDED."campaignName",
+        "thumbnailUrl"=CASE WHEN EXCLUDED."thumbnailUrl" != '' THEN EXCLUDED."thumbnailUrl" ELSE "AdsContentDaily"."thumbnailUrl" END,
         "spend"=EXCLUDED."spend","impressions"=EXCLUDED."impressions","clicks"=EXCLUDED."clicks",
         "inbox"=EXCLUDED."inbox","leads"=EXCLUDED."leads","cpi"=EXCLUDED."cpi",
         "likes"=EXCLUDED."likes","comments"=EXCLUDED."comments","shares"=EXCLUDED."shares",
@@ -291,6 +292,52 @@ export async function GET(req: NextRequest) {
 
     const fetchElapsed = ((Date.now() - start) / 1000).toFixed(1);
     console.log(`⚡ Fetched ${allInsights.length} rows from ${allAccountEntries.length} accounts in ${fetchElapsed}s`);
+
+    // ── Step 2.5: Fetch ad creative info (thumbnails + page_id) ─────────
+    // Fetch act_{id}/ads for each account to get creative thumbnails and page_id from story_id
+    const adCreativeMap = new Map<string, { thumbnailUrl: string; storyPageId: string }>(); // adId → creative info
+
+    await Promise.allSettled(
+      allAccountEntries.map(async ({ acc, token }) => {
+        try {
+          let url: string | null = `${BASE}/act_${acc.account_id}/ads?fields=id,creative{thumbnail_url,effective_object_story_id}&limit=500&access_token=${token}`;
+          let pages = 0;
+          while (url && pages < 5) {
+            const res: Response = await fetch(url, { cache: "no-store" });
+            if (!res.ok) break;
+            const json = await res.json();
+            for (const ad of json.data ?? []) {
+              const creative = ad.creative || {};
+              const thumbUrl = creative.thumbnail_url || "";
+              // Extract pageId from effective_object_story_id (format: "pageId_postId")
+              let storyPageId = "";
+              if (creative.effective_object_story_id) {
+                const parts = creative.effective_object_story_id.split("_");
+                if (parts.length >= 2 && /^\d+$/.test(parts[0])) {
+                  storyPageId = parts[0];
+                }
+              }
+              if (thumbUrl || storyPageId) {
+                adCreativeMap.set(ad.id, { thumbnailUrl: thumbUrl, storyPageId });
+              }
+            }
+            url = json.paging?.next || null;
+            pages++;
+          }
+        } catch { /* non-critical */ }
+      })
+    );
+    console.log(`🖼️ Fetched creative info for ${adCreativeMap.size} ads`);
+
+    // Merge creative page_id into pgIdMap (for campaigns without adset page_id)
+    for (const row of allInsights) {
+      if (!pgIdMap[row.campaignId]) {
+        const creative = adCreativeMap.get(row.adId);
+        if (creative?.storyPageId) {
+          pgIdMap[row.campaignId] = creative.storyPageId;
+        }
+      }
+    }
 
     // ── Step 3: Build pageId map from adsets (only for NEW campaigns) ───
     const newCampaignIds = new Set<string>();
@@ -454,10 +501,12 @@ export async function GET(req: NextRequest) {
     // ── Step 7: Bulk upsert ad-level (AdsContentDaily) ──────────────────
     const adRows = allInsights.map(row => {
       const pgId = pgIdMap[row.campaignId] ?? "";
+      const creative = adCreativeMap.get(row.adId);
       return {
         adId: row.adId, date: row.date,
         campaignId: row.campaignId, adAccountId: row.accountId,
         pageId: pgId, adName: row.adName, campaignName: row.campaignName,
+        thumbnailUrl: creative?.thumbnailUrl || "",
         spend: row.spend, impressions: row.impressions, clicks: row.clicks,
         inbox: row.inbox, leads: row.leads, cpi: row.cpi,
         likes: row.likes, comments: row.comments, shares: row.shares,
