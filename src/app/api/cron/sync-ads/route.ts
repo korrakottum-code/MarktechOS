@@ -295,22 +295,14 @@ export async function GET(req: NextRequest) {
     console.log(`⚡ Fetched ${allInsights.length} rows from ${allAccountEntries.length} accounts in ${fetchElapsed}s`);
 
     // ── Step 2.5: Fetch ad creative info (thumbnails + page_id) ─────────
-    // Use batch IDs API — only fetch creative for ads in insights (not all ads in account)
+    // Always fetch fresh image URLs (Meta CDN URLs expire in 1-2 days)
     const adCreativeMap = new Map<string, { thumbnailUrl: string; storyPageId: string }>();
 
-    // Pre-load existing thumbnails from DB to skip already-cached ads
-    const existingThumbs = await prisma.$queryRaw<{ adId: string; thumbnailUrl: string }[]>(
-      Prisma.sql`SELECT DISTINCT "adId", "thumbnailUrl" FROM "AdsContentDaily" WHERE "thumbnailUrl" IS NOT NULL AND "thumbnailUrl" != ''`
-    );
-    for (const t of existingThumbs) {
-      adCreativeMap.set(t.adId, { thumbnailUrl: t.thumbnailUrl, storyPageId: "" });
-    }
+    // All unique ad_ids, grouped by token
+    const allAdIds = [...new Set(allInsights.map(r => r.adId))];
+    console.log(`🖼️ Fetching creative info for ${allAdIds.length} ads (URLs expire, no cache)`);
 
-    // Collect unique ad_ids NOT already cached, grouped by token
-    const newAdIds = [...new Set(allInsights.map(r => r.adId))].filter(id => !adCreativeMap.has(id));
-    console.log(`🖼️ ${newAdIds.length} new ads need creative info (${existingThumbs.length} cached)`);
-
-    if (newAdIds.length > 0) {
+    if (allAdIds.length > 0) {
       // Group ad IDs by token (based on which account they belong to)
       const adIdToToken = new Map<string, string>();
       for (const row of allInsights) {
