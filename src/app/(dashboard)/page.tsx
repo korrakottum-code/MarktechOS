@@ -316,9 +316,9 @@ function FacebookAdsDashboard() {
   const [lightbox, setLightbox] = useState<{ url: string; name: string; spend: number; inbox: number; cpi: number; mediaType?: string; pageNames?: string[] } | null>(null);
   const [view, setView] = useState<'overview' | 'pages' | 'service' | 'content'>('overview');
   const [creativeTab, setCreativeTab] = useState<'inbox'|'leads'>('inbox');
-  const [svcSort, setSvcSort] = useState<{ key: keyof GlobalAdItem; dir: 'asc' | 'desc' }>({ key: 'spend', dir: 'desc' });
+  const [svcSort, setSvcSort] = useState<{ key: keyof GlobalAdItem; dir: 'asc' | 'desc' }>({ key: 'inbox', dir: 'desc' });
   const [isExporting, setIsExporting] = useState(false);
-  const [contentZoom, setContentZoom] = useState<'x1' | 'x1.5' | 'x2'>('x1');
+  const [contentZoom, setContentZoom] = useState<'x1' | 'x1.5' | 'x2'>('x1.5');
 
   // ── Unique service names for cross filter ────────────────────────────────
   const serviceNames = useMemo(() => {
