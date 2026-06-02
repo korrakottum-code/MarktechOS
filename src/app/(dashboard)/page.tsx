@@ -593,35 +593,36 @@ function FacebookAdsDashboard() {
       document.body.classList.add('exporting-pdf');
 
       const baseOpts = { 
-        quality: 1, 
+        quality: 0.92, 
         backgroundColor: '#060b13',
+        pixelRatio: 1,
         imagePlaceholder: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==',
         filter: (node: any) => {
           if (node?.className && typeof node.className === 'string' && node.className.includes('no-export')) return false;
           if (node?.tagName === 'IMG') {
             if (node?.style?.display === 'none') return false;
-            // Exclude broken or still-loading images to prevent [object Event] crashes
             if (!node.complete || node.naturalHeight === 0) return false;
           }
           return true;
         }
       };
 
+      // Helper: capture current view
+      const captureView = async () => {
+        const w = container.scrollWidth;
+        const h = container.scrollHeight;
+        return htmlToImage.toJpeg(container, { 
+          ...baseOpts, 
+          width: w, 
+          height: h 
+        });
+      };
+
       // Page 1: Overview
       setView('overview');
-      await new Promise(r => setTimeout(r, 1200)); // wait for render and animations
+      await new Promise(r => setTimeout(r, 1500));
       
-      // Measure AFTER view switch so we get the correct height for this view
-      const w1 = container.scrollWidth;
-      const h1 = container.scrollHeight;
-      const opts1 = { 
-        ...baseOpts, 
-        width: w1, height: h1, 
-        canvasWidth: w1 * 2, canvasHeight: h1 * 2,
-        style: { width: `${w1}px`, height: `${h1}px` }
-      };
-      
-      const imgData1 = await htmlToImage.toJpeg(container, opts1);
+      const imgData1 = await captureView();
       const tempPdf = new jsPDF("p", "px", "a4");
       const imgProps1 = tempPdf.getImageProperties(imgData1);
       
@@ -634,19 +635,9 @@ function FacebookAdsDashboard() {
       
       // Page 2: Content
       setView('content');
-      await new Promise(r => setTimeout(r, 1200)); // wait for render
+      await new Promise(r => setTimeout(r, 1500));
       
-      // Re-measure for content view (may have very different height)
-      const w2 = container.scrollWidth;
-      const h2 = container.scrollHeight;
-      const opts2 = { 
-        ...baseOpts, 
-        width: w2, height: h2, 
-        canvasWidth: w2 * 2, canvasHeight: h2 * 2,
-        style: { width: `${w2}px`, height: `${h2}px` }
-      };
-      
-      const imgData2 = await htmlToImage.toJpeg(container, opts2);
+      const imgData2 = await captureView();
       const imgProps2 = finalPdf.getImageProperties(imgData2);
       
       finalPdf.addPage([imgProps2.width, imgProps2.height], imgProps2.width > imgProps2.height ? "l" : "p");

@@ -151,11 +151,3 @@ body {
 .exporting-pdf .overflow-x-auto {
   overflow-x: hidden !important;
 }
-
-/* Ensure nothing is clipped during export */
-.exporting-pdf .overflow-hidden {
-  overflow: visible !important;
-}
-.exporting-pdf #export-container {
-  overflow: visible !important;
-}
