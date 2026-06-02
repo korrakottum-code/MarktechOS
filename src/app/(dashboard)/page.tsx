@@ -760,13 +760,29 @@ function FacebookAdsDashboard() {
               {selectedPages.size === 0 ? "ทุกสาขา" : `${selectedPages.size} สาขา`}
             </button>
             
-            {isPageFilterOpen && (
-              <div className="absolute right-0 top-full mt-2 w-64 bg-navy-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden">
+              {isPageFilterOpen && (
+              <div className="absolute right-0 top-full mt-2 w-72 bg-navy-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden">
                 <div className="p-2 border-b border-white/5 flex justify-between items-center bg-navy-950/50">
                   <span className="text-xs font-bold text-foreground">เลือกสาขา / เพจ</span>
                   <button onClick={() => setSelectedPages(new Set())} className="text-[10px] text-blue-400 hover:underline">เคลียร์</button>
                 </div>
-                <div className="max-h-60 overflow-y-auto p-2 flex flex-col gap-1">
+                <div className="px-2 pt-2 pb-1">
+                  <input
+                    type="text"
+                    placeholder="ค้นหาเพจ..."
+                    className="w-full px-3 py-1.5 bg-navy-950 border border-white/10 rounded-xl text-xs text-foreground placeholder:text-foreground-muted/50 focus:outline-none focus:border-blue-500/50"
+                    onChange={(e) => {
+                      const q = e.target.value.toLowerCase();
+                      const container = e.target.closest('div')?.parentElement?.querySelector('.page-filter-list');
+                      if (!container) return;
+                      container.querySelectorAll('label').forEach((el: any) => {
+                        const name = el.textContent?.toLowerCase() || '';
+                        el.style.display = name.includes(q) ? '' : 'none';
+                      });
+                    }}
+                  />
+                </div>
+                <div className="page-filter-list max-h-60 overflow-y-auto p-2 flex flex-col gap-1">
                   {allUniquePages.map(p => (
                     <label key={p.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-white/5 rounded-xl cursor-pointer">
                       <input 
@@ -1351,8 +1367,8 @@ function FacebookAdsDashboard() {
               <tr className="border-b border-white/10">
                   <th className="px-4 py-2.5 text-left text-[11px] font-bold text-foreground-muted uppercase tracking-wider min-w-[160px]">Service</th>
                   {([
-                    ['spend', 'Spent'], ['inbox', 'Inbox'], ['cpi', 'CPI'],
-                    ['leads', 'Lead'], ['cpl', 'CPL'], ['adCount', 'Ads'], ['pageCount', 'เพจ'],
+                    ['spend', 'Spent (฿)'], ['inbox', 'Inbox'], ['cpi', 'CPI'],
+                    ['leads', 'Lead'], ['cpl', 'CPL'], ['convRate', '%Lead/Inbox'],
                   ] as [keyof GlobalAdItem, string][]).map(([k, label]) => (
                     <th key={k}
                       onClick={() => setSvcSort(prev => ({ key: k, dir: prev.key === k && prev.dir === 'desc' ? 'asc' : 'desc' }))}
@@ -1368,27 +1384,59 @@ function FacebookAdsDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {[...globalAdContent]
-                  .filter(a => !serviceFilter || a.adName === serviceFilter)
-                  .sort((a, b) => {
-                    const av = (a[svcSort.key] as number) ?? 0;
-                    const bv = (b[svcSort.key] as number) ?? 0;
-                    return svcSort.dir === 'desc' ? bv - av : av - bv;
-                  })
-                  .map((svc, i) => (
-                  <tr key={svc.adName + i} className="border-b border-white/5 hover:bg-white/5 transition-colors group">
-                    <td className="px-4 py-3.5">
-                      <p className="font-semibold text-foreground text-[13px] truncate max-w-[200px] group-hover:text-gold-400 transition-colors" title={svc.adName}>{svc.adName}</p>
-                    </td>
-                    <td className="px-3 py-3.5 text-right font-bold text-rose-400 whitespace-nowrap">{thb(svc.spend)}</td>
-                    <td className="px-3 py-3.5 text-right font-bold text-blue-400 whitespace-nowrap">{num(svc.inbox)}</td>
-                    <td className="px-3 py-3.5 text-right font-medium text-cyan-400/80 whitespace-nowrap">{thb(svc.cpi)}</td>
-                    <td className="px-3 py-3.5 text-right font-bold text-purple-400 whitespace-nowrap">{svc.leads || "—"}</td>
-                    <td className="px-3 py-3.5 text-right font-medium text-orange-400/80 whitespace-nowrap">{svc.leads > 0 ? thb(svc.cpl) : "—"}</td>
-                    <td className="px-3 py-3.5 text-right text-foreground-muted text-xs">{svc.adCount}</td>
-                    <td className="px-3 py-3.5 text-right text-foreground-muted text-xs">{svc.pageCount}</td>
-                  </tr>
-                ))}
+                {(() => {
+                  const sorted = [...globalAdContent]
+                    .filter(a => !serviceFilter || a.adName === serviceFilter)
+                    .sort((a, b) => {
+                      const av = (a[svcSort.key] as number) ?? 0;
+                      const bv = (b[svcSort.key] as number) ?? 0;
+                      return svcSort.dir === 'desc' ? bv - av : av - bv;
+                    });
+                  const avgSpend = sorted.reduce((s, a) => s + a.spend, 0) / (sorted.length || 1);
+                  const avgInbox = sorted.reduce((s, a) => s + a.inbox, 0) / (sorted.length || 1);
+                  const avgLeads = sorted.reduce((s, a) => s + a.leads, 0) / (sorted.length || 1);
+                  const overallCPI = sorted.reduce((s, a) => s + a.inbox, 0) > 0 ? sorted.reduce((s, a) => s + a.spend, 0) / sorted.reduce((s, a) => s + a.inbox, 0) : 0;
+                  const overallCPL = sorted.reduce((s, a) => s + a.leads, 0) > 0 ? sorted.reduce((s, a) => s + a.spend, 0) / sorted.reduce((s, a) => s + a.leads, 0) : 0;
+                  const overallRatio = sorted.reduce((s, a) => s + a.inbox, 0) > 0 ? (sorted.reduce((s, a) => s + a.leads, 0) / sorted.reduce((s, a) => s + a.inbox, 0)) * 100 : 0;
+
+                  const good = "text-emerald-400 font-bold";
+                  const bad  = "text-red-400 font-bold ring-1 ring-red-500/40 rounded px-1.5 py-0.5 bg-red-500/10";
+                  const base = "text-foreground/80 font-medium";
+
+                  return sorted.map((svc, i) => {
+                    const spendGood = svc.spend > 0 && svc.spend < avgSpend * 0.85;
+                    const spendBad  = svc.spend > avgSpend * 1.15;
+                    const inboxGood = svc.inbox > avgInbox * 1.15;
+                    const inboxBad  = svc.inbox > 0 && svc.inbox < avgInbox * 0.85;
+                    const cpiGood   = svc.cpi > 0 && svc.cpi < overallCPI * 0.85;
+                    const cpiBad    = svc.cpi > overallCPI * 1.15;
+                    const leadGood  = svc.leads > avgLeads * 1.15;
+                    const leadBad   = svc.leads > 0 && svc.leads < avgLeads * 0.85;
+                    const cplGood   = svc.cpl > 0 && svc.cpl < overallCPL * 0.85;
+                    const cplBad    = svc.cpl > overallCPL * 1.15;
+                    const ratioVal  = svc.inbox > 0 ? (svc.leads / svc.inbox) * 100 : 0;
+                    const ratioGood = ratioVal > overallRatio * 1.15;
+                    const ratioBad  = ratioVal > 0 && ratioVal < overallRatio * 0.85;
+
+                    return (
+                    <tr key={svc.adName + i} className="border-b border-white/5 hover:bg-white/5 transition-colors group">
+                      <td className="px-4 py-3.5">
+                        <p className="font-semibold text-foreground text-[13px] truncate max-w-[200px] group-hover:text-gold-400 transition-colors" title={svc.adName}>{svc.adName}</p>
+                      </td>
+                      <td className="px-3 py-3.5 text-right whitespace-nowrap"><span className={spendGood ? good : spendBad ? bad : base}>{thb(svc.spend)}</span></td>
+                      <td className="px-3 py-3.5 text-right whitespace-nowrap"><span className={inboxGood ? good : inboxBad ? bad : base}>{num(svc.inbox)}</span></td>
+                      <td className="px-3 py-3.5 text-right whitespace-nowrap"><span className={cpiGood ? good : cpiBad ? bad : base}>{thb(svc.cpi)}</span></td>
+                      <td className="px-3 py-3.5 text-right whitespace-nowrap"><span className={leadGood ? good : leadBad ? bad : base}>{svc.leads || "—"}</span></td>
+                      <td className="px-3 py-3.5 text-right whitespace-nowrap"><span className={cplGood ? good : cplBad ? bad : base}>{svc.leads > 0 ? thb(svc.cpl) : "—"}</span></td>
+                      <td className="px-3 py-3.5 text-right whitespace-nowrap">
+                        <span className={svc.inbox > 0 ? (ratioGood ? good : ratioBad ? bad : base) : "text-foreground-muted/30"}>
+                          {svc.inbox > 0 ? pct(ratioVal) : "—"}
+                        </span>
+                      </td>
+                    </tr>
+                    );
+                  });
+                })()}
               </tbody>
             </table>
           </div>
