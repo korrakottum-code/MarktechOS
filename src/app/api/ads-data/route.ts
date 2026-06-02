@@ -359,7 +359,7 @@ export async function GET(req: NextRequest) {
         adNames: Set<string>; thumbnailUrl: string; mediaType: string;
         spend: number; impressions: number; clicks: number; inbox: number;
         leads: number; adIds: Set<string>; pageIds: Set<string>; pageNamesSet: Set<string>;
-        pageMetrics: Map<string, { pageName: string; pageId: string; adAccountId: string; spend: number; inbox: number; leads: number; impressions: number; clicks: number; active: number; paused: number }>;
+        pageMetrics: Map<string, { pageName: string; pageId: string; adAccountId: string; spend: number; inbox: number; leads: number; impressions: number; clicks: number; active: number; paused: number; thumbnailUrl: string }>;
       }>();
 
       for (const ad of globalAdRows) {
@@ -381,8 +381,9 @@ export async function GET(req: NextRequest) {
             pm.spend += ad.spend; pm.inbox += ad.inbox; pm.leads += ad.leads;
             pm.impressions += ad.impressions; pm.clicks += ad.clicks;
             pm.active += isActive; pm.paused += isPaused;
+            if (ad.thumbnailUrl && !pm.thumbnailUrl) pm.thumbnailUrl = ad.thumbnailUrl;
           } else {
-            e.pageMetrics.set(ad.pageId, { pageName: pn, pageId: ad.pageId, adAccountId: ad.adAccountId, spend: ad.spend, inbox: ad.inbox, leads: ad.leads, impressions: ad.impressions, clicks: ad.clicks, active: isActive, paused: isPaused });
+            e.pageMetrics.set(ad.pageId, { pageName: pn, pageId: ad.pageId, adAccountId: ad.adAccountId, spend: ad.spend, inbox: ad.inbox, leads: ad.leads, impressions: ad.impressions, clicks: ad.clicks, active: isActive, paused: isPaused, thumbnailUrl: ad.thumbnailUrl || "" });
           }
         } else {
           gNameMap.set(key, {
@@ -392,7 +393,7 @@ export async function GET(req: NextRequest) {
             inbox: ad.inbox, leads: ad.leads,
             adIds: new Set([ad.adId]), pageIds: new Set([ad.pageId]),
             pageNamesSet: new Set([pn]),
-            pageMetrics: new Map([[ad.pageId, { pageName: pn, pageId: ad.pageId, adAccountId: ad.adAccountId, spend: ad.spend, inbox: ad.inbox, leads: ad.leads, impressions: ad.impressions, clicks: ad.clicks, active: isActive, paused: isPaused }]]),
+            pageMetrics: new Map([[ad.pageId, { pageName: pn, pageId: ad.pageId, adAccountId: ad.adAccountId, spend: ad.spend, inbox: ad.inbox, leads: ad.leads, impressions: ad.impressions, clicks: ad.clicks, active: isActive, paused: isPaused, thumbnailUrl: ad.thumbnailUrl || "" }]]),
           });
         }
       }
