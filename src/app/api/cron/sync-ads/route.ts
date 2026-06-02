@@ -313,38 +313,43 @@ export async function GET(req: NextRequest) {
     const unknownPageIds = uniquePageIds.filter(id => !pageNameMap.has(id));
 
     if (unknownPageIds.length > 0) {
-      // Batch Graph API: /?ids=id1,id2,id3&fields=name
-      try {
-        // Use first available token for page name resolution
-        const batchRes = await fetch(
-          `${BASE}/?ids=${unknownPageIds.join(",")}&fields=name&access_token=${tokens[0]}`,
-          { cache: "no-store" }
-        );
-        if (batchRes.ok) {
-          const batchData = await batchRes.json();
-          const newCacheEntries: { pageId: string; pageName: string }[] = [];
-          for (const [id, info] of Object.entries(batchData) as [string, any][]) {
-            if (info.name) {
-              pageNameMap.set(id, info.name);
-              newCacheEntries.push({ pageId: id, pageName: info.name });
+      // Try each token to resolve page names (different tokens may have access to different pages)
+      let remaining = [...unknownPageIds];
+      for (const token of tokens) {
+        if (remaining.length === 0) break;
+        try {
+          const batchRes = await fetch(
+            `${BASE}/?ids=${remaining.join(",")}&fields=name&access_token=${token}`,
+            { cache: "no-store" }
+          );
+          if (batchRes.ok) {
+            const batchData = await batchRes.json();
+            const newCacheEntries: { pageId: string; pageName: string }[] = [];
+            for (const [id, info] of Object.entries(batchData) as [string, any][]) {
+              if (info.name) {
+                pageNameMap.set(id, info.name);
+                newCacheEntries.push({ pageId: id, pageName: info.name });
+              }
             }
+            // Persist to DB
+            if (newCacheEntries.length > 0) {
+              const vals = newCacheEntries.map(e =>
+                `(${escSql(e.pageId)},${escSql(e.pageName)},'api',NOW(),NOW())`
+              ).join(",");
+              try {
+                await prisma.$executeRawUnsafe(`
+                  INSERT INTO "PageNameCache" ("pageId","pageName","source","createdAt","updatedAt")
+                  VALUES ${vals}
+                  ON CONFLICT ("pageId") DO UPDATE SET "pageName"=EXCLUDED."pageName","updatedAt"=NOW()
+                `);
+              } catch { /* non-critical */ }
+            }
+            console.log(`📛 Resolved ${newCacheEntries.length} new page names`);
+            // Update remaining for next token
+            remaining = remaining.filter(id => !pageNameMap.has(id));
           }
-          // Persist to DB
-          if (newCacheEntries.length > 0) {
-            const vals = newCacheEntries.map(e =>
-              `(${escSql(e.pageId)},${escSql(e.pageName)},'api',NOW(),NOW())`
-            ).join(",");
-            try {
-              await prisma.$executeRawUnsafe(`
-                INSERT INTO "PageNameCache" ("pageId","pageName","source","createdAt","updatedAt")
-                VALUES ${vals}
-                ON CONFLICT ("pageId") DO UPDATE SET "pageName"=EXCLUDED."pageName","updatedAt"=NOW()
-              `);
-            } catch { /* non-critical */ }
-          }
-          console.log(`📛 Resolved ${newCacheEntries.length} new page names`);
-        }
-      } catch { /* non-critical */ }
+        } catch { /* non-critical */ }
+      }
     }
 
     // ── Step 5: Aggregate campaign-level data from ad insights ───────────
@@ -379,7 +384,7 @@ export async function GET(req: NextRequest) {
     // ── Step 6: Bulk upsert campaign-level (AdsMetricDaily) ─────────────
     const campaignRows = [...campaignAgg.values()].map(c => {
       const pgId = pgIdMap[c.campaignId] ?? "";
-      const pgName = pgId ? (pageNameMap.get(pgId) ?? pgId) : c.accountName;
+      const pgName = pgId ? (pageNameMap.get(pgId) || c.accountName) : c.accountName;
       const cpi = c.inbox > 0 ? c.spend / c.inbox : 0;
       const cpl = c.leads > 0 ? c.spend / c.leads : 0;
       const ctr = c.impressions > 0 ? (c.clicks / c.impressions) * 100 : 0;
