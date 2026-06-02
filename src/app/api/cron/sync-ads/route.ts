@@ -8,10 +8,14 @@ const BASE = `https://graph.facebook.com/${API_VERSION}`;
 // Allow up to 5 minutes for heavy sync (Vercel Pro)
 export const maxDuration = 300;
 
-function getToken() {
-  const t = process.env.META_SYSTEM_USER_TOKEN;
-  if (!t) throw new Error("META_SYSTEM_USER_TOKEN ยังไม่ได้ตั้งค่าใน .env.local");
-  return t;
+function getTokens(): string[] {
+  const tokens: string[] = [];
+  const t1 = process.env.META_SYSTEM_USER_TOKEN;
+  if (t1) tokens.push(t1);
+  const t2 = process.env.META_SYSTEM_USER_TOKEN_2;
+  if (t2) tokens.push(t2);
+  if (tokens.length === 0) throw new Error("META_SYSTEM_USER_TOKEN ยังไม่ได้ตั้งค่าใน .env.local");
+  return tokens;
 }
 
 function actionValue(actions: any[], ...types: string[]): number {
@@ -50,11 +54,12 @@ async function fetchInsightsForAccount(
   accountId: string,
   accountName: string,
   since: string,
-  until: string
+  until: string,
+  token: string
 ): Promise<AccountInsight[]> {
   const fields = "ad_id,ad_name,campaign_id,campaign_name,spend,impressions,clicks,ctr,actions";
   const timeRange = encodeURIComponent(JSON.stringify({ since, until }));
-  const url = `${BASE}/act_${accountId}/insights?level=ad&time_increment=1&fields=${fields}&time_range=${timeRange}&limit=1000&access_token=${getToken()}`;
+  const url = `${BASE}/act_${accountId}/insights?level=ad&time_increment=1&fields=${fields}&time_range=${timeRange}&limit=1000&access_token=${token}`;
 
   const insights: AccountInsight[] = [];
   let nextUrl: string | null = url;
@@ -180,7 +185,8 @@ export async function GET(req: NextRequest) {
   console.log("📊 Starting Meta Ads Sync...");
 
   try {
-    getToken();
+    const tokens = getTokens();
+    console.log(`🔑 Using ${tokens.length} Meta token(s)`);
 
     const { searchParams } = req.nextUrl;
     const today = new Date();
@@ -194,7 +200,6 @@ export async function GET(req: NextRequest) {
     console.log(`📅 ${since} → ${until}`);
 
     // ── Pre-load caches from DB ─────────────────────────────────────────
-    // 1. campaign→pageId cache (avoid adset API calls for known campaigns)
     const existingMappings = await prisma.$queryRaw<{ campaignId: string; pageId: string }[]>(
       Prisma.sql`SELECT DISTINCT "campaignId", "pageId" FROM "AdsMetricDaily" WHERE "pageId" != ''`
     );
@@ -202,35 +207,47 @@ export async function GET(req: NextRequest) {
     for (const m of existingMappings) pgIdMap[m.campaignId] = m.pageId;
     console.log(`📦 Loaded ${existingMappings.length} cached campaign→pageId mappings`);
 
-    // 2. Page name cache (batch load all)
     const allPageNames = await prisma.pageNameCache.findMany();
     const pageNameMap = new Map<string, string>();
     for (const p of allPageNames) pageNameMap.set(p.pageId, p.pageName);
     console.log(`📦 Loaded ${allPageNames.length} cached page names`);
 
-    // ── Step 1: Get all ad accounts ─────────────────────────────────────
-    const accountsRes = await fetch(
-      `${BASE}/me/adaccounts?fields=name,account_id,account_status&limit=100&access_token=${getToken()}`,
-      { cache: "no-store" }
-    );
-    if (!accountsRes.ok) throw new Error(`HTTP ${accountsRes.status}`);
-    const accountsJson = await accountsRes.json();
-    if (accountsJson.error) throw new Error(accountsJson.error.message);
+    // ── Step 1: Get all ad accounts from ALL tokens ─────────────────────
+    // Each token may have different ad accounts — deduplicate by account_id
+    const accountTokenMap = new Map<string, { acc: any; token: string }>(); // account_id → { acc, token }
 
-    const adAccounts: any[] = (accountsJson.data ?? []).filter(
-      (a: any) => a.account_status !== 2
-    );
+    await Promise.all(tokens.map(async (token, idx) => {
+      try {
+        const res = await fetch(
+          `${BASE}/me/adaccounts?fields=name,account_id,account_status&limit=100&access_token=${token}`,
+          { cache: "no-store" }
+        );
+        if (!res.ok) { console.warn(`⚠️ Token ${idx + 1}: HTTP ${res.status}`); return; }
+        const json = await res.json();
+        if (json.error) { console.warn(`⚠️ Token ${idx + 1}: ${json.error.message}`); return; }
+        for (const acc of (json.data ?? [])) {
+          if (acc.account_status === 2) continue; // skip disabled
+          if (!accountTokenMap.has(acc.account_id)) {
+            accountTokenMap.set(acc.account_id, { acc, token });
+          }
+        }
+        console.log(`🔑 Token ${idx + 1}: ${(json.data ?? []).length} accounts`);
+      } catch (e: any) {
+        console.warn(`⚠️ Token ${idx + 1} failed: ${e.message}`);
+      }
+    }));
 
-    if (adAccounts.length === 0) {
+    const allAccountEntries = [...accountTokenMap.values()];
+    if (allAccountEntries.length === 0) {
       return NextResponse.json({ message: "ไม่พบ Ad Account", results: [] });
     }
 
-    console.log(`📋 Found ${adAccounts.length} ad accounts`);
+    console.log(`📋 Found ${allAccountEntries.length} unique ad accounts (from ${tokens.length} tokens)`);
 
     // ── Step 2: Fetch insights for ALL accounts in parallel ─────────────
     const results = await Promise.allSettled(
-      adAccounts.map((acc) =>
-        fetchInsightsForAccount(acc.account_id, acc.name ?? acc.account_id, since, until)
+      allAccountEntries.map(({ acc, token }) =>
+        fetchInsightsForAccount(acc.account_id, acc.name ?? acc.account_id, since, until, token)
       )
     );
 
@@ -239,7 +256,7 @@ export async function GET(req: NextRequest) {
 
     for (let i = 0; i < results.length; i++) {
       const result = results[i];
-      const accName = adAccounts[i].name ?? adAccounts[i].account_id;
+      const accName = allAccountEntries[i].acc.name ?? allAccountEntries[i].acc.account_id;
       if (result.status === "fulfilled") {
         allInsights.push(...result.value);
         accountSummary.push({ name: accName, rows: result.value.length, status: "✅" });
@@ -250,7 +267,7 @@ export async function GET(req: NextRequest) {
     }
 
     const fetchElapsed = ((Date.now() - start) / 1000).toFixed(1);
-    console.log(`⚡ Fetched ${allInsights.length} rows from ${adAccounts.length} accounts in ${fetchElapsed}s`);
+    console.log(`⚡ Fetched ${allInsights.length} rows from ${allAccountEntries.length} accounts in ${fetchElapsed}s`);
 
     // ── Step 3: Build pageId map from adsets (only for NEW campaigns) ───
     const newCampaignIds = new Set<string>();
@@ -260,18 +277,21 @@ export async function GET(req: NextRequest) {
 
     if (newCampaignIds.size > 0) {
       // Find which accounts have new campaigns
-      const accountsWithNew = new Set<string>();
+      const accountsWithNewAndToken = new Map<string, string>(); // accountId → token
       for (const row of allInsights) {
-        if (newCampaignIds.has(row.campaignId)) accountsWithNew.add(row.accountId);
+        if (newCampaignIds.has(row.campaignId) && !accountsWithNewAndToken.has(row.accountId)) {
+          const entry = accountTokenMap.get(row.accountId);
+          if (entry) accountsWithNewAndToken.set(row.accountId, entry.token);
+        }
       }
 
-      console.log(`🔍 ${newCampaignIds.size} new campaigns in ${accountsWithNew.size} accounts — fetching adsets`);
+      console.log(`🔍 ${newCampaignIds.size} new campaigns in ${accountsWithNewAndToken.size} accounts — fetching adsets`);
 
       await Promise.allSettled(
-        [...accountsWithNew].map(async (accId) => {
+        [...accountsWithNewAndToken.entries()].map(async ([accId, accToken]) => {
           try {
             const res = await fetch(
-              `${BASE}/act_${accId}/adsets?fields=campaign_id,promoted_object{page_id}&limit=500&access_token=${getToken()}`,
+              `${BASE}/act_${accId}/adsets?fields=campaign_id,promoted_object{page_id}&limit=500&access_token=${accToken}`,
               { cache: "no-store" }
             );
             if (!res.ok) return;
@@ -295,8 +315,9 @@ export async function GET(req: NextRequest) {
     if (unknownPageIds.length > 0) {
       // Batch Graph API: /?ids=id1,id2,id3&fields=name
       try {
+        // Use first available token for page name resolution
         const batchRes = await fetch(
-          `${BASE}/?ids=${unknownPageIds.join(",")}&fields=name&access_token=${getToken()}`,
+          `${BASE}/?ids=${unknownPageIds.join(",")}&fields=name&access_token=${tokens[0]}`,
           { cache: "no-store" }
         );
         if (batchRes.ok) {
@@ -394,10 +415,10 @@ export async function GET(req: NextRequest) {
     console.log(`📝 Upserted ${adRows.length} ad rows (bulk)`);
 
     const elapsed = ((Date.now() - start) / 1000).toFixed(1);
-    console.log(`🏁 Done in ${elapsed}s — ${adAccounts.length} accounts, ${campaignRows.length} campaigns, ${adRows.length} ads`);
+    console.log(`🏁 Done in ${elapsed}s — ${allAccountEntries.length} accounts, ${campaignRows.length} campaigns, ${adRows.length} ads`);
 
     return NextResponse.json({
-      message: `✅ Sync ${since} → ${until} — ${adAccounts.length} accounts, ${campaignRows.length} campaign rows, ${adRows.length} ad rows (${elapsed}s)`,
+      message: `✅ Sync ${since} → ${until} — ${allAccountEntries.length} accounts (${tokens.length} tokens), ${campaignRows.length} campaign rows, ${adRows.length} ad rows (${elapsed}s)`,
       results: accountSummary, since, until,
     });
 
