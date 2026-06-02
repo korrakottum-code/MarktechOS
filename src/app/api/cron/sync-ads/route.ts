@@ -95,12 +95,12 @@ async function getPageName(pageId: string): Promise<string> {
     }
   } catch { /* fallback below */ }
 
-  // 5. Scrape og:title from m.facebook.com
+  // 5. Scrape og:title from www.facebook.com (Googlebot UA bypasses login redirect)
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
-    const res = await fetch(`https://m.facebook.com/${pageId}`, {
-      headers: { "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15" },
+    const res = await fetch(`https://www.facebook.com/${pageId}`, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)" },
       redirect: "follow",
       signal: controller.signal,
     });
@@ -110,7 +110,7 @@ async function getPageName(pageId: string): Promise<string> {
     const ogMatch = html.match(/<meta\s+property="og:title"\s+content="([^"]+)"/i);
     if (ogMatch?.[1]) {
       const decoded = decodeHtmlEntities(ogMatch[1]);
-      const name = decoded.replace(/\s*\|\s*[A-Z][\w\s,]*$/i, "").trim();
+      const name = decoded.replace(/\s*\|\s*[A-Z][\w\s,]*$/i, "").replace(/\s*[-–]\s*Facebook.*$/i, "").trim();
       if (!isInvalidPageName(name)) {
         await savePageName(pageId, name, "scrape");
         return name;
