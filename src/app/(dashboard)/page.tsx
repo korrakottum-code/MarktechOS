@@ -1204,7 +1204,7 @@ function FacebookAdsDashboard() {
                         </tr>
                       ))
                     ) : (
-                      [...globalAdContent].sort((a,b) => b.spend - a.spend).slice(0, 5).map((svc, i) => (
+                      [...globalAdContent].sort((a,b) => b.inbox - a.inbox).slice(0, 5).map((svc, i) => (
                         <tr key={svc.adName} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                           <td className="px-3 py-2.5 text-[11px] font-semibold text-white truncate max-w-[120px]">{svc.adName}</td>
                           <td className="px-2 py-2.5 text-right text-[11px] font-bold text-rose-400">{thb(svc.spend)}</td>
