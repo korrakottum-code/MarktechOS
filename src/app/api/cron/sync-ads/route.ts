@@ -5,6 +5,9 @@ import { createHash } from "crypto";
 const API_VERSION = "v20.0";
 const BASE = `https://graph.facebook.com/${API_VERSION}`;
 
+// Allow up to 5 minutes for heavy sync (Vercel Pro)
+export const maxDuration = 300;
+
 // ── In-memory cache (per-request warm layer, backed by DB) ──────────────────
 const PAGE_NAME_MEM = new Map<string, string>();
 

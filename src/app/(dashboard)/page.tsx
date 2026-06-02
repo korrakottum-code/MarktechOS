@@ -543,11 +543,11 @@ function FacebookAdsDashboard() {
 
       if (!done) setSyncMsg(`🔄 Syncing... (${pollCount * 5}s)`);
 
-      if (pollCount >= 36) {
+      if (pollCount >= 60) {
         if (done) return;
         done = true;
         if (syncIntervalRef.current) { clearInterval(syncIntervalRef.current); syncIntervalRef.current = null; }
-        setSyncMsg("⏱ Sync นานเกิน 3 นาที — ลอง refresh");
+        setSyncMsg("⏱ Sync นานเกิน 5 นาที — ลอง refresh");
         setSyncing(false);
         syncingRef.current = false;
         setTimeout(() => setSyncMsg(null), 10000);
