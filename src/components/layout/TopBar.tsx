@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { useAuthSession } from "@/lib/use-auth-session";
-import { useAppData } from "@/lib/use-app-data";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 interface TopBarProps {
@@ -16,9 +15,8 @@ interface TopBarProps {
 export default function TopBar({ onMenuClick }: TopBarProps) {
   const router = useRouter();
   const { user } = useAuthSession();
-  const { payload } = useAppData();
-  const notifications = payload?.data.notifications ?? [];
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const notifications: any[] = [];
+  const unreadCount = 0;
   const [showNotif, setShowNotif] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);

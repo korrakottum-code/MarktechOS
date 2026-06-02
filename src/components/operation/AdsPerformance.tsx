@@ -1,7 +1,7 @@
 "use client";
 
 import type { AdsMetric } from "@/lib/app-data-types";
-import { formatCurrency, formatNumber } from "@/lib/app-utils";
+import { formatCurrency, formatNumber } from "@/lib/app-data-types";
 import { TrendingUp, TrendingDown } from "lucide-react";
 
 interface AdsPerformanceProps {

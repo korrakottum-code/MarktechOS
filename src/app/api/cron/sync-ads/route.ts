@@ -544,14 +544,16 @@ export async function GET(req: NextRequest) {
     }
 
     // ── Cleanup: remove data from accounts that lost access ──────────────
+    // Only clean up within the date range being synced (don't touch historical data)
     const activeAccountIds = new Set(adAccounts.map((a: any) => a.account_id));
     const deleted = await prisma.adsMetricDaily.deleteMany({
       where: {
         adAccountId: { notIn: [...activeAccountIds] },
+        date: { gte: since, lte: until },
       },
     });
     if (deleted.count > 0) {
-      console.log(`🧹 Cleaned up ${deleted.count} daily rows from revoked accounts`);
+      console.log(`🧹 Cleaned up ${deleted.count} daily rows from revoked accounts (${since}→${until})`);
     }
 
     // ── Fetch page tokens ONCE (with 5-min cache) ───────────────────────

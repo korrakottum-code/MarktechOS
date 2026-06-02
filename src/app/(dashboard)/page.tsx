@@ -525,15 +525,15 @@ function FacebookAdsDashboard() {
         // Network error / proxy timeout — polling will detect completion
       });
 
-    // Poll /api/app-data every 5s to detect when lastSyncedAt changes
+    // Poll /api/ads-data every 5s to detect when lastSyncedAt changes
     let pollCount = 0;
     syncIntervalRef.current = setInterval(async () => {
       if (done) { if (syncIntervalRef.current) clearInterval(syncIntervalRef.current); return; }
       pollCount++;
       try {
-        const res = await fetch(`/api/app-data?t=${Date.now()}`, { cache: "no-store" });
+        const res = await fetch(`/api/ads-data?since=${since}&until=${until}&t=${Date.now()}`, { cache: "no-store" });
         const data = await res.json();
-        const newSyncedAt = data?.meta?.lastSyncedAt ?? null;
+        const newSyncedAt = data?.lastSyncedAt ?? null;
 
         if (newSyncedAt && newSyncedAt !== beforeSync) {
           finish("✅ Sync เสร็จแล้ว");
