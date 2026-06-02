@@ -346,7 +346,7 @@ function FacebookAdsDashboard() {
             if (pbFiltered.length === 0) return null;
             return {
                 ...svc,
-                thumbnailUrl: pbFiltered.find((p: any) => p.thumbnailUrl)?.thumbnailUrl || svc.thumbnailUrl,
+                thumbnailUrl: pbFiltered.find((p: any) => p.thumbnailUrl)?.thumbnailUrl || "",
                 pageBreakdown: pbFiltered,
                 spend: pbFiltered.reduce((s: number, p: any) => s + p.spend, 0),
                 inbox: pbFiltered.reduce((s: number, p: any) => s + p.inbox, 0),
