@@ -341,7 +341,7 @@ function FacebookAdsDashboard() {
     if (serviceFilter) filtered = filtered.filter(s => s.adName === serviceFilter);
     if (selectedPages.size > 0) {
         filtered = filtered.map(svc => {
-            if (!svc.pageBreakdown) return svc;
+            if (!svc.pageBreakdown) return null;
             const pbFiltered = svc.pageBreakdown.filter(pb => selectedPages.has(pb.pageName));
             if (pbFiltered.length === 0) return null;
             return {
@@ -366,7 +366,7 @@ function FacebookAdsDashboard() {
     if (serviceFilter) filtered = filtered.filter(ad => ad.adNames?.includes(serviceFilter));
     if (selectedPages.size > 0) {
         filtered = filtered.map(ad => {
-            if (!ad.pageBreakdown) return ad;
+            if (!ad.pageBreakdown) return null;
             const pbFiltered = ad.pageBreakdown.filter(pb => selectedPages.has(pb.pageName));
             if (pbFiltered.length === 0) return null;
             return {

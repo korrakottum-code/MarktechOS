@@ -276,11 +276,18 @@ export async function GET(req: NextRequest) {
         orderBy: [{ spend: "desc" }],
       });
 
-      // Build pageId → pageName map from adsMetrics
+      // Build pageId → pageName map from adsMetrics + PageNameCache
       const pageNameMap = new Map<string, string>();
       for (const m of adsMetrics) {
         if (m.pageId && m.pageName && m.pageName !== m.pageId) {
           pageNameMap.set(m.pageId, m.pageName);
+        }
+      }
+      // Also pull from PageNameCache for any pageIds not in metrics
+      const cachedNames = await prisma.pageNameCache.findMany();
+      for (const c of cachedNames) {
+        if (!pageNameMap.has(c.pageId) && c.pageName) {
+          pageNameMap.set(c.pageId, c.pageName);
         }
       }
 
