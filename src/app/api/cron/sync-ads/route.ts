@@ -139,11 +139,12 @@ async function scrapePageName(pageId: string): Promise<string | null> {
     const html = await res.text();
     const match = html.match(/<title>([^<]+)<\/title>/);
     if (!match) return null;
-    // Clean: remove " | City" suffix and "Facebook" generic title
-    let name = match[1].trim();
-    if (name === "Facebook" || name === "Log in to Facebook" || !name) return null;
-    // Remove " | City" suffix (e.g. "Keep Clinic | Nakhon Ratchasima")
-    name = name.replace(/\s*\|.*$/, "").trim();
+    let name = match[1].trim()
+      .replace(/&#039;/g, "'").replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"');
+    if (name === "Facebook" || name === "Log in to Facebook" || name === "เกิดข้อผิดพลาด" || !name) return null;
+    // Remove " | City" suffix only (keep the rest of the name)
+    name = name.replace(/\s*\|\s*[^|]+$/, "").trim();
     return name || null;
   } catch { return null; }
 }
