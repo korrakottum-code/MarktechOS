@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/server/prisma";
+import { Prisma } from "@prisma/client";
 
 const API_VERSION = "v20.0";
 const BASE = `https://graph.facebook.com/${API_VERSION}`;
@@ -7,46 +8,10 @@ const BASE = `https://graph.facebook.com/${API_VERSION}`;
 // Allow up to 5 minutes for heavy sync (Vercel Pro)
 export const maxDuration = 300;
 
-// ── In-memory cache (per-request warm layer, backed by DB) ──────────────────
-const PAGE_NAME_MEM = new Map<string, string>();
-
 function getToken() {
   const t = process.env.META_SYSTEM_USER_TOKEN;
   if (!t) throw new Error("META_SYSTEM_USER_TOKEN ยังไม่ได้ตั้งค่าใน .env.local");
   return t;
-}
-
-// ── Page Name Resolution (DB-backed) ────────────────────────────────────────
-async function getPageName(pageId: string): Promise<string> {
-  if (!pageId) return "";
-  if (PAGE_NAME_MEM.has(pageId)) return PAGE_NAME_MEM.get(pageId)!;
-
-  // Check DB cache
-  try {
-    const cached = await prisma.pageNameCache.findUnique({ where: { pageId } });
-    if (cached) { PAGE_NAME_MEM.set(pageId, cached.pageName); return cached.pageName; }
-  } catch { /* continue */ }
-
-  // Resolve from Meta Graph API
-  try {
-    const res = await fetch(`${BASE}/${pageId}?fields=id,name&access_token=${getToken()}`, { cache: "no-store" });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.name) {
-        PAGE_NAME_MEM.set(pageId, data.name);
-        try {
-          await prisma.pageNameCache.upsert({
-            where: { pageId },
-            create: { pageId, pageName: data.name, source: "api" },
-            update: { pageName: data.name, source: "api" },
-          });
-        } catch { /* non-critical */ }
-        return data.name;
-      }
-    }
-  } catch { /* fallback below */ }
-
-  return pageId; // fallback: use ID
 }
 
 function actionValue(actions: any[], ...types: string[]): number {
@@ -89,8 +54,7 @@ async function fetchInsightsForAccount(
 ): Promise<AccountInsight[]> {
   const fields = "ad_id,ad_name,campaign_id,campaign_name,spend,impressions,clicks,ctr,actions";
   const timeRange = encodeURIComponent(JSON.stringify({ since, until }));
-  // Single call: level=ad + time_increment=1 gives daily ad-level breakdown
-  const url = `${BASE}/act_${accountId}/insights?level=ad&time_increment=1&fields=${fields}&time_range=${timeRange}&limit=500&access_token=${getToken()}`;
+  const url = `${BASE}/act_${accountId}/insights?level=ad&time_increment=1&fields=${fields}&time_range=${timeRange}&limit=1000&access_token=${getToken()}`;
 
   const insights: AccountInsight[] = [];
   let nextUrl: string | null = url;
@@ -156,6 +120,60 @@ async function fetchInsightsForAccount(
   return insights;
 }
 
+// ── Bulk Upsert helpers ─────────────────────────────────────────────────────
+function escSql(v: any): string {
+  if (v === null || v === undefined) return "NULL";
+  if (typeof v === "number") return isFinite(v) ? String(v) : "0";
+  return `'${String(v).replace(/'/g, "''")}'`;
+}
+
+async function bulkUpsertMetricDaily(rows: any[]) {
+  if (rows.length === 0) return;
+  const BATCH = 500;
+  for (let i = 0; i < rows.length; i += BATCH) {
+    const batch = rows.slice(i, i + BATCH);
+    const values = batch.map(c =>
+      `(${escSql(c.campaignId)},${escSql(c.date)},${escSql(c.clinicName)},${escSql(c.pageName)},${escSql(c.pageId)},${escSql(c.adAccountId)},${escSql(c.campaign)},${c.spend},${c.inbox},${c.leads},${c.cpl},${c.cpi},${c.impressions},${c.clicks},${c.ctr},${escSql(c.status)},NOW(),NOW())`
+    ).join(",\n");
+
+    await prisma.$executeRawUnsafe(`
+      INSERT INTO "AdsMetricDaily" ("campaignId","date","clinicName","pageName","pageId","adAccountId","campaign","spend","inbox","leads","cpl","cpi","impressions","clicks","ctr","status","createdAt","updatedAt")
+      VALUES ${values}
+      ON CONFLICT ("campaignId","date") DO UPDATE SET
+        "clinicName"=EXCLUDED."clinicName","pageName"=EXCLUDED."pageName","pageId"=EXCLUDED."pageId",
+        "adAccountId"=EXCLUDED."adAccountId","campaign"=EXCLUDED."campaign",
+        "spend"=EXCLUDED."spend","inbox"=EXCLUDED."inbox","leads"=EXCLUDED."leads",
+        "cpl"=EXCLUDED."cpl","cpi"=EXCLUDED."cpi",
+        "impressions"=EXCLUDED."impressions","clicks"=EXCLUDED."clicks","ctr"=EXCLUDED."ctr",
+        "updatedAt"=NOW()
+    `);
+  }
+}
+
+async function bulkUpsertContentDaily(rows: any[]) {
+  if (rows.length === 0) return;
+  const BATCH = 500;
+  for (let i = 0; i < rows.length; i += BATCH) {
+    const batch = rows.slice(i, i + BATCH);
+    const values = batch.map(r =>
+      `(${escSql(r.adId)},${escSql(r.date)},${escSql(r.campaignId)},${escSql(r.adAccountId)},${escSql(r.pageId)},${escSql(r.adName)},${escSql(r.campaignName)},${r.spend},${r.impressions},${r.clicks},${r.inbox},${r.leads},${r.cpi},${r.likes},${r.comments},${r.shares},${r.videoViews},${r.ctr},${escSql(r.status)},NOW(),NOW())`
+    ).join(",\n");
+
+    await prisma.$executeRawUnsafe(`
+      INSERT INTO "AdsContentDaily" ("adId","date","campaignId","adAccountId","pageId","adName","campaignName","spend","impressions","clicks","inbox","leads","cpi","likes","comments","shares","videoViews","ctr","status","createdAt","updatedAt")
+      VALUES ${values}
+      ON CONFLICT ("adId","date") DO UPDATE SET
+        "campaignId"=EXCLUDED."campaignId","adAccountId"=EXCLUDED."adAccountId","pageId"=EXCLUDED."pageId",
+        "adName"=EXCLUDED."adName","campaignName"=EXCLUDED."campaignName",
+        "spend"=EXCLUDED."spend","impressions"=EXCLUDED."impressions","clicks"=EXCLUDED."clicks",
+        "inbox"=EXCLUDED."inbox","leads"=EXCLUDED."leads","cpi"=EXCLUDED."cpi",
+        "likes"=EXCLUDED."likes","comments"=EXCLUDED."comments","shares"=EXCLUDED."shares",
+        "videoViews"=EXCLUDED."videoViews","ctr"=EXCLUDED."ctr",
+        "updatedAt"=NOW()
+    `);
+  }
+}
+
 // ── GET /api/cron/sync-ads ──────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
   const start = Date.now();
@@ -168,11 +186,27 @@ export async function GET(req: NextRequest) {
     const today = new Date();
     const toISO = (d: Date) => d.toISOString().slice(0, 10);
 
-    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-    const since = searchParams.get("since") || toISO(firstDay);
+    // Default: last 3 days (Meta attribution window)
+    const threeDaysAgo = new Date(today.getTime() - 3 * 86400000);
+    const since = searchParams.get("since") || toISO(threeDaysAgo);
     const until = searchParams.get("until") || toISO(today);
 
     console.log(`📅 ${since} → ${until}`);
+
+    // ── Pre-load caches from DB ─────────────────────────────────────────
+    // 1. campaign→pageId cache (avoid adset API calls for known campaigns)
+    const existingMappings = await prisma.$queryRaw<{ campaignId: string; pageId: string }[]>(
+      Prisma.sql`SELECT DISTINCT "campaignId", "pageId" FROM "AdsMetricDaily" WHERE "pageId" != ''`
+    );
+    const pgIdMap: Record<string, string> = {};
+    for (const m of existingMappings) pgIdMap[m.campaignId] = m.pageId;
+    console.log(`📦 Loaded ${existingMappings.length} cached campaign→pageId mappings`);
+
+    // 2. Page name cache (batch load all)
+    const allPageNames = await prisma.pageNameCache.findMany();
+    const pageNameMap = new Map<string, string>();
+    for (const p of allPageNames) pageNameMap.set(p.pageId, p.pageName);
+    console.log(`📦 Loaded ${allPageNames.length} cached page names`);
 
     // ── Step 1: Get all ad accounts ─────────────────────────────────────
     const accountsRes = await fetch(
@@ -184,7 +218,7 @@ export async function GET(req: NextRequest) {
     if (accountsJson.error) throw new Error(accountsJson.error.message);
 
     const adAccounts: any[] = (accountsJson.data ?? []).filter(
-      (a: any) => a.account_status !== 2 // Skip DISABLED accounts
+      (a: any) => a.account_status !== 2
     );
 
     if (adAccounts.length === 0) {
@@ -193,14 +227,13 @@ export async function GET(req: NextRequest) {
 
     console.log(`📋 Found ${adAccounts.length} ad accounts`);
 
-    // ── Step 2: Fetch insights for ALL accounts in parallel (Korrakot-DB style) ─
+    // ── Step 2: Fetch insights for ALL accounts in parallel ─────────────
     const results = await Promise.allSettled(
       adAccounts.map((acc) =>
         fetchInsightsForAccount(acc.account_id, acc.name ?? acc.account_id, since, until)
       )
     );
 
-    // Flatten all insights
     const allInsights: AccountInsight[] = [];
     const accountSummary: any[] = [];
 
@@ -219,38 +252,86 @@ export async function GET(req: NextRequest) {
     const fetchElapsed = ((Date.now() - start) / 1000).toFixed(1);
     console.log(`⚡ Fetched ${allInsights.length} rows from ${adAccounts.length} accounts in ${fetchElapsed}s`);
 
-    // ── Step 3: Build pageId map from adsets (parallel for all accounts) ──
-    const pgIdMap: Record<string, string> = {};
-    const uniqueAccountIds = [...new Set(adAccounts.map((a: any) => a.account_id))];
+    // ── Step 3: Build pageId map from adsets (only for NEW campaigns) ───
+    const newCampaignIds = new Set<string>();
+    for (const row of allInsights) {
+      if (!pgIdMap[row.campaignId]) newCampaignIds.add(row.campaignId);
+    }
 
-    await Promise.allSettled(
-      uniqueAccountIds.map(async (accId) => {
-        try {
-          const res = await fetch(
-            `${BASE}/act_${accId}/adsets?fields=campaign_id,promoted_object{page_id}&limit=500&access_token=${getToken()}`,
-            { cache: "no-store" }
-          );
-          if (!res.ok) return;
-          const json = await res.json();
-          for (const adset of json.data ?? []) {
-            if (adset.promoted_object?.page_id && !pgIdMap[adset.campaign_id]) {
-              pgIdMap[adset.campaign_id] = adset.promoted_object.page_id;
+    if (newCampaignIds.size > 0) {
+      // Find which accounts have new campaigns
+      const accountsWithNew = new Set<string>();
+      for (const row of allInsights) {
+        if (newCampaignIds.has(row.campaignId)) accountsWithNew.add(row.accountId);
+      }
+
+      console.log(`🔍 ${newCampaignIds.size} new campaigns in ${accountsWithNew.size} accounts — fetching adsets`);
+
+      await Promise.allSettled(
+        [...accountsWithNew].map(async (accId) => {
+          try {
+            const res = await fetch(
+              `${BASE}/act_${accId}/adsets?fields=campaign_id,promoted_object{page_id}&limit=500&access_token=${getToken()}`,
+              { cache: "no-store" }
+            );
+            if (!res.ok) return;
+            const json = await res.json();
+            for (const adset of json.data ?? []) {
+              if (adset.promoted_object?.page_id && !pgIdMap[adset.campaign_id]) {
+                pgIdMap[adset.campaign_id] = adset.promoted_object.page_id;
+              }
+            }
+          } catch { /* non-critical */ }
+        })
+      );
+    } else {
+      console.log(`✅ All campaigns already have pageId cached — skipping adset fetch`);
+    }
+
+    // ── Step 4: Resolve page names (batch) ──────────────────────────────
+    const uniquePageIds = [...new Set(Object.values(pgIdMap))];
+    const unknownPageIds = uniquePageIds.filter(id => !pageNameMap.has(id));
+
+    if (unknownPageIds.length > 0) {
+      // Batch Graph API: /?ids=id1,id2,id3&fields=name
+      try {
+        const batchRes = await fetch(
+          `${BASE}/?ids=${unknownPageIds.join(",")}&fields=name&access_token=${getToken()}`,
+          { cache: "no-store" }
+        );
+        if (batchRes.ok) {
+          const batchData = await batchRes.json();
+          const newCacheEntries: { pageId: string; pageName: string }[] = [];
+          for (const [id, info] of Object.entries(batchData) as [string, any][]) {
+            if (info.name) {
+              pageNameMap.set(id, info.name);
+              newCacheEntries.push({ pageId: id, pageName: info.name });
             }
           }
-        } catch { /* non-critical */ }
-      })
-    );
-
-    // ── Step 4: Resolve page names ──────────────────────────────────────
-    const uniquePageIds = [...new Set(Object.values(pgIdMap))];
-    await Promise.all(uniquePageIds.map((pid) => getPageName(pid)));
+          // Persist to DB
+          if (newCacheEntries.length > 0) {
+            const vals = newCacheEntries.map(e =>
+              `(${escSql(e.pageId)},${escSql(e.pageName)},'api',NOW(),NOW())`
+            ).join(",");
+            try {
+              await prisma.$executeRawUnsafe(`
+                INSERT INTO "PageNameCache" ("pageId","pageName","source","createdAt","updatedAt")
+                VALUES ${vals}
+                ON CONFLICT ("pageId") DO UPDATE SET "pageName"=EXCLUDED."pageName","updatedAt"=NOW()
+              `);
+            } catch { /* non-critical */ }
+          }
+          console.log(`📛 Resolved ${newCacheEntries.length} new page names`);
+        }
+      } catch { /* non-critical */ }
+    }
 
     // ── Step 5: Aggregate campaign-level data from ad insights ───────────
-    type CampaignKey = string; // "campaignId|date"
+    type CampaignKey = string;
     const campaignAgg = new Map<CampaignKey, {
       campaignId: string; date: string; campaignName: string;
       accountId: string; accountName: string;
-      spend: number; impressions: number; clicks: number; ctr: number;
+      spend: number; impressions: number; clicks: number;
       inbox: number; leads: number;
     }>();
 
@@ -269,81 +350,54 @@ export async function GET(req: NextRequest) {
           campaignName: row.campaignName,
           accountId: row.accountId, accountName: row.accountName,
           spend: row.spend, impressions: row.impressions, clicks: row.clicks,
-          ctr: row.ctr, inbox: row.inbox, leads: row.leads,
+          inbox: row.inbox, leads: row.leads,
         });
       }
     }
 
-    // ── Step 6: Upsert campaign-level (AdsMetricDaily) ──────────────────
-    const BATCH = 50;
-    const campaigns = [...campaignAgg.values()];
-    let campaignUpserts = 0;
+    // ── Step 6: Bulk upsert campaign-level (AdsMetricDaily) ─────────────
+    const campaignRows = [...campaignAgg.values()].map(c => {
+      const pgId = pgIdMap[c.campaignId] ?? "";
+      const pgName = pgId ? (pageNameMap.get(pgId) ?? pgId) : c.accountName;
+      const cpi = c.inbox > 0 ? c.spend / c.inbox : 0;
+      const cpl = c.leads > 0 ? c.spend / c.leads : 0;
+      const ctr = c.impressions > 0 ? (c.clicks / c.impressions) * 100 : 0;
+      return {
+        campaignId: c.campaignId, date: c.date,
+        clinicName: c.accountName, pageName: pgName, pageId: pgId,
+        adAccountId: c.accountId, campaign: c.campaignName,
+        spend: c.spend, inbox: c.inbox, leads: c.leads, cpi, cpl,
+        impressions: c.impressions, clicks: c.clicks, ctr,
+        status: "active",
+      };
+    });
 
-    for (let i = 0; i < campaigns.length; i += BATCH) {
-      await Promise.all(campaigns.slice(i, i + BATCH).map(async (c) => {
-        const pgId = pgIdMap[c.campaignId] ?? "";
-        const pgName = pgId ? (PAGE_NAME_MEM.get(pgId) ?? pgId) : c.accountName;
-        const cpi = c.inbox > 0 ? c.spend / c.inbox : 0;
-        const cpl = c.leads > 0 ? c.spend / c.leads : 0;
+    await bulkUpsertMetricDaily(campaignRows);
+    console.log(`📝 Upserted ${campaignRows.length} campaign rows (bulk)`);
 
-        await prisma.adsMetricDaily.upsert({
-          where: { campaignId_date: { campaignId: c.campaignId, date: c.date } },
-          create: {
-            campaignId: c.campaignId, date: c.date,
-            clinicName: c.accountName, pageName: pgName, pageId: pgId,
-            adAccountId: c.accountId, campaign: c.campaignName,
-            spend: c.spend, inbox: c.inbox, leads: c.leads, cpi, cpl,
-            impressions: c.impressions, clicks: c.clicks, ctr: c.ctr,
-            status: "active",
-          },
-          update: {
-            clinicName: c.accountName, pageName: pgName, pageId: pgId,
-            adAccountId: c.accountId, campaign: c.campaignName,
-            spend: c.spend, inbox: c.inbox, leads: c.leads, cpi, cpl,
-            impressions: c.impressions, clicks: c.clicks, ctr: c.ctr,
-          },
-        });
-        campaignUpserts++;
-      }));
-    }
+    // ── Step 7: Bulk upsert ad-level (AdsContentDaily) ──────────────────
+    const adRows = allInsights.map(row => {
+      const pgId = pgIdMap[row.campaignId] ?? "";
+      return {
+        adId: row.adId, date: row.date,
+        campaignId: row.campaignId, adAccountId: row.accountId,
+        pageId: pgId, adName: row.adName, campaignName: row.campaignName,
+        spend: row.spend, impressions: row.impressions, clicks: row.clicks,
+        inbox: row.inbox, leads: row.leads, cpi: row.cpi,
+        likes: row.likes, comments: row.comments, shares: row.shares,
+        videoViews: row.videoViews, ctr: row.ctr,
+        status: "active",
+      };
+    });
 
-    // ── Step 7: Upsert ad-level (AdsContentDaily) ───────────────────────
-    let adUpserts = 0;
-
-    for (let i = 0; i < allInsights.length; i += BATCH) {
-      await Promise.all(allInsights.slice(i, i + BATCH).map(async (row) => {
-        const pgId = pgIdMap[row.campaignId] ?? "";
-
-        await prisma.adsContentDaily.upsert({
-          where: { adId_date: { adId: row.adId, date: row.date } },
-          create: {
-            adId: row.adId, date: row.date,
-            campaignId: row.campaignId, adAccountId: row.accountId,
-            pageId: pgId, adName: row.adName, campaignName: row.campaignName,
-            spend: row.spend, impressions: row.impressions, clicks: row.clicks,
-            inbox: row.inbox, leads: row.leads, cpi: row.cpi,
-            likes: row.likes, comments: row.comments, shares: row.shares,
-            videoViews: row.videoViews, ctr: row.ctr,
-            status: "active",
-          },
-          update: {
-            campaignId: row.campaignId, adAccountId: row.accountId,
-            pageId: pgId, adName: row.adName, campaignName: row.campaignName,
-            spend: row.spend, impressions: row.impressions, clicks: row.clicks,
-            inbox: row.inbox, leads: row.leads, cpi: row.cpi,
-            likes: row.likes, comments: row.comments, shares: row.shares,
-            videoViews: row.videoViews, ctr: row.ctr,
-          },
-        });
-        adUpserts++;
-      }));
-    }
+    await bulkUpsertContentDaily(adRows);
+    console.log(`📝 Upserted ${adRows.length} ad rows (bulk)`);
 
     const elapsed = ((Date.now() - start) / 1000).toFixed(1);
-    console.log(`🏁 Done in ${elapsed}s — ${adAccounts.length} accounts, ${campaignUpserts} campaigns, ${adUpserts} ads`);
+    console.log(`🏁 Done in ${elapsed}s — ${adAccounts.length} accounts, ${campaignRows.length} campaigns, ${adRows.length} ads`);
 
     return NextResponse.json({
-      message: `✅ Sync ${since} → ${until} — ${adAccounts.length} accounts, ${campaignUpserts} campaign rows, ${adUpserts} ad rows (${elapsed}s)`,
+      message: `✅ Sync ${since} → ${until} — ${adAccounts.length} accounts, ${campaignRows.length} campaign rows, ${adRows.length} ad rows (${elapsed}s)`,
       results: accountSummary, since, until,
     });
 

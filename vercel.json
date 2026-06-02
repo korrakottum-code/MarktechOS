@@ -1,7 +1,7 @@
 {
   "crons": [
     {
-      "path": "/api/cron/sync-ads?mode=daily",
+      "path": "/api/cron/sync-ads",
       "schedule": "0 3 * * *"
     }
   ]

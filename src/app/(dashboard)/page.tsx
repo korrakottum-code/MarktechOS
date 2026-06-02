@@ -444,38 +444,46 @@ function FacebookAdsDashboard() {
   }, [raw, globalAdContent, search, serviceFilter, selectedPages, sortKey, sortDir]);
 
   const kpis = useMemo(() => {
-    const totalSpend = pages.reduce((s, p) => s + p.spend, 0);
-    const totalInbox = pages.reduce((s, p) => s + p.inbox, 0);
-    const totalLeads = pages.reduce((s, p) => s + p.leads, 0);
-    
-    let totalImpressions = 0;
-    let totalClicks = 0;
-    let active = 0;
-    
+    // When filters are active, derive from the filtered pages array
     if (serviceFilter || selectedPages.size > 0) {
-      totalImpressions = pages.reduce((s, p) => s + ((p as any).impressions || 0), 0);
-      totalClicks = pages.reduce((s, p) => s + ((p as any).clicks || 0), 0);
-      active = pages.reduce((s, p) => s + p.activeCnt, 0);
-    } else {
-      const filteredRaw = raw.filter(m => search === "" || (m.pageName || m.clinic || "").toLowerCase().includes(search.toLowerCase()) || (m.adAccountId || "").includes(search));
-      totalImpressions = filteredRaw.reduce((s, m) => s + m.impressions, 0);
-      totalClicks = filteredRaw.reduce((s, m) => s + m.clicks, 0);
-      active = filteredRaw.filter(m => m.status === "active").length;
+      const totalSpend = pages.reduce((s, p) => s + p.spend, 0);
+      const totalInbox = pages.reduce((s, p) => s + p.inbox, 0);
+      const totalLeads = pages.reduce((s, p) => s + p.leads, 0);
+      const totalImpressions = pages.reduce((s, p) => s + ((p as any).impressions || 0), 0);
+      const totalClicks = pages.reduce((s, p) => s + ((p as any).clicks || 0), 0);
+      const active = pages.reduce((s, p) => s + p.activeCnt, 0);
+      return {
+        totalSpend, totalInbox, totalLeads, totalImpressions, totalClicks,
+        avgCPI: totalInbox > 0 ? totalSpend / totalInbox : 0,
+        avgCPL: totalLeads > 0 ? totalSpend / totalLeads : 0,
+        ratio:  totalInbox > 0 ? (totalLeads / totalInbox) * 100 : 0,
+        ctr:    totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0,
+        active,
+      };
     }
 
+    // Base case: derive from globalAdContent (same source as Top/Bottom/Top5 sections)
+    // This ensures overview KPIs match the service breakdown sections
+    const src = globalAdContent.length > 0 ? globalAdContent : [];
+    const totalSpend = src.reduce((s, a) => s + a.spend, 0);
+    const totalInbox = src.reduce((s, a) => s + a.inbox, 0);
+    const totalLeads = src.reduce((s, a) => s + a.leads, 0);
+    const totalImpressions = src.reduce((s, a) => s + a.impressions, 0);
+    const totalClicks = src.reduce((s, a) => s + a.clicks, 0);
+
+    // Active count still from raw campaigns (globalAdContent doesn't track this)
+    const filteredRaw = raw.filter(m => search === "" || (m.pageName || m.clinic || "").toLowerCase().includes(search.toLowerCase()) || (m.adAccountId || "").includes(search));
+    const active = filteredRaw.filter(m => m.status === "active").length;
+
     return {
-      totalSpend,
-      totalInbox,
-      totalLeads,
-      totalImpressions,
-      totalClicks,
-      avgCPI:  totalInbox > 0 ? totalSpend / totalInbox : 0,
-      avgCPL:  totalLeads > 0 ? totalSpend / totalLeads : 0,
-      ratio:   totalInbox > 0 ? (totalLeads / totalInbox) * 100 : 0,
-      ctr:     totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0,
+      totalSpend, totalInbox, totalLeads, totalImpressions, totalClicks,
+      avgCPI: totalInbox > 0 ? totalSpend / totalInbox : 0,
+      avgCPL: totalLeads > 0 ? totalSpend / totalLeads : 0,
+      ratio:  totalInbox > 0 ? (totalLeads / totalInbox) * 100 : 0,
+      ctr:    totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0,
       active,
     };
-  }, [pages, raw, search, serviceFilter, selectedPages]);
+  }, [pages, raw, globalAdContent, search, serviceFilter, selectedPages]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir(d => d === "desc" ? "asc" : "desc");

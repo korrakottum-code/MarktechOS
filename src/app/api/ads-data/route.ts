@@ -346,74 +346,19 @@ export async function GET(req: NextRequest) {
           pageBreakdown: [...a.pageMetrics.values()],
         }))
         .sort((a, b) => b.spend - a.spend);
-
-      // Group by content — prefer creativeId (same across pages), fallback to thumbnail filename
-      function gThumbKey(url: string): string {
-        try {
-          const p = new URL(url).pathname;
-          const segs = p.split('/').filter(Boolean);
-          return `thumb:${segs[segs.length - 1] || p}`;
-        } catch { return `thumb:${url}`; }
-      }
-
-      // Hamming distance helper for perceptual hash fuzzy matching
-      function hammingDist(a: string, b: string): number {
-        if (a.length !== b.length) return 999;
-        let d = 0;
-        for (let i = 0; i < a.length; i++) {
-          const diff = parseInt(a[i], 16) ^ parseInt(b[i], 16);
-          d += diff.toString(2).replace(/0/g, "").length;
-        }
-        return d;
-      }
-
-      const gThumbMap = new Map<string, {
+      // Group by adName (same structure as globalAdContent for consistency)
+      // This replaces the old thumbnail/pHash grouping which operated on empty strings
+      const gNameMap = new Map<string, {
         adNames: Set<string>; thumbnailUrl: string; mediaType: string;
         spend: number; impressions: number; clicks: number; inbox: number;
         leads: number; adIds: Set<string>; pageIds: Set<string>; pageNamesSet: Set<string>;
         pageMetrics: Map<string, { pageName: string; pageId: string; adAccountId: string; spend: number; inbox: number; leads: number; impressions: number; clicks: number; active: number; paused: number }>;
       }>();
 
-      // Fuzzy pHash grouping — canonical list + per-hash cache.
-      // Distinct hashes ≪ rows, so this avoids the previous O(rows × keys) scan
-      // while preserving identical "first-match-wins" grouping behaviour.
-      const phCanonical: string[] = [];           // canonical pHash bodies (without "ph:" prefix)
-      const phKeyCache = new Map<string, string>(); // full imageHash ("ph:...") → resolved group key
-      function resolvePhKey(fullHash: string): string {
-        const cached = phKeyCache.get(fullHash);
-        if (cached) return cached;
-        const h = fullHash.slice(3); // remove "ph:" prefix
-        for (const c of phCanonical) {
-          if (hammingDist(h, c) <= 10) {
-            const k = `hash:ph:${c}`;
-            phKeyCache.set(fullHash, k);
-            return k;
-          }
-        }
-        phCanonical.push(h);
-        const k = `hash:ph:${h}`;
-        phKeyCache.set(fullHash, k);
-        return k;
-      }
-
       for (const ad of globalAdRows) {
-        // Priority: imageHash (fuzzy pHash) > creativeId > thumbnail filename > adId
-        let key: string;
-        if (ad.imageHash) {
-          if (ad.imageHash.startsWith("ph:")) {
-            key = resolvePhKey(ad.imageHash);
-          } else {
-            key = `hash:${ad.imageHash}`;
-          }
-        } else if (ad.creativeId) {
-          key = `crt:${ad.creativeId}`;
-        } else if (ad.thumbnailUrl) {
-          key = gThumbKey(ad.thumbnailUrl);
-        } else {
-          key = `no-thumb-${ad.adId}`;
-        }
+        const key = ad.adName || ad.adId;
         const pn = pageNameMap.get(ad.pageId) ?? ad.pageId;
-        const e = gThumbMap.get(key);
+        const e = gNameMap.get(key);
         const isActive = ad.status === "active" ? 1 : 0;
         const isPaused = ad.status === "paused" ? 1 : 0;
 
@@ -422,17 +367,18 @@ export async function GET(req: NextRequest) {
           e.inbox += ad.inbox; e.leads += ad.leads;
           e.adNames.add(ad.adName || ad.adId); e.adIds.add(ad.adId); e.pageIds.add(ad.pageId);
           if (!e.mediaType && ad.mediaType) e.mediaType = ad.mediaType;
+          if (ad.thumbnailUrl && !e.thumbnailUrl) e.thumbnailUrl = ad.thumbnailUrl;
           e.pageNamesSet.add(pn);
-          // Per-page accumulation
           const pm = e.pageMetrics.get(ad.pageId);
-          if (pm) { 
-            pm.spend += ad.spend; pm.inbox += ad.inbox; pm.leads += ad.leads; 
+          if (pm) {
+            pm.spend += ad.spend; pm.inbox += ad.inbox; pm.leads += ad.leads;
             pm.impressions += ad.impressions; pm.clicks += ad.clicks;
             pm.active += isActive; pm.paused += isPaused;
+          } else {
+            e.pageMetrics.set(ad.pageId, { pageName: pn, pageId: ad.pageId, adAccountId: ad.adAccountId, spend: ad.spend, inbox: ad.inbox, leads: ad.leads, impressions: ad.impressions, clicks: ad.clicks, active: isActive, paused: isPaused });
           }
-          else { e.pageMetrics.set(ad.pageId, { pageName: pn, pageId: ad.pageId, adAccountId: ad.adAccountId, spend: ad.spend, inbox: ad.inbox, leads: ad.leads, impressions: ad.impressions, clicks: ad.clicks, active: isActive, paused: isPaused }); }
         } else {
-          gThumbMap.set(key, {
+          gNameMap.set(key, {
             adNames: new Set([ad.adName || ad.adId]),
             thumbnailUrl: ad.thumbnailUrl, mediaType: ad.mediaType,
             spend: ad.spend, impressions: ad.impressions, clicks: ad.clicks,
@@ -444,7 +390,7 @@ export async function GET(req: NextRequest) {
         }
       }
 
-      responseExtra.globalAdByContent = [...gThumbMap.values()]
+      responseExtra.globalAdByContent = [...gNameMap.values()]
         .map(a => ({
           adName: [...a.adNames].join(", "),
           adNames: [...a.adNames],

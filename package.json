@@ -9,8 +9,7 @@
     "lint": "eslint",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
-    "db:studio": "prisma studio",
-    "backfill:phash": "npx tsx --env-file=.env.local scripts/backfill-phash.ts"
+    "db:studio": "prisma studio"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
