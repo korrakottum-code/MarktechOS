@@ -837,7 +837,7 @@ function FacebookAdsDashboard() {
         <div className="p-4 sm:p-5 border-b border-white/5 bg-navy-950/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           
           {/* Segmented Control Tabs */}
-          <div className="flex p-1 bg-navy-950/80 rounded-2xl border border-white/5 self-start shadow-inner overflow-x-auto scrollbar-hide">
+          <div className="flex p-1 bg-navy-950/80 rounded-2xl border border-white/5 shadow-inner overflow-x-auto scrollbar-hide w-full sm:w-auto">
             {([
               ['overview', 'Overview Dashboard'],
               ['pages',   `รายเพจ (${pages.length})`],
@@ -845,7 +845,7 @@ function FacebookAdsDashboard() {
               ['content', `Content (${globalAdByContent.length})`],
             ] as [typeof view, string][]).map(([key, label]) => (
               <button key={key} onClick={() => setView(key)}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                className={`px-4 py-3 sm:py-2 rounded-xl text-[13px] sm:text-xs font-bold transition-all whitespace-nowrap ${
                   view === key
                     ? "bg-gold-500 text-navy-950 shadow-md"
                     : "text-foreground-muted hover:text-foreground hover:bg-white/5"
@@ -1192,7 +1192,7 @@ function FacebookAdsDashboard() {
           <table className="w-full text-sm">
             <thead className="bg-navy-950/40">
               <tr className="border-b border-white/10">
-                <th className="px-3 py-3 text-left text-[11px] font-bold text-foreground-muted uppercase tracking-wider min-w-[200px] max-w-[260px]">
+                <th className="px-3 py-2 text-left text-[10px] font-bold text-foreground-muted uppercase tracking-wider min-w-[120px] max-w-[200px]">
                   <div className="flex items-center gap-1">
                     ชื่อเพจ
                     <button onClick={() => setShowExtraCols(!showExtraCols)}
@@ -1202,9 +1202,9 @@ function FacebookAdsDashboard() {
                     </button>
                   </div>
                 </th>
-                {showExtraCols && <th className="px-2 py-3 text-left text-[11px] font-bold text-foreground-muted uppercase tracking-wider">Ad Account ID</th>}
-                {showExtraCols && <th className="px-2 py-3 text-center text-[11px] font-bold text-foreground-muted uppercase tracking-wider">Status</th>}
-                {showExtraCols && <th className="px-2 py-3 text-center text-[11px] font-bold text-foreground-muted uppercase tracking-wider">Cmp.</th>}
+                {showExtraCols && <th className="px-2 py-2 text-left text-[10px] font-bold text-foreground-muted uppercase tracking-wider">Ad Account ID</th>}
+                {showExtraCols && <th className="px-2 py-2 text-center text-[10px] font-bold text-foreground-muted uppercase tracking-wider">Status</th>}
+                {showExtraCols && <th className="px-2 py-2 text-center text-[10px] font-bold text-foreground-muted uppercase tracking-wider">Cmp.</th>}
                 {([
                   ["spend",          "Spent (฿)"],
                   ["inbox",          "Inbox"],
@@ -1214,7 +1214,7 @@ function FacebookAdsDashboard() {
                   ["leadInboxRatio", "%Lead/Inbox"],
                 ] as [SortKey, string][]).map(([key, label]) => (
                   <th key={key} onClick={() => toggleSort(key)}
-                    className="px-2 py-3 text-[11px] font-bold text-foreground-muted uppercase tracking-wider text-right cursor-pointer hover:text-gold-400 select-none transition-colors whitespace-nowrap min-w-[70px]">
+                    className="px-2 py-2 text-[10px] font-bold text-foreground-muted uppercase tracking-wider text-right cursor-pointer hover:text-gold-400 select-none transition-colors whitespace-nowrap">
                     <div className="flex items-center justify-end gap-1">
                       {label}
                       {sortKey === key
@@ -1262,33 +1262,33 @@ function FacebookAdsDashboard() {
                 <tr key={p.pageName}
                   className="border-b border-border/30 hover:bg-navy-800/40 transition-colors animate-fade-in"
                   style={{ animationDelay: `${Math.min(i * 20, 400)}ms` }}>
-                  <td className="px-3 py-2">
+                  <td className="px-2 py-2.5">
                     <Link href={`/page/${p.pageId}?since=${since}&until=${until}`} className="group/link flex items-center gap-1">
-                      <p className="font-semibold text-foreground text-[13px] leading-tight truncate group-hover/link:text-gold-400 transition-colors" title={p.pageName}>{p.pageName}</p>
-                      <ChevronRight size={12} className="text-foreground-muted/30 group-hover/link:text-gold-400 transition-colors shrink-0" />
+                      <p className="font-semibold text-foreground text-[11px] leading-tight truncate max-w-[180px] group-hover/link:text-gold-400 transition-colors" title={p.pageName}>{p.pageName}</p>
+                      <ChevronRight size={10} className="text-foreground-muted/30 group-hover/link:text-gold-400 transition-colors shrink-0" />
                     </Link>
                   </td>
-                  {showExtraCols && <td className="px-2 py-2">
-                    <span className="text-xs font-mono text-foreground-muted/70 bg-navy-800 px-2 py-0.5 rounded">{p.adAccountId || '—'}</span>
+                  {showExtraCols && <td className="px-2 py-2.5">
+                    <span className="text-[10px] font-mono text-foreground-muted/70 bg-navy-800 px-1.5 py-0.5 rounded">{p.adAccountId || '—'}</span>
                   </td>}
-                  {showExtraCols && <td className="px-2 py-2 text-center"><StatusBadge p={p} /></td>}
-                  {showExtraCols && <td className="px-2 py-2 text-center text-foreground-muted text-xs">{p.totalCampaigns}</td>}
-                  <td className="px-2 py-2 text-right whitespace-nowrap">
+                  {showExtraCols && <td className="px-2 py-2.5 text-center"><StatusBadge p={p} /></td>}
+                  {showExtraCols && <td className="px-2 py-2.5 text-center text-foreground-muted text-[11px]">{p.totalCampaigns}</td>}
+                  <td className="px-2 py-2.5 text-right whitespace-nowrap">
                     <span className={spendGood ? good : spendBad ? bad : base}>{thb(p.spend)}</span>
                   </td>
-                  <td className="px-2 py-2 text-right whitespace-nowrap">
+                  <td className="px-2 py-2.5 text-right whitespace-nowrap">
                     <span className={inboxGood ? good : inboxBad ? bad : base}>{num(p.inbox)}</span>
                   </td>
-                  <td className="px-2 py-2 text-right whitespace-nowrap">
+                  <td className="px-2 py-2.5 text-right whitespace-nowrap">
                     <span className={cpiGood ? good : cpiBad ? bad : base}>{thb(p.cpi)}</span>
                   </td>
-                  <td className="px-2 py-2 text-right whitespace-nowrap">
+                  <td className="px-2 py-2.5 text-right whitespace-nowrap">
                     <span className={leadGood ? good : leadBad ? bad : base}>{p.leads}</span>
                   </td>
-                  <td className="px-2 py-2 text-right whitespace-nowrap">
+                  <td className="px-2 py-2.5 text-right whitespace-nowrap">
                     <span className={cplGood ? good : cplBad ? bad : base}>{thb(p.cpl)}</span>
                   </td>
-                  <td className="px-2 py-2 text-right whitespace-nowrap">
+                  <td className="px-2 py-2.5 text-right whitespace-nowrap">
                     <span className={p.inbox > 0 ? (ratioGood ? good : ratioBad ? bad : base) : "text-foreground-muted/30"}>
                       {p.inbox > 0 ? pct(p.leadInboxRatio) : "—"}
                     </span>
@@ -1327,14 +1327,14 @@ function FacebookAdsDashboard() {
           <table className="w-full text-sm">
             <thead className="bg-navy-950/40">
               <tr className="border-b border-white/10">
-                  <th className="px-4 py-2.5 text-left text-[11px] font-bold text-foreground-muted uppercase tracking-wider min-w-[160px]">Service</th>
+                  <th className="px-3 py-2 text-left text-[10px] font-bold text-foreground-muted uppercase tracking-wider min-w-[120px] max-w-[200px]">Service</th>
                   {([
                     ['spend', 'Spent (฿)'], ['inbox', 'Inbox'], ['cpi', 'CPI'],
                     ['leads', 'Lead'], ['cpl', 'CPL'], ['convRate', '%Lead/Inbox'],
                   ] as [keyof GlobalAdItem, string][]).map(([k, label]) => (
                     <th key={k}
                       onClick={() => setSvcSort(prev => ({ key: k, dir: prev.key === k && prev.dir === 'desc' ? 'asc' : 'desc' }))}
-                      className="px-3 py-2.5 text-right text-[11px] font-bold text-foreground-muted uppercase tracking-wider whitespace-nowrap cursor-pointer hover:text-gold-400 select-none transition-colors">
+                      className="px-2 py-2 text-right text-[10px] font-bold text-foreground-muted uppercase tracking-wider whitespace-nowrap cursor-pointer hover:text-gold-400 select-none transition-colors">
                       <div className="flex items-center justify-end gap-0.5">
                         {label}
                         {svcSort.key === k
@@ -1382,15 +1382,15 @@ function FacebookAdsDashboard() {
 
                     return (
                     <tr key={svc.adName + i} className="border-b border-white/5 hover:bg-white/5 transition-colors group">
-                      <td className="px-4 py-3.5">
-                        <p className="font-semibold text-foreground text-[13px] truncate max-w-[200px] group-hover:text-gold-400 transition-colors" title={svc.adName}>{svc.adName}</p>
+                      <td className="px-2 py-2.5">
+                        <p className="font-semibold text-foreground text-[11px] truncate max-w-[160px] group-hover:text-gold-400 transition-colors" title={svc.adName}>{svc.adName}</p>
                       </td>
-                      <td className="px-3 py-3.5 text-right whitespace-nowrap"><span className={spendGood ? good : spendBad ? bad : base}>{thb(svc.spend)}</span></td>
-                      <td className="px-3 py-3.5 text-right whitespace-nowrap"><span className={inboxGood ? good : inboxBad ? bad : base}>{num(svc.inbox)}</span></td>
-                      <td className="px-3 py-3.5 text-right whitespace-nowrap"><span className={cpiGood ? good : cpiBad ? bad : base}>{thb(svc.cpi)}</span></td>
-                      <td className="px-3 py-3.5 text-right whitespace-nowrap"><span className={leadGood ? good : leadBad ? bad : base}>{svc.leads || "—"}</span></td>
-                      <td className="px-3 py-3.5 text-right whitespace-nowrap"><span className={cplGood ? good : cplBad ? bad : base}>{svc.leads > 0 ? thb(svc.cpl) : "—"}</span></td>
-                      <td className="px-3 py-3.5 text-right whitespace-nowrap">
+                      <td className="px-2 py-2.5 text-right whitespace-nowrap"><span className={spendGood ? good : spendBad ? bad : base}>{thb(svc.spend)}</span></td>
+                      <td className="px-2 py-2.5 text-right whitespace-nowrap"><span className={inboxGood ? good : inboxBad ? bad : base}>{num(svc.inbox)}</span></td>
+                      <td className="px-2 py-2.5 text-right whitespace-nowrap"><span className={cpiGood ? good : cpiBad ? bad : base}>{thb(svc.cpi)}</span></td>
+                      <td className="px-2 py-2.5 text-right whitespace-nowrap"><span className={leadGood ? good : leadBad ? bad : base}>{svc.leads || "—"}</span></td>
+                      <td className="px-2 py-2.5 text-right whitespace-nowrap"><span className={cplGood ? good : cplBad ? bad : base}>{svc.leads > 0 ? thb(svc.cpl) : "—"}</span></td>
+                      <td className="px-2 py-2.5 text-right whitespace-nowrap">
                         <span className={svc.inbox > 0 ? (ratioGood ? good : ratioBad ? bad : base) : "text-foreground-muted/30"}>
                           {svc.inbox > 0 ? pct(ratioVal) : "—"}
                         </span>
