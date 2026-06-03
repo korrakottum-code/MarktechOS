@@ -682,39 +682,55 @@ function FacebookAdsDashboard() {
         </div>
 
         {/* Filters Group (Floating Island style) */}
-        <div className="relative z-50 flex flex-wrap items-center gap-2 bg-navy-900/80 backdrop-blur-xl p-1.5 rounded-2xl border border-white/5 shadow-xl">
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-navy-950/50 rounded-xl">
-            <Calendar size={14} className="text-gold-400 shrink-0" />
-            <input
-              type="date" value={since} onChange={e => {
-                const val = e.target.value;
-                setSince(val);
-                const params = new URLSearchParams(searchParams.toString());
-                params.set("since", val);
-                params.set("until", until);
-                window.history.pushState(null, "", `/?${params.toString()}`);
-              }}
-              disabled={syncing}
-              className={`bg-transparent text-xs font-medium text-foreground focus:outline-none w-28 ${syncing ? 'opacity-40 cursor-not-allowed' : ''}`}
-            />
-            <span className="text-foreground-muted text-xs">→</span>
-            <input
-              type="date" value={until} onChange={e => {
-                const val = e.target.value;
-                setUntil(val);
-                const params = new URLSearchParams(searchParams.toString());
-                params.set("since", since);
-                params.set("until", val);
-                window.history.pushState(null, "", `/?${params.toString()}`);
-              }}
-              disabled={syncing}
-              className={`bg-transparent text-xs font-medium text-foreground focus:outline-none w-28 ${syncing ? 'opacity-40 cursor-not-allowed' : ''}`}
-            />
+        <div className="relative z-50 flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 bg-navy-900/80 backdrop-blur-xl p-1.5 rounded-2xl border border-white/5 shadow-xl">
+          <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-navy-950/50 rounded-xl flex-1 sm:flex-none">
+              <Calendar size={14} className="text-gold-400 shrink-0" />
+              <input
+                type="date" value={since} onChange={e => {
+                  const val = e.target.value;
+                  setSince(val);
+                  const params = new URLSearchParams(searchParams.toString());
+                  params.set("since", val);
+                  params.set("until", until);
+                  window.history.pushState(null, "", `/?${params.toString()}`);
+                }}
+                disabled={syncing}
+                className={`bg-transparent text-xs font-medium text-foreground focus:outline-none w-full sm:w-28 ${syncing ? 'opacity-40 cursor-not-allowed' : ''}`}
+              />
+              <span className="text-foreground-muted text-xs">→</span>
+              <input
+                type="date" value={until} onChange={e => {
+                  const val = e.target.value;
+                  setUntil(val);
+                  const params = new URLSearchParams(searchParams.toString());
+                  params.set("since", since);
+                  params.set("until", val);
+                  window.history.pushState(null, "", `/?${params.toString()}`);
+                }}
+                disabled={syncing}
+                className={`bg-transparent text-xs font-medium text-foreground focus:outline-none w-full sm:w-28 ${syncing ? 'opacity-40 cursor-not-allowed' : ''}`}
+              />
+            </div>
+
+            {/* Sync & Export Buttons moved here for mobile top-level wrapping */}
+            <div className="flex gap-2 shrink-0 sm:hidden">
+              <button onClick={handleSync} disabled={syncing}
+                className="flex items-center gap-2 px-3 py-1.5 bg-gold-500 text-navy-950 rounded-xl text-xs font-bold hover:bg-gold-400 transition-all shadow-lg shadow-gold-500/20 disabled:opacity-60">
+                <RefreshCw size={12} className={syncing ? "animate-spin" : ""} />
+              </button>
+              <button
+                onClick={handleExportPDFs} disabled={isExporting}
+                className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-500 transition-all shadow-lg shadow-blue-500/20 disabled:opacity-60">
+                <Download size={12} />
+              </button>
+            </div>
           </div>
 
           <div className="w-px h-6 bg-white/10 mx-1 hidden sm:block" />
 
-          <div className="flex gap-1 hidden md:flex">
+          {/* Scrollable preset dates */}
+          <div className="flex gap-1 overflow-x-auto scrollbar-hide shrink-0 pb-1 sm:pb-0 px-1 sm:px-0 max-w-[85vw] sm:max-w-none">
             {[
               { label: "วันนี้",     s: toISO(new Date()), u: toISO(new Date()) },
               { label: "เมื่อวาน",   s: toISO(new Date(Date.now() - 864e5)), u: toISO(new Date(Date.now() - 864e5)) },
@@ -731,7 +747,7 @@ function FacebookAdsDashboard() {
                 params.set("until", p.u);
                 window.history.pushState(null, "", `/?${params.toString()}`);
               }}
-                className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all ${
+                className={`px-3 py-1.5 rounded-xl text-[11px] font-bold whitespace-nowrap transition-all shrink-0 ${
                   since === p.s && until === p.u
                     ? "bg-gold-500/20 text-gold-400"
                     : "text-foreground-muted hover:text-foreground hover:bg-white/5"
@@ -741,20 +757,20 @@ function FacebookAdsDashboard() {
             ))}
           </div>
 
-          <button onClick={handleSync} disabled={syncing}
-            className="flex items-center gap-2 px-4 py-1.5 bg-gold-500 text-navy-950 rounded-xl text-sm font-bold hover:bg-gold-400 transition-all shadow-lg shadow-gold-500/20 disabled:opacity-60 ml-1">
-            <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />
-            {syncing ? "Syncing" : "Sync"}
-          </button>
-          
+          <div className="hidden sm:flex items-center ml-1">
+            <button onClick={handleSync} disabled={syncing}
+              className="flex items-center gap-2 px-4 py-1.5 bg-gold-500 text-navy-950 rounded-xl text-sm font-bold hover:bg-gold-400 transition-all shadow-lg shadow-gold-500/20 disabled:opacity-60">
+              <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />
+              {syncing ? "Syncing" : "Sync"}
+            </button>
 
-
-          <button
-            onClick={handleExportPDFs} disabled={isExporting}
-            className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-500 transition-all shadow-lg shadow-blue-500/20 disabled:opacity-60 ml-1">
-            <Download size={14} />
-            {isExporting ? "Exporting..." : "Export PDF"}
-          </button>
+            <button
+              onClick={handleExportPDFs} disabled={isExporting}
+              className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-500 transition-all shadow-lg shadow-blue-500/20 disabled:opacity-60 ml-2">
+              <Download size={14} />
+              {isExporting ? "Exporting..." : "Export PDF"}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -917,7 +933,7 @@ function FacebookAdsDashboard() {
                 <div key={i} className={`rounded-3xl bg-navy-900 border ${stat.border} p-5 flex flex-col items-center justify-center text-center relative overflow-hidden shadow-xl`}>
                   <div className={`absolute -top-4 -right-4 w-16 h-16 rounded-full ${stat.bg} blur-xl`} />
                   <stat.icon size={24} className={`${stat.color} mb-3 relative z-10`} />
-                  <p className={`text-2xl lg:text-3xl font-black tracking-tight ${stat.color} relative z-10 mb-1`}>{stat.value}</p>
+                  <p className={`text-xl sm:text-2xl lg:text-3xl font-black tracking-tight ${stat.color} relative z-10 mb-1`}>{stat.value}</p>
                   <p className="text-[10px] font-bold text-white/60 uppercase relative z-10">{stat.title}</p>
                 </div>
               ))}
@@ -933,8 +949,8 @@ function FacebookAdsDashboard() {
                 <h3 className="text-[11px] font-black text-white uppercase tracking-wider">ประสิทธิภาพแต่ละขั้นตอน (Funnel)</h3>
               </div>
               <div className="p-4 flex-1 flex items-center justify-center bg-gradient-to-b from-navy-900 to-navy-950/30">
-                <div className="grid grid-cols-4 gap-2 w-full relative">
-                  <div className="absolute top-6 left-[10%] right-[10%] h-0 border-t-2 border-dashed border-white/10 z-0" />
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-2 w-full relative">
+                  <div className="hidden lg:block absolute top-6 left-[10%] right-[10%] h-0 border-t-2 border-dashed border-white/10 z-0" />
                   {[
                     { step: 1, label: "Impressions", value: num(kpis.totalImpressions), drop: null, color: "text-sky-400", bg: "bg-sky-500" },
                     { step: 2, label: "Clicks", value: num(kpis.totalClicks), drop: kpis.totalImpressions ? pct(kpis.totalClicks/kpis.totalImpressions*100) : "0%", color: "text-blue-400", bg: "bg-blue-500" },
