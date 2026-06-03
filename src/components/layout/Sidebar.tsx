@@ -1,16 +1,16 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, LayoutDashboard, Monitor } from "lucide-react";
 import { useAuthSession } from "@/lib/use-auth-session";
 import { canAccessPath } from "@/lib/auth/permissions";
 
-
-const navItems: { label: string; href: string; icon: any; badge?: string }[] = [];
-// All modules hidden — single-page Facebook Ads Dashboard mode
-
-
+interface PageData {
+  pageId: string;
+  pageName: string;
+}
 interface SidebarProps {
   collapsed: boolean;
   onToggleCollapse: () => void;
@@ -26,11 +26,22 @@ export default function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
   const { user } = useAuthSession();
+  const [pages, setPages] = useState<PageData[]>([]);
 
-  const visibleNavItems = navItems.filter((item) => {
-    if (!user?.role) return true;
-    return canAccessPath(item.href, user.role);
-  });
+  useEffect(() => {
+    async function fetchPages() {
+      try {
+        const res = await fetch("/api/pages");
+        if (res.ok) {
+          const data = await res.json();
+          setPages(data.pages || []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch pages for sidebar", err);
+      }
+    }
+    fetchPages();
+  }, []);
 
   return (
     <aside
@@ -76,17 +87,43 @@ export default function Sidebar({
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
-        {visibleNavItems.map((item) => {
-          const isActive =
-            pathname === item.href ||
-            (item.href !== "/" && pathname.startsWith(item.href));
-          const Icon = item.icon;
+        {/* Overview Item */}
+        <Link
+          href="/"
+          onClick={onCloseMobile}
+          className={`relative group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-200 ${
+            (!collapsed || mobileOpen) ? "" : "justify-center"
+          } ${
+            pathname === "/"
+              ? "bg-gradient-to-r from-gold-500/15 to-transparent text-gold-400 border border-gold-500/20"
+              : "text-foreground-muted hover:bg-navy-800 hover:text-foreground"
+          }`}
+          title={collapsed && !mobileOpen ? "ภาพรวมทั้งหมด" : undefined}
+        >
+          <LayoutDashboard size={20} className={`shrink-0 ${pathname === "/" ? "text-gold-400" : "text-foreground-muted group-hover:text-foreground"}`} />
+          {(!collapsed || mobileOpen) && <span className="truncate">ภาพรวมทั้งหมด</span>}
+          {pathname === "/" && <div className="absolute left-0 w-1 h-8 rounded-r-full bg-gold-400" />}
+        </Link>
+
+        {pages.length > 0 && (
+          <div className="pt-4 pb-2">
+            {(!collapsed || mobileOpen) && (
+              <p className="px-3 text-[10px] font-bold text-foreground-muted uppercase tracking-widest mb-1">
+                คลินิก / เพจ
+              </p>
+            )}
+          </div>
+        )}
+
+        {pages.map((page) => {
+          const href = `/page/${page.pageId}`;
+          const isActive = pathname === href;
           const showLabel = !collapsed || mobileOpen;
 
           return (
             <Link
-              key={item.href}
-              href={item.href}
+              key={page.pageId}
+              href={href}
               onClick={onCloseMobile}
               className={`relative group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-200 ${
                 !showLabel ? "justify-center" : ""
@@ -95,9 +132,9 @@ export default function Sidebar({
                   ? "bg-gradient-to-r from-gold-500/15 to-transparent text-gold-400 border border-gold-500/20"
                   : "text-foreground-muted hover:bg-navy-800 hover:text-foreground"
               }`}
-              title={!showLabel ? item.label : undefined}
+              title={!showLabel ? page.pageName : undefined}
             >
-              <Icon
+              <Monitor
                 size={20}
                 className={`shrink-0 ${
                   isActive
@@ -105,22 +142,7 @@ export default function Sidebar({
                     : "text-foreground-muted group-hover:text-foreground"
                 }`}
               />
-              {showLabel && (
-                <>
-                  <span className="truncate">{item.label}</span>
-                  {item.badge && (
-                    <span
-                      className={`ml-auto text-[10px] px-1.5 py-0.5 rounded font-mono ${
-                        isActive
-                          ? "bg-gold-500/20 text-gold-400"
-                          : "bg-navy-700 text-foreground-muted"
-                      }`}
-                    >
-                      {item.badge}
-                    </span>
-                  )}
-                </>
-              )}
+              {showLabel && <span className="truncate">{page.pageName}</span>}
               {isActive && (
                 <div className="absolute left-0 w-1 h-8 rounded-r-full bg-gold-400" />
               )}
