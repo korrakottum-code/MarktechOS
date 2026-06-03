@@ -39,7 +39,7 @@ interface GlobalAdItem {
   leads: number; cpi: number; cpl: number; ctr: number;
   adCount: number; pageCount: number; convRate: number;
   adNames?: string[]; pageNames?: string[];
-  pageBreakdown?: { pageName: string; spend: number; inbox: number; leads: number; cpi: number; thumbnailUrl?: string; }[];
+  pageBreakdown?: { pageId: string; pageName: string; spend: number; inbox: number; leads: number; cpi: number; thumbnailUrl?: string; }[];
 }
 
 interface AdsDataPayload {
@@ -299,19 +299,9 @@ function FacebookAdsDashboard() {
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [showExtraCols, setShowExtraCols] = useState(false);
   const [serviceFilter, setServiceFilter] = useState<string | null>(null);
-  const [selectedPages, setSelectedPages] = useState<Set<string>>(new Set());
-  const [isPageFilterOpen, setIsPageFilterOpen] = useState(false);
-  const filterDropdownRef = useRef<HTMLDivElement>(null);
+  const urlPages = searchParams.get("pages");
+  const selectedPages = useMemo(() => new Set(urlPages ? urlPages.split(",") : []), [urlPages]);
 
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target as Node)) {
-        setIsPageFilterOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
   const [expandedServices, setExpandedServices] = useState<Set<string>>(new Set());
   const [lightbox, setLightbox] = useState<{ url: string; name: string; spend: number; inbox: number; cpi: number; mediaType?: string; pageNames?: string[] } | null>(null);
   const [view, setView] = useState<'overview' | 'pages' | 'service' | 'content'>('overview');
@@ -342,7 +332,7 @@ function FacebookAdsDashboard() {
     if (selectedPages.size > 0) {
         filtered = filtered.map(svc => {
             if (!svc.pageBreakdown) return null;
-            const pbFiltered = svc.pageBreakdown.filter(pb => selectedPages.has(pb.pageName));
+            const pbFiltered = svc.pageBreakdown.filter(pb => selectedPages.has(pb.pageId));
             if (pbFiltered.length === 0) return null;
             return {
                 ...svc,
@@ -367,7 +357,7 @@ function FacebookAdsDashboard() {
     if (selectedPages.size > 0) {
         filtered = filtered.map(ad => {
             if (!ad.pageBreakdown) return null;
-            const pbFiltered = ad.pageBreakdown.filter(pb => selectedPages.has(pb.pageName));
+            const pbFiltered = ad.pageBreakdown.filter(pb => selectedPages.has(pb.pageId));
             if (pbFiltered.length === 0) return null;
             return {
                 ...ad,
@@ -435,7 +425,7 @@ function FacebookAdsDashboard() {
       basePages = basePages.filter(p => search === "" || p.pageName.toLowerCase().includes(search.toLowerCase()) || p.adAccountId.includes(search));
     }
     if (selectedPages.size > 0) {
-        basePages = basePages.filter(p => selectedPages.has(p.pageName));
+        basePages = basePages.filter(p => selectedPages.has(p.pageId));
     }
     return basePages.sort((a, b) => {
       const av = a[sortKey] as number;
@@ -724,8 +714,6 @@ function FacebookAdsDashboard() {
 
           <div className="w-px h-6 bg-white/10 mx-1 hidden sm:block" />
 
-          <div className="w-px h-6 bg-white/10 mx-1 hidden sm:block" />
-
           <div className="flex gap-1 hidden md:flex">
             {[
               { label: "วันนี้",     s: toISO(new Date()), u: toISO(new Date()) },
@@ -759,59 +747,7 @@ function FacebookAdsDashboard() {
             {syncing ? "Syncing" : "Sync"}
           </button>
           
-          {/* Page Filter Dropdown */}
-          <div className="relative" ref={filterDropdownRef}>
-            <button 
-              onClick={() => setIsPageFilterOpen(!isPageFilterOpen)}
-              className="flex items-center gap-2 px-3 py-1.5 bg-navy-950/50 rounded-xl border border-white/5 hover:bg-white/5 transition-colors text-xs font-medium text-foreground h-full"
-            >
-              <Filter size={14} className="text-foreground-muted" />
-              {selectedPages.size === 0 ? "ทุกสาขา" : `${selectedPages.size} สาขา`}
-            </button>
-            
-              {isPageFilterOpen && (
-              <div className="absolute right-0 top-full mt-2 w-72 bg-navy-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden">
-                <div className="p-2 border-b border-white/5 flex justify-between items-center bg-navy-950/50">
-                  <span className="text-xs font-bold text-foreground">เลือกสาขา / เพจ</span>
-                  <button onClick={() => setSelectedPages(new Set())} className="text-[10px] text-blue-400 hover:underline">เคลียร์</button>
-                </div>
-                <div className="px-2 pt-2 pb-1">
-                  <input
-                    type="text"
-                    placeholder="ค้นหาเพจ..."
-                    className="w-full px-3 py-1.5 bg-navy-950 border border-white/10 rounded-xl text-xs text-foreground placeholder:text-foreground-muted/50 focus:outline-none focus:border-blue-500/50"
-                    onChange={(e) => {
-                      const q = e.target.value.toLowerCase();
-                      const container = e.target.closest('div')?.parentElement?.querySelector('.page-filter-list');
-                      if (!container) return;
-                      container.querySelectorAll('label').forEach((el: any) => {
-                        const name = el.textContent?.toLowerCase() || '';
-                        el.style.display = name.includes(q) ? '' : 'none';
-                      });
-                    }}
-                  />
-                </div>
-                <div className="page-filter-list max-h-60 overflow-y-auto p-2 flex flex-col gap-1">
-                  {allUniquePages.map(p => (
-                    <label key={p.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-white/5 rounded-xl cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        checked={selectedPages.has(p.id)}
-                        onChange={(e) => {
-                          const next = new Set(selectedPages);
-                          if (e.target.checked) next.add(p.id); else next.delete(p.id);
-                          setSelectedPages(next);
-                        }}
-                        className="rounded border-white/10 bg-navy-950 text-blue-500 focus:ring-0"
-                      />
-                      <span className="text-xs text-foreground truncate">{p.name}</span>
-                    </label>
-                  ))}
-                  {allUniquePages.length === 0 && <div className="p-2 text-xs text-foreground-muted text-center">ไม่มีข้อมูล</div>}
-                </div>
-              </div>
-            )}
-          </div>
+
 
           <button
             onClick={handleExportPDFs} disabled={isExporting}

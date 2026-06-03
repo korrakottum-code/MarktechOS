@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { ChevronLeft, ChevronRight, X, LayoutDashboard, Monitor } from "lucide-react";
+import { usePathname, useSearchParams, useRouter } from "next/navigation";
+import { ChevronLeft, ChevronRight, X, LayoutDashboard, Monitor, Search, CheckSquare, Square } from "lucide-react";
 import { useAuthSession } from "@/lib/use-auth-session";
 import { canAccessPath } from "@/lib/auth/permissions";
 
@@ -25,8 +25,14 @@ export default function Sidebar({
   onCloseMobile,
 }: SidebarProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const { user } = useAuthSession();
   const [pages, setPages] = useState<PageData[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const urlPages = searchParams.get("pages");
+  const selectedPages = new Set(urlPages ? urlPages.split(",") : []);
 
   useEffect(() => {
     async function fetchPages() {
@@ -42,6 +48,26 @@ export default function Sidebar({
     }
     fetchPages();
   }, []);
+
+  function togglePage(pageId: string) {
+    const next = new Set(selectedPages);
+    if (next.has(pageId)) next.delete(pageId);
+    else next.add(pageId);
+    
+    const params = new URLSearchParams(searchParams.toString());
+    if (next.size > 0) params.set("pages", Array.from(next).join(","));
+    else params.delete("pages");
+    
+    router.replace(`/?${params.toString()}`, { scroll: false });
+  }
+
+  function clearPages() {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("pages");
+    router.replace(`/?${params.toString()}`, { scroll: false });
+  }
+
+  const filteredPages = pages.filter(p => p.pageName.toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
     <aside
@@ -85,71 +111,87 @@ export default function Sidebar({
         </button>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
-        {/* Overview Item */}
-        <Link
-          href="/"
-          onClick={onCloseMobile}
-          className={`relative group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-200 ${
+      {/* Navigation & Filters */}
+      <div className="flex-1 overflow-y-auto py-4 px-3 space-y-4 flex flex-col">
+        {/* Global Dashboard Link (Clears filters) */}
+        <button
+          onClick={() => {
+            clearPages();
+            if (mobileOpen) onCloseMobile();
+          }}
+          className={`w-full relative group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-200 ${
             (!collapsed || mobileOpen) ? "" : "justify-center"
           } ${
-            pathname === "/"
+            pathname === "/" && selectedPages.size === 0
               ? "bg-gradient-to-r from-gold-500/15 to-transparent text-gold-400 border border-gold-500/20"
               : "text-foreground-muted hover:bg-navy-800 hover:text-foreground"
           }`}
           title={collapsed && !mobileOpen ? "ภาพรวมทั้งหมด" : undefined}
         >
-          <LayoutDashboard size={20} className={`shrink-0 ${pathname === "/" ? "text-gold-400" : "text-foreground-muted group-hover:text-foreground"}`} />
-          {(!collapsed || mobileOpen) && <span className="truncate">ภาพรวมทั้งหมด</span>}
-          {pathname === "/" && <div className="absolute left-0 w-1 h-8 rounded-r-full bg-gold-400" />}
-        </Link>
+          <LayoutDashboard size={20} className={`shrink-0 ${pathname === "/" && selectedPages.size === 0 ? "text-gold-400" : "text-foreground-muted group-hover:text-foreground"}`} />
+          {(!collapsed || mobileOpen) && <span className="truncate">ภาพรวมทุกสาขา</span>}
+          {pathname === "/" && selectedPages.size === 0 && <div className="absolute left-0 w-1 h-8 rounded-r-full bg-gold-400" />}
+        </button>
 
         {pages.length > 0 && (
-          <div className="pt-4 pb-2">
+          <div className="flex-1 flex flex-col min-h-0">
             {(!collapsed || mobileOpen) && (
-              <p className="px-3 text-[10px] font-bold text-foreground-muted uppercase tracking-widest mb-1">
-                คลินิก / เพจ
-              </p>
+              <div className="flex items-center justify-between px-3 mb-2">
+                <p className="text-[10px] font-bold text-foreground-muted uppercase tracking-widest">
+                  ตัวกรองคลินิก
+                </p>
+                {selectedPages.size > 0 && (
+                  <button onClick={clearPages} className="text-[10px] text-gold-400 hover:text-gold-300">
+                    ล้าง ({selectedPages.size})
+                  </button>
+                )}
+              </div>
             )}
+
+            {(!collapsed || mobileOpen) && (
+              <div className="px-2 mb-3">
+                <div className="relative">
+                  <Search size={14} className="absolute left-2.5 top-2.5 text-foreground-muted" />
+                  <input
+                    type="text"
+                    placeholder="ค้นหาคลินิก..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    className="w-full bg-navy-900 border border-border rounded-lg pl-8 pr-3 py-2 text-xs text-foreground placeholder:text-foreground-muted focus:outline-none focus:border-gold-500/50"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="flex-1 overflow-y-auto space-y-0.5 px-1 pb-4">
+              {filteredPages.map((page) => {
+                const isSelected = selectedPages.has(page.pageId);
+                const showLabel = !collapsed || mobileOpen;
+
+                return (
+                  <button
+                    key={page.pageId}
+                    onClick={() => togglePage(page.pageId)}
+                    className={`w-full group flex items-center gap-3 rounded-lg px-2 py-2 text-sm transition-all duration-200 ${
+                      !showLabel ? "justify-center" : ""
+                    } hover:bg-navy-800 ${isSelected ? "text-foreground" : "text-foreground-muted"}`}
+                    title={!showLabel ? page.pageName : undefined}
+                  >
+                    <div className={`shrink-0 flex items-center justify-center w-5 h-5 rounded border ${isSelected ? "bg-gold-500 border-gold-500 text-navy-950" : "border-border bg-navy-900 group-hover:border-gold-500/50"}`}>
+                      {isSelected && <CheckSquare size={14} className="hidden" />}
+                      {isSelected ? <CheckSquare size={16} className="absolute" /> : null}
+                    </div>
+                    {showLabel && <span className="truncate text-left text-xs">{page.pageName}</span>}
+                  </button>
+                );
+              })}
+              {filteredPages.length === 0 && (!collapsed || mobileOpen) && (
+                <div className="text-center py-4 text-xs text-foreground-muted">ไม่พบข้อมูล</div>
+              )}
+            </div>
           </div>
         )}
-
-        {pages.map((page) => {
-          const href = `/page/${page.pageId}`;
-          const isActive = pathname === href;
-          const showLabel = !collapsed || mobileOpen;
-
-          return (
-            <Link
-              key={page.pageId}
-              href={href}
-              onClick={onCloseMobile}
-              className={`relative group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-200 ${
-                !showLabel ? "justify-center" : ""
-              } ${
-                isActive
-                  ? "bg-gradient-to-r from-gold-500/15 to-transparent text-gold-400 border border-gold-500/20"
-                  : "text-foreground-muted hover:bg-navy-800 hover:text-foreground"
-              }`}
-              title={!showLabel ? page.pageName : undefined}
-            >
-              <Monitor
-                size={20}
-                className={`shrink-0 ${
-                  isActive
-                    ? "text-gold-400"
-                    : "text-foreground-muted group-hover:text-foreground"
-                }`}
-              />
-              {showLabel && <span className="truncate">{page.pageName}</span>}
-              {isActive && (
-                <div className="absolute left-0 w-1 h-8 rounded-r-full bg-gold-400" />
-              )}
-            </Link>
-          );
-        })}
-      </nav>
+      </div>
 
       {/* Collapse Button — desktop only */}
       <div className="hidden lg:block p-3 border-t border-border">

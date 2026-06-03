@@ -2,7 +2,7 @@
 
 import Sidebar from "./Sidebar";
 import TopBar from "./TopBar";
-import { useState } from "react";
+import { useState, Suspense } from "react";
 
 export default function DashboardLayout({
   children,
@@ -22,12 +22,14 @@ export default function DashboardLayout({
         />
       )}
 
-      <Sidebar
-        collapsed={collapsed}
-        onToggleCollapse={() => setCollapsed(!collapsed)}
-        mobileOpen={mobileOpen}
-        onCloseMobile={() => setMobileOpen(false)}
-      />
+      <Suspense fallback={<aside className={`fixed top-0 left-0 z-50 h-screen bg-navy-950 border-r border-border transition-all duration-300 ${collapsed ? "lg:w-20" : "lg:w-64"}`} />}>
+        <Sidebar
+          collapsed={collapsed}
+          onToggleCollapse={() => setCollapsed(!collapsed)}
+          mobileOpen={mobileOpen}
+          onCloseMobile={() => setMobileOpen(false)}
+        />
+      </Suspense>
 
       <div
         className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
