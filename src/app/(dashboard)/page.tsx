@@ -1138,7 +1138,8 @@ function FacebookAdsDashboard() {
                     .filter(ad => ad.thumbnailUrl)
                     .sort((a,b) => creativeTab === 'inbox' ? b.inbox - a.inbox : b.leads - a.leads)
                     .reduce((acc, ad) => {
-                      if (!acc.find(x => x.adName === ad.adName)) acc.push(ad);
+                      // Deduplicate by thumbnail URL to avoid showing same image twice
+                      if (!acc.find(x => x.thumbnailUrl === ad.thumbnailUrl)) acc.push(ad);
                       return acc;
                     }, [] as typeof globalAdByContent)
                     .slice(0, 4)

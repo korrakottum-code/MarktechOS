@@ -310,7 +310,8 @@ export async function GET(req: NextRequest) {
           e.spend += ad.spend; e.impressions += ad.impressions; e.clicks += ad.clicks;
           e.inbox += ad.inbox; e.leads += ad.leads;
           e.adIds.add(ad.adId); e.pageIds.add(ad.pageId);
-          if (ad.thumbnailUrl && (!e.thumbnailUrl || e.thumbnailUrl.includes("c0.5000x0.5000f"))) {
+          // Keep the first thumbnail (data is sorted by spend DESC, so first = highest spend ad)
+          if (!e.thumbnailUrl && ad.thumbnailUrl) {
             e.thumbnailUrl = ad.thumbnailUrl;
           }
           if (!e.mediaType && ad.mediaType) e.mediaType = ad.mediaType;
@@ -320,7 +321,8 @@ export async function GET(req: NextRequest) {
             pm.spend += ad.spend; pm.impressions += ad.impressions; pm.clicks += ad.clicks;
             pm.inbox += ad.inbox; pm.leads += ad.leads;
             pm.active += isActive; pm.paused += isPaused;
-            if (ad.thumbnailUrl && (!pm.thumbnailUrl || pm.thumbnailUrl.includes("c0.5000x0.5000f"))) {
+            // Keep first thumbnail (highest spend ad's thumbnail)
+            if (!pm.thumbnailUrl && ad.thumbnailUrl) {
                pm.thumbnailUrl = ad.thumbnailUrl;
             }
           } else {
@@ -353,9 +355,24 @@ export async function GET(req: NextRequest) {
           pageBreakdown: [...a.pageMetrics.values()],
         }))
         .sort((a, b) => b.spend - a.spend);
-      // Group by adName (same structure as globalAdContent for consistency)
-      // This replaces the old thumbnail/pHash grouping which operated on empty strings
-      const gNameMap = new Map<string, {
+      // Group by unique creative (thumbnail image pathname) so each entry = 1 visual creative
+      // This ensures thumbnail, metrics, and page breakdown all match correctly
+      const globalThumbKey = (url: string): string => {
+        if (!url) return "";
+        try { return new URL(url).pathname; } catch { return url; }
+      };
+
+      // First pass: resolve best thumbnail per adId (prefer non-cropped)
+      const globalBestThumb = new Map<string, string>();
+      for (const ad of globalAdRows) {
+        if (ad.thumbnailUrl) {
+          const existing = globalBestThumb.get(ad.adId);
+          const isBetter = !existing || (existing.includes("c0.5000x0.5000f") && !ad.thumbnailUrl.includes("c0.5000x0.5000f"));
+          if (isBetter) globalBestThumb.set(ad.adId, ad.thumbnailUrl);
+        }
+      }
+
+      const gThumbMap = new Map<string, {
         adNames: Set<string>; thumbnailUrl: string; mediaType: string;
         spend: number; impressions: number; clicks: number; inbox: number;
         leads: number; adIds: Set<string>; pageIds: Set<string>; pageNamesSet: Set<string>;
@@ -363,9 +380,11 @@ export async function GET(req: NextRequest) {
       }>();
 
       for (const ad of globalAdRows) {
-        const key = ad.adName || ad.adId;
+        const resolvedThumb = globalBestThumb.get(ad.adId) || "";
+        // Group by thumbnail image pathname — each unique image = 1 entry
+        const key = resolvedThumb ? globalThumbKey(resolvedThumb) : `no-thumb-${ad.adId}`;
         const pn = pageNameMap.get(ad.pageId) ?? ad.pageId;
-        const e = gNameMap.get(key);
+        const e = gThumbMap.get(key);
         const isActive = ad.status === "active" ? 1 : 0;
         const isPaused = ad.status === "paused" ? 1 : 0;
 
@@ -374,31 +393,34 @@ export async function GET(req: NextRequest) {
           e.inbox += ad.inbox; e.leads += ad.leads;
           e.adNames.add(ad.adName || ad.adId); e.adIds.add(ad.adId); e.pageIds.add(ad.pageId);
           if (!e.mediaType && ad.mediaType) e.mediaType = ad.mediaType;
-          if (ad.thumbnailUrl && !e.thumbnailUrl) e.thumbnailUrl = ad.thumbnailUrl;
+          // Keep best quality thumbnail URL for this group
+          if (resolvedThumb && e.thumbnailUrl.includes("c0.5000x0.5000f") && !resolvedThumb.includes("c0.5000x0.5000f")) {
+            e.thumbnailUrl = resolvedThumb;
+          }
           e.pageNamesSet.add(pn);
           const pm = e.pageMetrics.get(ad.pageId);
           if (pm) {
             pm.spend += ad.spend; pm.inbox += ad.inbox; pm.leads += ad.leads;
             pm.impressions += ad.impressions; pm.clicks += ad.clicks;
             pm.active += isActive; pm.paused += isPaused;
-            if (ad.thumbnailUrl && !pm.thumbnailUrl) pm.thumbnailUrl = ad.thumbnailUrl;
           } else {
-            e.pageMetrics.set(ad.pageId, { pageName: pn, pageId: ad.pageId, adAccountId: ad.adAccountId, spend: ad.spend, inbox: ad.inbox, leads: ad.leads, impressions: ad.impressions, clicks: ad.clicks, active: isActive, paused: isPaused, thumbnailUrl: ad.thumbnailUrl || "" });
+            e.pageMetrics.set(ad.pageId, { pageName: pn, pageId: ad.pageId, adAccountId: ad.adAccountId, spend: ad.spend, inbox: ad.inbox, leads: ad.leads, impressions: ad.impressions, clicks: ad.clicks, active: isActive, paused: isPaused, thumbnailUrl: resolvedThumb || "" });
           }
         } else {
-          gNameMap.set(key, {
+          gThumbMap.set(key, {
             adNames: new Set([ad.adName || ad.adId]),
-            thumbnailUrl: ad.thumbnailUrl, mediaType: ad.mediaType,
+            thumbnailUrl: resolvedThumb, mediaType: ad.mediaType,
             spend: ad.spend, impressions: ad.impressions, clicks: ad.clicks,
             inbox: ad.inbox, leads: ad.leads,
             adIds: new Set([ad.adId]), pageIds: new Set([ad.pageId]),
             pageNamesSet: new Set([pn]),
-            pageMetrics: new Map([[ad.pageId, { pageName: pn, pageId: ad.pageId, adAccountId: ad.adAccountId, spend: ad.spend, inbox: ad.inbox, leads: ad.leads, impressions: ad.impressions, clicks: ad.clicks, active: isActive, paused: isPaused, thumbnailUrl: ad.thumbnailUrl || "" }]]),
+            pageMetrics: new Map([[ad.pageId, { pageName: pn, pageId: ad.pageId, adAccountId: ad.adAccountId, spend: ad.spend, inbox: ad.inbox, leads: ad.leads, impressions: ad.impressions, clicks: ad.clicks, active: isActive, paused: isPaused, thumbnailUrl: resolvedThumb || "" }]]),
           });
         }
       }
 
-      responseExtra.globalAdByContent = [...gNameMap.values()]
+      responseExtra.globalAdByContent = [...gThumbMap.values()]
+        .filter(a => a.thumbnailUrl) // Only include entries with a thumbnail
         .map(a => ({
           adName: [...a.adNames].join(", "),
           adNames: [...a.adNames],
