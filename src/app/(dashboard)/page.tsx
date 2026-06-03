@@ -1141,7 +1141,7 @@ function FacebookAdsDashboard() {
                   ดูทั้งหมด
                 </button>
               </div>
-              <div className="overflow-x-auto flex-1 bg-navy-900/50 flex flex-col justify-center">
+              <div className="overflow-x-auto flex-1 bg-navy-900/50 flex flex-col justify-start">
                 <table className="w-full text-sm">
                   <thead className="bg-navy-950/40">
                     <tr className="border-b border-white/10">
