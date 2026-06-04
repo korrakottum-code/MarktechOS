@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams, useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, X, LayoutDashboard, Monitor, Search, CheckSquare, Square } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, LayoutDashboard, Monitor, Search, CheckSquare, Square, Users } from "lucide-react";
 import { useAuthSession } from "@/lib/use-auth-session";
 import { canAccessPath, isClientRole } from "@/lib/auth/permissions";
 
@@ -233,6 +233,27 @@ export default function Sidebar({
           </div>
         )}
       </div>
+
+      {/* Admin Panel Link — only for ceo/admin */}
+      {user && (user.role === "ceo" || user.role === "admin") && (
+        <div className="px-3 pb-1">
+          <Link
+            href="/admin"
+            onClick={() => { if (mobileOpen) onCloseMobile(); }}
+            className={`w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-200 ${
+              (!collapsed || mobileOpen) ? "" : "justify-center"
+            } ${
+              pathname === "/admin"
+                ? "bg-gradient-to-r from-purple-500/15 to-transparent text-purple-400 border border-purple-500/20"
+                : "text-foreground-muted hover:bg-navy-800 hover:text-foreground"
+            }`}
+            title={collapsed && !mobileOpen ? "จัดการผู้ใช้" : undefined}
+          >
+            <Users size={20} className={`shrink-0 ${pathname === "/admin" ? "text-purple-400" : "text-foreground-muted"}`} />
+            {(!collapsed || mobileOpen) && <span className="truncate">จัดการผู้ใช้</span>}
+          </Link>
+        </div>
+      )}
 
       {/* Collapse Button — desktop only */}
       <div className="hidden lg:block p-3 border-t border-border">

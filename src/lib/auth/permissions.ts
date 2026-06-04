@@ -2,6 +2,7 @@ export type UserRole = "ceo" | "admin" | "finance" | "am" | "content" | "ads" | 
 
 const protectedRoots = [
   "/",
+  "/admin",
   "/admin-crm",
   "/operation",
   "/client-hr",
@@ -14,6 +15,7 @@ const protectedRoots = [
 ] as const;
 
 const restrictedRoutes: Array<{ prefix: string; roles: UserRole[] }> = [
+  { prefix: "/admin", roles: ["ceo", "admin"] },
   { prefix: "/platform-ops", roles: ["ceo", "admin"] },
   { prefix: "/incentive", roles: ["ceo", "admin", "finance"] },
   { prefix: "/admin-crm", roles: ["ceo", "admin", "am"] },
