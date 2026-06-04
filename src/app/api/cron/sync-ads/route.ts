@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/server/prisma";
 import { Prisma } from "@prisma/client";
+import { createHash } from "crypto";
 
 const API_VERSION = "v20.0";
 const BASE = `https://graph.facebook.com/${API_VERSION}`;
@@ -389,6 +390,40 @@ export async function GET(req: NextRequest) {
       }
     }
     console.log(`🖼️ Total creative info: ${adCreativeMap.size} ads`);
+
+    // ── Step B2: Compute hash from thumbnail for ads missing imageHash ───
+    // This covers boosted posts / video creatives where Meta API doesn't return image_hash
+    const missingHashUrls = new Map<string, string[]>(); // url → adIds
+    for (const [adId, info] of adCreativeMap) {
+      if (!info.imageHash && info.thumbnailUrl) {
+        const list = missingHashUrls.get(info.thumbnailUrl) || [];
+        list.push(adId);
+        missingHashUrls.set(info.thumbnailUrl, list);
+      }
+    }
+    if (missingHashUrls.size > 0) {
+      console.log(`🔍 Computing thumbnail hash for ${missingHashUrls.size} unique URLs without imageHash`);
+      const urlBatches: [string, string[]][][] = [];
+      const entries = [...missingHashUrls.entries()];
+      for (let i = 0; i < entries.length; i += 20) urlBatches.push(entries.slice(i, i + 20));
+
+      for (const batch of urlBatches) {
+        await Promise.allSettled(batch.map(async ([url, adIds]) => {
+          try {
+            const res = await fetch(url, { cache: "no-store" });
+            if (!res.ok) return;
+            const buffer = await res.arrayBuffer();
+            const hash = "thumb:" + createHash("sha256").update(Buffer.from(buffer)).digest("hex").slice(0, 16);
+            for (const adId of adIds) {
+              const info = adCreativeMap.get(adId);
+              if (info) info.imageHash = hash;
+            }
+          } catch { /* non-critical */ }
+        }));
+      }
+      const afterCount = [...adCreativeMap.values()].filter(v => !!v.imageHash).length;
+      console.log(`🔍 After thumbnail hashing: ${afterCount}/${adCreativeMap.size} ads have imageHash`);
+    }
 
     // Merge creative page_id into pgIdMap (for campaigns without adset page_id)
     for (const row of allInsights) {
