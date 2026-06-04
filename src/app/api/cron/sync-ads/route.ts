@@ -4,22 +4,31 @@ import { Prisma } from "@prisma/client";
 import { createHash } from "crypto";
 import sharp from "sharp";
 
-// Compute perceptual hash (aHash) from image buffer
+// Compute perceptual hash (dHash 16x16) from image buffer
+// dHash compares adjacent pixel brightness — much better than aHash for similar-color images
 async function computePHashFromBuffer(buffer: Buffer): Promise<string | null> {
   try {
+    const W = 17, H = 16; // 17 wide to get 16 horizontal differences per row
     const pixels = await sharp(buffer)
-      .resize(8, 8, { fit: 'fill' })
+      .resize(W, H, { fit: 'fill' })
       .grayscale()
       .raw()
       .toBuffer();
-    let sum = 0;
-    for (let i = 0; i < pixels.length; i++) sum += pixels[i];
-    const avg = sum / pixels.length;
-    let hash = 0n;
-    for (let i = 0; i < pixels.length; i++) {
-      if (pixels[i] > avg) hash |= 1n << BigInt(pixels.length - 1 - i);
+    // Compare adjacent horizontal pixels → 16*16 = 256 bits
+    const bits: number[] = [];
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W - 1; x++) {
+        const idx = y * W + x;
+        bits.push(pixels[idx] > pixels[idx + 1] ? 1 : 0);
+      }
     }
-    return 'phash:' + hash.toString(16).padStart(16, '0');
+    // Convert 256 bits to 64 hex chars
+    let hex = '';
+    for (let i = 0; i < bits.length; i += 4) {
+      const nibble = (bits[i] << 3) | (bits[i+1] << 2) | (bits[i+2] << 1) | bits[i+3];
+      hex += nibble.toString(16);
+    }
+    return 'phash:' + hex;
   } catch { return null; }
 }
 

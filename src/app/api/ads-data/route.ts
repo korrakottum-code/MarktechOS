@@ -283,7 +283,6 @@ export async function GET(req: NextRequest) {
       for (const ad of adRows) {
         const resolvedThumb = bestThumb.get(ad.adId) || "";
         const visualKey = thumbKey(resolvedThumb, ad.imageHash || undefined, ad.perceptualHash || undefined) || `no-thumb-${ad.adId}`;
-        // Include adName to prevent different services (e.g. hifu vs pico) merging on similar images
         const key = `${ad.adName || ''}|${visualKey}`;
         const e = thumbMap.get(key);
         if (e) {
@@ -440,7 +439,6 @@ export async function GET(req: NextRequest) {
 
       for (const ad of globalAdRows) {
         const resolvedThumb = globalBestThumb.get(ad.adId) || "";
-        // Group by adName + visual key to prevent cross-service merging
         const visualKey = globalThumbKey(resolvedThumb, ad.imageHash || undefined, ad.perceptualHash || undefined) || `no-thumb-${ad.adId}`;
         const key = `${ad.adName || ''}|${visualKey}`;
         const pn = pageNameMap.get(ad.pageId) ?? ad.pageId;

@@ -1,29 +1,28 @@
 /**
- * Backfill perceptualHash for all AdsContentDaily rows that have thumbnailUrl but no perceptualHash.
- * Downloads each unique thumbnail, computes aHash, and updates all rows with that thumbnail.
+ * Re-backfill perceptualHash using dHash 16x16 (replacing old aHash 8x8).
  */
 const { PrismaClient } = require('@prisma/client');
 const { computePHash } = require('./src/lib/server/phash');
 
 const p = new PrismaClient();
-const BATCH_SIZE = 20; // Concurrent downloads
+const BATCH_SIZE = 20;
 
 async function main() {
-  // Get all unique thumbnail URLs that don't have perceptualHash
+  // Clear old aHash values and recompute with dHash
+  await p.$executeRawUnsafe(`UPDATE "AdsContentDaily" SET "perceptualHash" = '' WHERE "perceptualHash" != ''`);
+  console.log('🗑️  Cleared old aHash values\n');
+
   const rows = await p.$queryRawUnsafe(`
     SELECT DISTINCT "thumbnailUrl" 
     FROM "AdsContentDaily" 
     WHERE "thumbnailUrl" != '' 
-    AND ("perceptualHash" = '' OR "perceptualHash" IS NULL)
     LIMIT 5000
   `);
 
-  console.log(`🖼️  Found ${rows.length} unique thumbnail URLs to hash\n`);
+  console.log(`🖼️  Found ${rows.length} unique thumbnail URLs to hash with dHash 16x16\n`);
 
-  let done = 0;
-  let failed = 0;
+  let done = 0, failed = 0;
 
-  // Process in batches
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
     const batch = rows.slice(i, i + BATCH_SIZE);
     const results = await Promise.all(
@@ -33,7 +32,6 @@ async function main() {
       })
     );
 
-    // Update DB for each result
     for (const { url, hash } of results) {
       if (hash) {
         await p.$executeRawUnsafe(
@@ -51,9 +49,8 @@ async function main() {
     process.stdout.write(`\r  Progress: ${i + batch.length}/${rows.length} (${pct}%) — ✅ ${done} hashed, ❌ ${failed} failed`);
   }
 
-  console.log(`\n\n🏁 Done! ${done} thumbnails hashed, ${failed} failed`);
+  console.log(`\n\n🏁 Done! ${done} thumbnails hashed (dHash 16x16), ${failed} failed`);
 
-  // Show stats
   const total = await p.$queryRawUnsafe(`SELECT COUNT(*) as c FROM "AdsContentDaily" WHERE "perceptualHash" != ''`);
   const unique = await p.$queryRawUnsafe(`SELECT COUNT(DISTINCT "perceptualHash") as c FROM "AdsContentDaily" WHERE "perceptualHash" != ''`);
   console.log(`📊 Total rows with pHash: ${total[0].c}, Unique pHashes: ${unique[0].c}`);
