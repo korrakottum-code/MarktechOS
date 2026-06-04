@@ -203,7 +203,7 @@ export default function Sidebar({
                     className={`w-full group flex items-center gap-3 rounded-lg px-2 py-2 text-sm transition-all duration-200 ${
                       !showLabel ? "justify-center" : ""
                     } hover:bg-navy-800 ${isSelected ? "text-foreground" : "text-foreground-muted"}`}
-                    title={!showLabel ? page.pageName : undefined}
+                    title={page.pageName}
                   >
                     <div className={`shrink-0 flex items-center justify-center w-5 h-5 rounded border ${isSelected ? "bg-gold-500 border-gold-500 text-navy-950" : "border-border bg-navy-900 group-hover:border-gold-500/50"}`}>
                       {isSelected && <CheckSquare size={14} className="hidden" />}
