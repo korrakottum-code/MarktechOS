@@ -67,6 +67,24 @@ export default function Sidebar({
     router.replace(`/?${params.toString()}`, { scroll: false });
   }
 
+  function selectAll() {
+    const next = new Set(selectedPages);
+    const allFilteredIds = filteredPages.map(p => p.pageId);
+    const areAllSelected = allFilteredIds.length > 0 && allFilteredIds.every(id => next.has(id));
+
+    if (areAllSelected) {
+      allFilteredIds.forEach(id => next.delete(id));
+    } else {
+      allFilteredIds.forEach(id => next.add(id));
+    }
+
+    const params = new URLSearchParams(searchParams.toString());
+    if (next.size > 0) params.set("pages", Array.from(next).join(","));
+    else params.delete("pages");
+    
+    router.replace(`/?${params.toString()}`, { scroll: false });
+  }
+
   const filteredPages = pages.filter(p => p.pageName.toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
@@ -140,11 +158,21 @@ export default function Sidebar({
                 <p className="text-[10px] font-bold text-foreground-muted uppercase tracking-widest">
                   ตัวกรองคลินิก
                 </p>
-                {selectedPages.size > 0 && (
-                  <button onClick={clearPages} className="text-[10px] text-gold-400 hover:text-gold-300">
-                    ล้าง ({selectedPages.size})
-                  </button>
-                )}
+                <div className="flex items-center gap-1.5">
+                  {filteredPages.length > 0 && (
+                    <button onClick={selectAll} className="text-[10px] text-gold-400 hover:text-gold-300">
+                      {filteredPages.every(p => selectedPages.has(p.pageId)) ? "ยกเลิกทั้งหมด" : "เลือกทั้งหมด"}
+                    </button>
+                  )}
+                  {selectedPages.size > 0 && (
+                    <>
+                      {filteredPages.length > 0 && <span className="text-[9px] text-white/10">|</span>}
+                      <button onClick={clearPages} className="text-[10px] text-gold-400 hover:text-gold-300">
+                        ล้าง ({selectedPages.size})
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             )}
 
