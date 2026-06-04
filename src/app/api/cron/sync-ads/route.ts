@@ -2,6 +2,26 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/server/prisma";
 import { Prisma } from "@prisma/client";
 import { createHash } from "crypto";
+import sharp from "sharp";
+
+// Compute perceptual hash (aHash) from image buffer
+async function computePHashFromBuffer(buffer: Buffer): Promise<string | null> {
+  try {
+    const pixels = await sharp(buffer)
+      .resize(8, 8, { fit: 'fill' })
+      .grayscale()
+      .raw()
+      .toBuffer();
+    let sum = 0;
+    for (let i = 0; i < pixels.length; i++) sum += pixels[i];
+    const avg = sum / pixels.length;
+    let hash = 0n;
+    for (let i = 0; i < pixels.length; i++) {
+      if (pixels[i] > avg) hash |= 1n << BigInt(pixels.length - 1 - i);
+    }
+    return 'phash:' + hash.toString(16).padStart(16, '0');
+  } catch { return null; }
+}
 
 const API_VERSION = "v20.0";
 const BASE = `https://graph.facebook.com/${API_VERSION}`;
@@ -185,17 +205,18 @@ async function bulkUpsertContentDaily(rows: any[]) {
   for (let i = 0; i < rows.length; i += BATCH) {
     const batch = rows.slice(i, i + BATCH);
     const values = batch.map(r =>
-      `(${escSql(r.adId)},${escSql(r.date)},${escSql(r.campaignId)},${escSql(r.adAccountId)},${escSql(r.pageId)},${escSql(r.adName)},${escSql(r.campaignName)},${escSql(r.thumbnailUrl || '')},${escSql(r.imageHash || '')},${r.spend},${r.impressions},${r.clicks},${r.inbox},${r.leads},${r.cpi},${r.likes},${r.comments},${r.shares},${r.videoViews},${r.ctr},${escSql(r.status)},NOW(),NOW())`
+      `(${escSql(r.adId)},${escSql(r.date)},${escSql(r.campaignId)},${escSql(r.adAccountId)},${escSql(r.pageId)},${escSql(r.adName)},${escSql(r.campaignName)},${escSql(r.thumbnailUrl || '')},${escSql(r.imageHash || '')},${escSql(r.perceptualHash || '')},${r.spend},${r.impressions},${r.clicks},${r.inbox},${r.leads},${r.cpi},${r.likes},${r.comments},${r.shares},${r.videoViews},${r.ctr},${escSql(r.status)},NOW(),NOW())`
     ).join(",\n");
 
     await prisma.$executeRawUnsafe(`
-      INSERT INTO "AdsContentDaily" ("adId","date","campaignId","adAccountId","pageId","adName","campaignName","thumbnailUrl","imageHash","spend","impressions","clicks","inbox","leads","cpi","likes","comments","shares","videoViews","ctr","status","createdAt","updatedAt")
+      INSERT INTO "AdsContentDaily" ("adId","date","campaignId","adAccountId","pageId","adName","campaignName","thumbnailUrl","imageHash","perceptualHash","spend","impressions","clicks","inbox","leads","cpi","likes","comments","shares","videoViews","ctr","status","createdAt","updatedAt")
       VALUES ${values}
       ON CONFLICT ("adId","date") DO UPDATE SET
         "campaignId"=EXCLUDED."campaignId","adAccountId"=EXCLUDED."adAccountId","pageId"=EXCLUDED."pageId",
         "adName"=EXCLUDED."adName","campaignName"=EXCLUDED."campaignName",
         "thumbnailUrl"=CASE WHEN EXCLUDED."thumbnailUrl" != '' THEN EXCLUDED."thumbnailUrl" ELSE "AdsContentDaily"."thumbnailUrl" END,
         "imageHash"=CASE WHEN EXCLUDED."imageHash" != '' THEN EXCLUDED."imageHash" ELSE "AdsContentDaily"."imageHash" END,
+        "perceptualHash"=CASE WHEN EXCLUDED."perceptualHash" != '' THEN EXCLUDED."perceptualHash" ELSE "AdsContentDaily"."perceptualHash" END,
         "spend"=EXCLUDED."spend","impressions"=EXCLUDED."impressions","clicks"=EXCLUDED."clicks",
         "inbox"=EXCLUDED."inbox","leads"=EXCLUDED."leads","cpi"=EXCLUDED."cpi",
         "likes"=EXCLUDED."likes","comments"=EXCLUDED."comments","shares"=EXCLUDED."shares",
@@ -424,6 +445,40 @@ export async function GET(req: NextRequest) {
       console.log(`🔍 After thumbnail hashing: ${afterCount}/${adCreativeMap.size} ads have imageHash`);
     }
 
+    // ── Step 2.5: Compute perceptual hash for ALL thumbnails ──────────────
+    const pHashMap = new Map<string, string>(); // url → phash
+    const allThumbUrls = new Map<string, string[]>(); // url → adIds
+    for (const [adId, info] of adCreativeMap) {
+      if (info.thumbnailUrl) {
+        const list = allThumbUrls.get(info.thumbnailUrl) || [];
+        list.push(adId);
+        allThumbUrls.set(info.thumbnailUrl, list);
+      }
+    }
+    if (allThumbUrls.size > 0) {
+      console.log(`🧠 Computing perceptual hash for ${allThumbUrls.size} unique thumbnails`);
+      const pEntries = [...allThumbUrls.entries()];
+      for (let i = 0; i < pEntries.length; i += 20) {
+        const batch = pEntries.slice(i, i + 20);
+        await Promise.allSettled(batch.map(async ([url, adIds]) => {
+          try {
+            const res = await fetch(url, { cache: "no-store" });
+            if (!res.ok) return;
+            const buffer = Buffer.from(await res.arrayBuffer());
+            const ph = await computePHashFromBuffer(buffer);
+            if (ph) {
+              pHashMap.set(url, ph);
+              for (const adId of adIds) {
+                const info = adCreativeMap.get(adId);
+                if (info) (info as any).perceptualHash = ph;
+              }
+            }
+          } catch { /* non-critical */ }
+        }));
+      }
+      console.log(`🧠 Computed ${pHashMap.size}/${allThumbUrls.size} perceptual hashes`);
+    }
+
     // Merge creative page_id into pgIdMap (for campaigns without adset page_id)
     for (const row of allInsights) {
       if (!pgIdMap[row.campaignId]) {
@@ -621,6 +676,7 @@ export async function GET(req: NextRequest) {
           pageId: pgId, adName: row.adName, campaignName: row.campaignName,
           thumbnailUrl: creative?.thumbnailUrl || "",
           imageHash: creative?.imageHash || "",
+          perceptualHash: (creative as any)?.perceptualHash || "",
           spend: row.spend, impressions: row.impressions, clicks: row.clicks,
           inbox: row.inbox, leads: row.leads, cpi: row.cpi,
           likes: row.likes, comments: row.comments, shares: row.shares,

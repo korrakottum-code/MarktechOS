@@ -59,6 +59,7 @@ model AdsContentDaily {
   ctr           Float         @default(0)
   creativeId    String        @default("")   // Meta creative ID
   imageHash     String        @default("")   // Image hash for grouping
+  perceptualHash String       @default("")   // Computed perceptual hash for visual dedup
   status        String        @default("active")
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt

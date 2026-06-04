@@ -2,6 +2,39 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/server/prisma";
 import { getAllowedPagesForCurrentUser } from "@/lib/server/allowed-pages";
 
+// Hamming distance between two hex pHash strings
+function hammingDistance(a: string, b: string): number {
+  if (a.length !== b.length) return 64;
+  const av = BigInt("0x" + a);
+  const bv = BigInt("0x" + b);
+  let xor = av ^ bv;
+  let dist = 0;
+  while (xor > 0n) { dist += Number(xor & 1n); xor >>= 1n; }
+  return dist;
+}
+
+// Build a map: phash → canonical phash (cluster representative)
+// Groups pHashes with hamming distance ≤ threshold
+function buildPHashCluster(pHashes: string[], threshold = 8): Map<string, string> {
+  const canonical = new Map<string, string>();
+  const representatives: string[] = [];
+  for (const ph of pHashes) {
+    let found = false;
+    for (const rep of representatives) {
+      if (hammingDistance(ph, rep) <= threshold) {
+        canonical.set(ph, rep);
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      representatives.push(ph);
+      canonical.set(ph, ph);
+    }
+  }
+  return canonical;
+}
+
 // ── GET /api/ads-data?since=YYYY-MM-DD&until=YYYY-MM-DD&pageId=xxx ───────────
 // Queries daily rows from AdsMetricDaily and aggregates per campaign.
 // When pageId is provided, also returns dailyTrend + adContent.
@@ -211,9 +244,10 @@ export async function GET(req: NextRequest) {
 
       adContent = [...adNameMap.values()].map(formatAdRow).sort((a, b) => b.spend - a.spend);
 
-      // ── Performance by Content: group by imageHash (same image = 1 row) ──
-      // Meta gives the same imageHash for identical creatives across pages
-      function thumbKey(url: string, hash?: string): string {
+      // ── Performance by Content: group by perceptualHash > imageHash > URL ──
+      // perceptualHash = computed aHash from actual image pixels (most reliable for visual dedup)
+      function thumbKey(url: string, hash?: string, phash?: string): string {
+        if (phash) return `phash:${phash}`;
         if (hash) return `hash:${hash}`;
         if (url) {
           try { return `url:${new URL(url).pathname}`; } catch { return `url:${url}`; }
@@ -248,7 +282,9 @@ export async function GET(req: NextRequest) {
 
       for (const ad of adRows) {
         const resolvedThumb = bestThumb.get(ad.adId) || "";
-        const key = resolvedThumb ? thumbKey(resolvedThumb, ad.imageHash || undefined) : (ad.imageHash ? `hash:${ad.imageHash}` : `no-thumb-${ad.adId}`);
+        const visualKey = thumbKey(resolvedThumb, ad.imageHash || undefined, ad.perceptualHash || undefined) || `no-thumb-${ad.adId}`;
+        // Include adName to prevent different services (e.g. hifu vs pico) merging on similar images
+        const key = `${ad.adName || ''}|${visualKey}`;
         const e = thumbMap.get(key);
         if (e) {
           e.spend += ad.spend; e.impressions += ad.impressions; e.clicks += ad.clicks;
@@ -375,9 +411,9 @@ export async function GET(req: NextRequest) {
           pageBreakdown: [...a.pageMetrics.values()],
         }))
         .sort((a, b) => b.spend - a.spend);
-      // Group by unique creative — imageHash is the most reliable grouping key
-      // Meta gives the same imageHash for identical creatives across pages/CDN servers
-      const globalThumbKey = (url: string, hash?: string): string => {
+      // Group by unique creative — perceptualHash > imageHash > URL pathname
+      const globalThumbKey = (url: string, hash?: string, phash?: string): string => {
+        if (phash) return `phash:${phash}`;
         if (hash) return `hash:${hash}`;
         if (url) {
           try { return `url:${new URL(url).pathname}`; } catch { return `url:${url}`; }
@@ -404,8 +440,9 @@ export async function GET(req: NextRequest) {
 
       for (const ad of globalAdRows) {
         const resolvedThumb = globalBestThumb.get(ad.adId) || "";
-        // Group by thumbnail URL pathname first, then imageHash fallback
-        const key = resolvedThumb ? globalThumbKey(resolvedThumb, ad.imageHash || undefined) : (ad.imageHash ? `hash:${ad.imageHash}` : `no-thumb-${ad.adId}`);
+        // Group by adName + visual key to prevent cross-service merging
+        const visualKey = globalThumbKey(resolvedThumb, ad.imageHash || undefined, ad.perceptualHash || undefined) || `no-thumb-${ad.adId}`;
+        const key = `${ad.adName || ''}|${visualKey}`;
         const pn = pageNameMap.get(ad.pageId) ?? ad.pageId;
         const e = gThumbMap.get(key);
         const isActive = ad.status === "active" ? 1 : 0;
