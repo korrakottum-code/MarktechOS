@@ -369,22 +369,14 @@ export async function GET(req: NextRequest) {
           await Promise.allSettled(batches2.slice(c, c + CONCURRENCY).map(async (ids) => {
             try {
               const res = await fetch(
-                `${BASE}/?ids=${ids.join(",")}&fields=thumbnail_url,image_hash,object_story_spec&thumbnail_width=480&thumbnail_height=480&access_token=${token}`,
+                `${BASE}/?ids=${ids.join(",")}&fields=thumbnail_url,image_hash&thumbnail_width=480&thumbnail_height=480&access_token=${token}`,
                 { cache: "no-store" }
               );
               if (!res.ok) return;
               const json = await res.json();
               for (const [creativeId, data] of Object.entries(json) as [string, any][]) {
                 const thumbUrl = (data as any).thumbnail_url || "";
-                // Try image_hash first, then fallback to object_story_spec
-                let imgHash = (data as any).image_hash || "";
-                // Fallback: extract from object_story_spec (boosted posts)
-                if (!imgHash) {
-                  const spec = (data as any).object_story_spec;
-                  if (spec) {
-                    imgHash = spec.link_data?.image_hash || spec.photo_data?.image_hash || spec.video_data?.image_hash || "";
-                  }
-                }
+                const imgHash = (data as any).image_hash || "";
                 const relatedAdIds = creativeIdToAdIds.get(creativeId) || [];
                 for (const adId of relatedAdIds) {
                   const info = adCreativeIds.get(adId);
