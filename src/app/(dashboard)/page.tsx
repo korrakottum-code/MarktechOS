@@ -888,8 +888,8 @@ function FacebookAdsDashboard() {
           </div>
         </div>
 
-        {/* Sub-filters (Service pills for non-page views) */}
-        {view !== 'pages' && serviceNames.length > 0 && (
+        {/* Sub-filters (Service pills) */}
+        {serviceNames.length > 0 && (
           <div className="px-5 py-3 border-b border-white/5 bg-navy-900/30 flex items-center gap-2 overflow-x-auto scrollbar-hide">
             <Filter size={14} className="text-purple-400 shrink-0 mr-1" />
             <button onClick={() => setServiceFilter(null)}
