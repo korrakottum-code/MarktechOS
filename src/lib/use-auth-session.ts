@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { getDisplayNameFromSupabaseUser, getRoleFromSupabaseUser } from "@/lib/auth/user-role";
+import { getDisplayNameFromSupabaseUser, getRoleFromSupabaseUser, getAllowedPagesFromSupabaseUser } from "@/lib/auth/user-role";
 import type { UserRole } from "@/lib/auth/permissions";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 export interface AuthSessionUser {
   username: string;
   role: UserRole;
+  allowedPages: string[] | null; // null = unrestricted, string[] = restricted to these page IDs
 }
 
 export function useAuthSession() {
@@ -32,6 +33,7 @@ export function useAuthSession() {
       setUser({
         username: getDisplayNameFromSupabaseUser(user),
         role: getRoleFromSupabaseUser(user),
+        allowedPages: getAllowedPagesFromSupabaseUser(user),
       });
     } catch {
       setUser(null);
@@ -50,3 +52,4 @@ export function useAuthSession() {
     reload: load,
   };
 }
+

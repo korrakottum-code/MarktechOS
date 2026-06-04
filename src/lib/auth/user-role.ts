@@ -12,6 +12,24 @@ export function getRoleFromSupabaseUser(user: User): UserRole {
   return "admin";
 }
 
+/**
+ * Read the allowed page IDs from Supabase app_metadata.
+ * Returns `null` if the user has unrestricted access (no allowed_pages set).
+ * Returns an array of page ID strings if restricted.
+ */
+export function getAllowedPagesFromSupabaseUser(user: User): string[] | null {
+  const allowedPages = user.app_metadata?.allowed_pages;
+
+  if (!Array.isArray(allowedPages)) return null;
+
+  // Ensure all entries are strings
+  const validated = allowedPages.filter(
+    (p: unknown): p is string => typeof p === "string" && p.length > 0
+  );
+
+  return validated.length > 0 ? validated : null;
+}
+
 export function getDisplayNameFromSupabaseUser(user: User): string {
   const metaName =
     typeof user.user_metadata?.full_name === "string"
@@ -27,3 +45,4 @@ export function getDisplayNameFromSupabaseUser(user: User): string {
 
   return user.id;
 }
+

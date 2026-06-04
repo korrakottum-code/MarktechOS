@@ -1,4 +1,4 @@
-export type UserRole = "ceo" | "admin" | "finance" | "am" | "content" | "ads";
+export type UserRole = "ceo" | "admin" | "finance" | "am" | "content" | "ads" | "client";
 
 const protectedRoots = [
   "/",
@@ -17,7 +17,19 @@ const restrictedRoutes: Array<{ prefix: string; roles: UserRole[] }> = [
   { prefix: "/platform-ops", roles: ["ceo", "admin"] },
   { prefix: "/incentive", roles: ["ceo", "admin", "finance"] },
   { prefix: "/admin-crm", roles: ["ceo", "admin", "am"] },
+  // Client users can only access the main dashboard ("/")
+  { prefix: "/operation", roles: ["ceo", "admin", "finance", "am", "content", "ads"] },
+  { prefix: "/client-hr", roles: ["ceo", "admin", "finance", "am", "content", "ads"] },
+  { prefix: "/ai-brain", roles: ["ceo", "admin", "finance", "am", "content", "ads"] },
+  { prefix: "/ticketing", roles: ["ceo", "admin", "finance", "am", "content", "ads"] },
+  { prefix: "/timeline", roles: ["ceo", "admin", "finance", "am", "content", "ads"] },
+  { prefix: "/notifications", roles: ["ceo", "admin", "finance", "am", "content", "ads"] },
 ];
+
+/** Check if a role is the client (customer) role */
+export function isClientRole(role: UserRole): boolean {
+  return role === "client";
+}
 
 export function parseUserRole(role: string | undefined): UserRole | null {
   if (!role) return null;
@@ -29,7 +41,8 @@ export function parseUserRole(role: string | undefined): UserRole | null {
     normalized === "finance" ||
     normalized === "am" ||
     normalized === "content" ||
-    normalized === "ads"
+    normalized === "ads" ||
+    normalized === "client"
   ) {
     return normalized;
   }

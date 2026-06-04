@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import html2canvas from "html2canvas-pro";
 import { jsPDF } from "jspdf";
+import { useAuthSession } from "@/lib/use-auth-session";
+import { isClientRole } from "@/lib/auth/permissions";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function toISO(d: Date) { 
@@ -241,6 +243,10 @@ function FacebookAdsDashboard() {
   const [until, setUntil] = useState(() => searchParams.get("until") || today);
 
   const { metrics: raw, meta, globalAdContent: _globalAdContent, globalAdByContent: _globalAdByContent, loading, error, reload, isStale } = useAdsData(since, until);
+
+  // ── Auth: check if current user is a client (hide sync, admin features) ────
+  const { user: authUser } = useAuthSession();
+  const isClient = authUser ? isClientRole(authUser.role) : false;
 
   const [search, setSearch]   = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("spend");
@@ -724,10 +730,12 @@ function FacebookAdsDashboard() {
 
             {/* Sync & Export Buttons moved here for mobile top-level wrapping */}
             <div className="flex gap-2 shrink-0 sm:hidden">
+              {!isClient && (
               <button onClick={handleSync} disabled={syncing}
                 className="flex items-center gap-2 px-3 py-1.5 bg-gold-500 text-navy-950 rounded-xl text-xs font-bold hover:bg-gold-400 transition-all shadow-lg shadow-gold-500/20 disabled:opacity-60">
                 <RefreshCw size={12} className={syncing ? "animate-spin" : ""} />
               </button>
+              )}
               <button
                 onClick={handleExportPDFs} disabled={isExporting}
                 className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-500 transition-all shadow-lg shadow-blue-500/20 disabled:opacity-60">
@@ -767,15 +775,17 @@ function FacebookAdsDashboard() {
           </div>
 
           <div className="hidden sm:flex items-center ml-1">
+            {!isClient && (
             <button onClick={handleSync} disabled={syncing}
               className="flex items-center gap-2 px-4 py-1.5 bg-gold-500 text-navy-950 rounded-xl text-sm font-bold hover:bg-gold-400 transition-all shadow-lg shadow-gold-500/20 disabled:opacity-60">
               <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />
               {syncing ? "Syncing" : "Sync"}
             </button>
+            )}
 
             <button
               onClick={handleExportPDFs} disabled={isExporting}
-              className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-500 transition-all shadow-lg shadow-blue-500/20 disabled:opacity-60 ml-2">
+              className={`flex items-center gap-2 px-4 py-1.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-500 transition-all shadow-lg shadow-blue-500/20 disabled:opacity-60 ${!isClient ? 'ml-2' : ''}`}>
               <Download size={14} />
               {isExporting ? "Exporting..." : "Export PDF"}
             </button>
@@ -794,8 +804,8 @@ function FacebookAdsDashboard() {
         </div>
       )}
 
-      {/* Stale data banner */}
-      {isStale && !syncing && !syncMsg && (
+      {/* Stale data banner — hidden for client users */}
+      {isStale && !syncing && !syncMsg && !isClient && (
         <div className="mb-6 flex items-center gap-3 px-4 py-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 animate-fade-in shadow-lg">
           <AlertCircle size={16} className="text-amber-400 shrink-0" />
           <p className="text-sm text-amber-400 flex-1 font-medium">
@@ -1042,7 +1052,7 @@ function FacebookAdsDashboard() {
                             <Image size={16} className="text-emerald-400 opacity-50" />
                           )}
                         </div>
-                        <p className="text-[10px] font-bold text-white truncate max-w-[80px] mx-auto mb-1">{best.adName}</p>
+                        <p className="text-[10px] font-bold text-white truncate max-w-[120px] mx-auto mb-1" title={best.adName}>{best.adName}</p>
                         <p className="text-base font-black text-emerald-400 leading-none">{thb(best.cpi)}</p>
                       </div>
                       
@@ -1062,7 +1072,7 @@ function FacebookAdsDashboard() {
                             <Image size={16} className="text-rose-400 opacity-50" />
                           )}
                         </div>
-                        <p className="text-[10px] font-bold text-white truncate max-w-[80px] mx-auto mb-1">{worst.adName}</p>
+                        <p className="text-[10px] font-bold text-white truncate max-w-[120px] mx-auto mb-1" title={worst.adName}>{worst.adName}</p>
                         <p className="text-base font-black text-rose-400 leading-none">{thb(worst.cpi)}</p>
                       </div>
                     </div>
@@ -1171,7 +1181,7 @@ function FacebookAdsDashboard() {
                     {serviceFilter ? (
                       [...pages].slice(0, 5).map((p, i) => (
                         <tr key={p.pageId} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                          <td className="px-3 py-2.5 text-[11px] font-semibold text-white truncate max-w-[120px]">{p.pageName}</td>
+                          <td className="px-3 py-2.5 text-[11px] font-semibold text-white truncate max-w-[220px]" title={p.pageName}>{p.pageName}</td>
                           <td className="px-2 py-2.5 text-right text-[11px] font-bold text-rose-400">{thb(p.spend)}</td>
                           <td className="px-2 py-2.5 text-right text-[11px] text-cyan-400">{thb(p.cpi)}</td>
                           <td className="px-2 py-2.5 text-right text-[11px] font-bold text-blue-400">{num(p.inbox)}</td>
@@ -1182,7 +1192,7 @@ function FacebookAdsDashboard() {
                     ) : (
                       [...globalAdContent].sort((a,b) => b.inbox - a.inbox).slice(0, 5).map((svc, i) => (
                         <tr key={svc.adName} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                          <td className="px-3 py-2.5 text-[11px] font-semibold text-white truncate max-w-[120px]">{svc.adName}</td>
+                          <td className="px-3 py-2.5 text-[11px] font-semibold text-white truncate max-w-[220px]" title={svc.adName}>{svc.adName}</td>
                           <td className="px-2 py-2.5 text-right text-[11px] font-bold text-rose-400">{thb(svc.spend)}</td>
                           <td className="px-2 py-2.5 text-right text-[11px] text-cyan-400">{thb(svc.cpi)}</td>
                           <td className="px-2 py-2.5 text-right text-[11px] font-bold text-blue-400">{num(svc.inbox)}</td>
@@ -1278,7 +1288,7 @@ function FacebookAdsDashboard() {
                   style={{ animationDelay: `${Math.min(i * 20, 400)}ms` }}>
                   <td className="px-1 sm:px-2 py-2">
                     <Link href={`/page/${p.pageId}?since=${since}&until=${until}`} className="group/link flex items-center gap-1">
-                      <p className="font-semibold text-foreground text-[10px] sm:text-[11px] leading-tight truncate max-w-[70px] sm:max-w-[180px] group-hover/link:text-gold-400 transition-colors" title={p.pageName}>{p.pageName}</p>
+                      <p className="font-semibold text-foreground text-[10px] sm:text-[11px] leading-tight truncate max-w-[140px] sm:max-w-[300px] group-hover/link:text-gold-400 transition-colors" title={p.pageName}>{p.pageName}</p>
                       <ChevronRight size={10} className="text-foreground-muted/30 group-hover/link:text-gold-400 transition-colors shrink-0" />
                     </Link>
                   </td>
@@ -1397,7 +1407,7 @@ function FacebookAdsDashboard() {
                     return (
                     <tr key={svc.adName + i} className="border-b border-white/5 hover:bg-white/5 transition-colors group">
                       <td className="px-1 sm:px-2 py-2">
-                        <p className="font-semibold text-foreground text-[10px] sm:text-[11px] truncate max-w-[70px] sm:max-w-[160px] group-hover:text-gold-400 transition-colors" title={svc.adName}>{svc.adName}</p>
+                        <p className="font-semibold text-foreground text-[10px] sm:text-[11px] truncate max-w-[140px] sm:max-w-[280px] group-hover:text-gold-400 transition-colors" title={svc.adName}>{svc.adName}</p>
                       </td>
                       <td className="px-1 sm:px-2 py-2 text-right whitespace-nowrap text-[10px] sm:text-[11px]"><span className={spendGood ? good : spendBad ? bad : base}>{thb(svc.spend)}</span></td>
                       <td className="px-1 sm:px-2 py-2 text-right whitespace-nowrap text-[10px] sm:text-[11px]"><span className={inboxGood ? good : inboxBad ? bad : base}>{num(svc.inbox)}</span></td>
@@ -1511,19 +1521,19 @@ function FacebookAdsDashboard() {
                     'x1': {
                       imgC: 'w-12 h-12 rounded-xl', tdW: 'w-14 px-4 py-2',
                       tag: 'text-[9px] px-1.5 py-0.5 rounded-md', tagT: 'text-[10px]',
-                      bdT: 'text-[10px]', bdW: [140, 45, 28, 55, 28], bdG: '6px',
+                      bdT: 'text-[10px]', bdW: [280, 45, 28, 55, 28], bdG: '6px',
                       mT: 'text-sm', cT: 'text-xs', cTag: 'text-[10px] px-2 py-1 rounded-md', ic: 14
                     },
                     'x1.5': {
                       imgC: 'w-16 h-16 rounded-xl', tdW: 'w-20 px-4 py-2',
                       tag: 'text-[11px] px-2 py-0.5 rounded-md', tagT: 'text-[12px]',
-                      bdT: 'text-[12px]', bdW: [180, 60, 36, 70, 36], bdG: '8px',
+                      bdT: 'text-[12px]', bdW: [340, 60, 36, 70, 36], bdG: '8px',
                       mT: 'text-base', cT: 'text-sm', cTag: 'text-[12px] px-2 py-1 rounded-md', ic: 18
                     },
                     'x2': {
                       imgC: 'w-24 h-24 rounded-2xl', tdW: 'w-28 px-4 py-2',
                       tag: 'text-[14px] px-2 py-1 rounded-lg', tagT: 'text-[16px]',
-                      bdT: 'text-[16px]', bdW: [250, 80, 50, 100, 50], bdG: '12px',
+                      bdT: 'text-[16px]', bdW: [450, 80, 50, 100, 50], bdG: '12px',
                       mT: 'text-xl', cT: 'text-lg', cTag: 'text-[16px] px-3 py-1.5 rounded-lg', ic: 24
                     }
                   }[contentZoom];
@@ -1577,7 +1587,7 @@ function FacebookAdsDashboard() {
                           {/* Per-page breakdown */}
                           {(ad.pageBreakdown ?? []).map((pg, pi) => (
                             <div key={pi} className={`${zc.bdT} flex items-center bg-navy-950/30 px-3 py-2 rounded-lg w-fit border border-white/5`} style={{ gap: zc.bdG }}>
-                              <span className="text-foreground-muted/80 truncate font-medium" style={{ width: zc.bdW[0], flexShrink: 0 }}>{pg.pageName}</span>
+                              <span className="text-foreground-muted/80 font-medium whitespace-normal break-words" style={{ width: zc.bdW[0], flexShrink: 0 }} title={pg.pageName}>{pg.pageName}</span>
                               <span className="text-rose-400/90 font-bold tabular-nums" style={{ width: zc.bdW[1], textAlign: "right", flexShrink: 0 }}>{thb(pg.spend)}</span>
                               <span className="text-blue-400/90 font-bold tabular-nums" style={{ width: zc.bdW[2], textAlign: "right", flexShrink: 0 }}>{num(pg.inbox)}<span className="text-[0.75em] ml-1 opacity-60">ib</span></span>
                               <span className="text-cyan-400/80 font-medium tabular-nums" style={{ width: zc.bdW[3], textAlign: "right", flexShrink: 0 }}><span className="text-[0.75em] opacity-60 mr-1">CPI</span>{pg.inbox > 0 ? thb(pg.spend / pg.inbox) : "—"}</span>

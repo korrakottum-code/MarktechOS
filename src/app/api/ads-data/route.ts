@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/server/prisma";
+import { getAllowedPagesForCurrentUser } from "@/lib/server/allowed-pages";
 
 // ── GET /api/ads-data?since=YYYY-MM-DD&until=YYYY-MM-DD&pageId=xxx ───────────
 // Queries daily rows from AdsMetricDaily and aggregates per campaign.
@@ -11,13 +12,23 @@ export async function GET(req: NextRequest) {
   const pageId = searchParams.get("pageId") ?? "";
 
   try {
+    // ── Check user's allowed pages (page-level access control) ────────────
+    const allowedPages = await getAllowedPagesForCurrentUser();
+
     // Build date filter
     const where: any = {};
     if (since && until) {
       where.date = { gte: since, lte: until };
     }
     if (pageId) {
+      // If user requests a specific page, verify they have access
+      if (allowedPages && !allowedPages.includes(pageId)) {
+        return NextResponse.json({ error: "Access denied to this page" }, { status: 403 });
+      }
       where.pageId = pageId;
+    } else if (allowedPages) {
+      // No specific page requested, but user has page restrictions
+      where.pageId = { in: allowedPages };
     }
 
     const rows = await prisma.adsMetricDaily.findMany({
@@ -136,6 +147,7 @@ export async function GET(req: NextRequest) {
       // Ad content: fetch from AdsContentDaily
       const adWhere: any = { pageId };
       if (since && until) adWhere.date = { gte: since, lte: until };
+      // allowedPages check already done above (403 if not allowed)
 
       const adRows = await prisma.adsContentDaily.findMany({
         where: adWhere,
@@ -272,8 +284,12 @@ export async function GET(req: NextRequest) {
 
     // ── Global ad content (when no pageId — for main dashboard) ──────────
     if (!pageId && since && until) {
+      const globalAdWhere: any = { date: { gte: since, lte: until } };
+      if (allowedPages) {
+        globalAdWhere.pageId = { in: allowedPages };
+      }
       const globalAdRows = await prisma.adsContentDaily.findMany({
-        where: { date: { gte: since, lte: until } },
+        where: globalAdWhere,
         orderBy: [{ spend: "desc" }],
       });
 

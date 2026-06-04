@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams, useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, X, LayoutDashboard, Monitor, Search, CheckSquare, Square } from "lucide-react";
 import { useAuthSession } from "@/lib/use-auth-session";
-import { canAccessPath } from "@/lib/auth/permissions";
+import { canAccessPath, isClientRole } from "@/lib/auth/permissions";
 
 interface PageData {
   pageId: string;
@@ -48,6 +48,17 @@ export default function Sidebar({
     }
     fetchPages();
   }, []);
+
+  // For client users with a single page: auto-select it
+  const isClient = user ? isClientRole(user.role) : false;
+  useEffect(() => {
+    if (isClient && pages.length === 1 && selectedPages.size === 0) {
+      const singlePageId = pages[0].pageId;
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("pages", singlePageId);
+      router.replace(`/?${params.toString()}`, { scroll: false });
+    }
+  }, [isClient, pages, selectedPages.size, searchParams, router]);
 
   function togglePage(pageId: string) {
     const next = new Set(selectedPages);
@@ -131,7 +142,8 @@ export default function Sidebar({
 
       {/* Navigation & Filters */}
       <div className="flex-1 overflow-y-auto py-4 px-3 space-y-4 flex flex-col">
-        {/* Global Dashboard Link (Clears filters) */}
+        {/* Global Dashboard Link — hidden for client users with 1 page */}
+        {!(isClient && pages.length <= 1) && (
         <button
           onClick={() => {
             clearPages();
@@ -147,9 +159,10 @@ export default function Sidebar({
           title={collapsed && !mobileOpen ? "ภาพรวมทั้งหมด" : undefined}
         >
           <LayoutDashboard size={20} className={`shrink-0 ${pathname === "/" && selectedPages.size === 0 ? "text-gold-400" : "text-foreground-muted group-hover:text-foreground"}`} />
-          {(!collapsed || mobileOpen) && <span className="truncate">ภาพรวมทุกสาขา</span>}
+          {(!collapsed || mobileOpen) && <span className="truncate">{isClient ? "ภาพรวมของฉัน" : "ภาพรวมทุกสาขา"}</span>}
           {pathname === "/" && selectedPages.size === 0 && <div className="absolute left-0 w-1 h-8 rounded-r-full bg-gold-400" />}
         </button>
+        )}
 
         {pages.length > 0 && (
           <div className="flex-1 flex flex-col min-h-0">

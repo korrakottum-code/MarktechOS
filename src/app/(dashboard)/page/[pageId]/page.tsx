@@ -454,7 +454,7 @@ export default function PageDetailPage() {
                     <tr key={ad.adName + i}
                       className="border-b border-white/5 hover:bg-white/5 transition-colors group">
                       <td className="px-4 py-3.5">
-                        <p className="font-semibold text-foreground text-[13px] leading-tight truncate max-w-[280px] group-hover:text-gold-400 transition-colors" title={ad.adName}>{ad.adName}</p>
+                        <p className="font-semibold text-foreground text-[13px] leading-tight truncate max-w-[450px] group-hover:text-gold-400 transition-colors" title={ad.adName}>{ad.adName}</p>
                       </td>
                       <td className="px-3 py-3.5 text-right font-bold text-rose-400 text-sm">{thb(ad.spend)}</td>
                       <td className="px-3 py-3.5 text-right font-bold text-blue-400 text-sm">{ad.inbox}</td>
@@ -580,7 +580,7 @@ export default function PageDetailPage() {
                       </td>
                       <td className="px-3 py-3">
                         <div className="flex flex-col gap-1.5">
-                          <p className="font-semibold text-foreground text-[13px] leading-tight truncate max-w-[240px] group-hover/row:text-gold-400 transition-colors" title={ad.adName}>{ad.adName}</p>
+                          <p className="font-semibold text-foreground text-[13px] leading-tight truncate max-w-[400px] group-hover/row:text-gold-400 transition-colors" title={ad.adName}>{ad.adName}</p>
                           <div className="flex items-center gap-1.5">
                             {(ad as any).mediaType && (
                               <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${
@@ -640,7 +640,7 @@ export default function PageDetailPage() {
                   {lightbox.mediaType === "video" ? "🎬 Video" : "📷 Image"}
                 </span>
               )}
-              <p className="text-sm font-semibold text-white truncate flex-1" title={lightbox.name}>{lightbox.name}</p>
+              <p className="text-sm font-semibold text-white whitespace-normal break-words flex-1" title={lightbox.name}>{lightbox.name}</p>
               <span className="text-xs text-gold-400 font-bold">{thb(lightbox.spend)}</span>
               <span className="text-xs text-blue-400">Inbox: {lightbox.inbox}</span>
               <span className="text-xs text-foreground-muted">CPI: {thb(lightbox.cpi)}</span>
