@@ -820,10 +820,10 @@ function FacebookAdsDashboard() {
                 <span className="text-sm font-semibold text-foreground-muted">{k.label}</span>
               </div>
               <div className="relative z-10 pt-1">
-                <span className={`font-bold tracking-tight ${k.color} ${
+                <span className={`font-bold ${k.color} ${
                   isLongValue 
-                    ? "text-xl sm:text-2xl lg:text-[1.375rem] xl:text-[1.625rem]" 
-                    : "text-2xl sm:text-3xl"
+                    ? "text-[1.125rem] sm:text-[1.35rem] lg:text-[1.125rem] xl:text-[1.35rem] tracking-tighter" 
+                    : "text-2xl sm:text-3xl tracking-tight"
                 }`}>{k.value}</span>
               </div>
             </div>
