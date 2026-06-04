@@ -807,8 +807,9 @@ function FacebookAdsDashboard() {
           { label: "% L/I",  value: pct(kpis.ratio),      icon: Activity,    color: "text-emerald-400",bg: "bg-emerald-500/10",border: "border-emerald-500/20", glow: "from-emerald-500/20" },
         ].map((k, i) => {
           const Icon = k.icon;
+          const isLongValue = k.value.length > 10;
           return (
-            <div key={i} className="relative overflow-hidden rounded-3xl bg-navy-900 border border-white/5 p-4 sm:p-5 shadow-xl flex flex-col gap-3 group hover:border-white/10 transition-colors animate-fade-in" style={{ animationDelay: `${i * 50}ms` }}>
+            <div key={i} className="relative overflow-hidden rounded-3xl bg-navy-900 border border-white/5 p-4 px-3.5 sm:p-5 sm:px-4 shadow-xl flex flex-col gap-3 group hover:border-white/10 transition-colors animate-fade-in" style={{ animationDelay: `${i * 50}ms` }}>
               {/* Subtle background glow */}
               <div className={`absolute -right-6 -top-6 w-24 h-24 rounded-full bg-gradient-to-br ${k.glow} to-transparent opacity-50 blur-2xl group-hover:scale-150 group-hover:opacity-70 transition-all duration-500`} />
               
@@ -819,7 +820,11 @@ function FacebookAdsDashboard() {
                 <span className="text-sm font-semibold text-foreground-muted">{k.label}</span>
               </div>
               <div className="relative z-10 pt-1">
-                <span className={`text-2xl sm:text-3xl font-bold tracking-tight ${k.color}`}>{k.value}</span>
+                <span className={`font-bold tracking-tight ${k.color} ${
+                  isLongValue 
+                    ? "text-xl sm:text-2xl lg:text-[1.375rem] xl:text-[1.625rem]" 
+                    : "text-2xl sm:text-3xl"
+                }`}>{k.value}</span>
               </div>
             </div>
           );
