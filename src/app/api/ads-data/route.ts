@@ -2,39 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/server/prisma";
 import { getAllowedPagesForCurrentUser } from "@/lib/server/allowed-pages";
 
-// Hamming distance between two hex pHash strings
-function hammingDistance(a: string, b: string): number {
-  if (a.length !== b.length) return 64;
-  const av = BigInt("0x" + a);
-  const bv = BigInt("0x" + b);
-  let xor = av ^ bv;
-  let dist = 0;
-  while (xor > 0n) { dist += Number(xor & 1n); xor >>= 1n; }
-  return dist;
-}
-
-// Build a map: phash → canonical phash (cluster representative)
-// Groups pHashes with hamming distance ≤ threshold
-function buildPHashCluster(pHashes: string[], threshold = 8): Map<string, string> {
-  const canonical = new Map<string, string>();
-  const representatives: string[] = [];
-  for (const ph of pHashes) {
-    let found = false;
-    for (const rep of representatives) {
-      if (hammingDistance(ph, rep) <= threshold) {
-        canonical.set(ph, rep);
-        found = true;
-        break;
-      }
-    }
-    if (!found) {
-      representatives.push(ph);
-      canonical.set(ph, ph);
-    }
-  }
-  return canonical;
-}
-
 // ── GET /api/ads-data?since=YYYY-MM-DD&until=YYYY-MM-DD&pageId=xxx ───────────
 // Queries daily rows from AdsMetricDaily and aggregates per campaign.
 // When pageId is provided, also returns dailyTrend + adContent.
