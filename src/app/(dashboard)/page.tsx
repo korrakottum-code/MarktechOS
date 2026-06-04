@@ -632,9 +632,22 @@ function FacebookAdsDashboard() {
       finalPdf.addImage(p2.imgData, "JPEG", 0, 0, p2.pageW, p2.pageH);
       
       // Build filename: PageName_1-31May2026.pdf
-      const pagePart = selectedPages.size > 0 
-        ? [...selectedPages].join('_').replace(/[^a-zA-Z0-9ก-๙_\- ]/g, '').substring(0, 60)
-        : 'AllPages';
+      const pageIdToNameMap = new Map<string, string>();
+      for (const m of raw) {
+        if (m.pageId && m.pageName) {
+          pageIdToNameMap.set(m.pageId, m.pageName);
+        }
+      }
+
+      let pagePart = 'AllPages';
+      if (selectedPages.size > 0) {
+        const names = [...selectedPages].map(id => pageIdToNameMap.get(id) || id);
+        pagePart = names.join('_');
+      }
+
+      // Clean up filename characters (keep Thai characters, letters, numbers, spaces, underscores, dashes)
+      pagePart = pagePart.replace(/[^a-zA-Z0-9ก-๙_\- ]/g, '').substring(0, 80);
+
       const fmt = (d: string) => {
         const dt = new Date(d + 'T00:00:00');
         return `${dt.getDate()}${dt.toLocaleString('en', { month: 'short' })}${dt.getFullYear().toString().slice(-2)}`;
