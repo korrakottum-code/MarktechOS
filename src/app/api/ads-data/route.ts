@@ -199,9 +199,10 @@ export async function GET(req: NextRequest) {
 
       adContent = [...adNameMap.values()].map(formatAdRow).sort((a, b) => b.spend - a.spend);
 
-      // ── Performance by Content: group by image path (same image = 1 row) ──
-      // Normalize: extract image pathname to group same images regardless of URL params
-      function thumbKey(url: string): string {
+      // ── Performance by Content: group by image hash or pathname (same image = 1 row) ──
+      // Use imageHash from Meta API when available for cross-page dedup, fallback to pathname
+      function thumbKey(url: string, hash?: string): string {
+        if (hash) return `hash:${hash}`;
         try { return new URL(url).pathname; } catch { return url; }
       }
 
@@ -232,7 +233,7 @@ export async function GET(req: NextRequest) {
 
       for (const ad of adRows) {
         const resolvedThumb = bestThumb.get(ad.adId) || "";
-        const key = resolvedThumb ? thumbKey(resolvedThumb) : `no-thumb-${ad.adId}`;
+        const key = resolvedThumb ? thumbKey(resolvedThumb, ad.imageHash || undefined) : `no-thumb-${ad.adId}`;
         const e = thumbMap.get(key);
         if (e) {
           e.spend += ad.spend; e.impressions += ad.impressions; e.clicks += ad.clicks;
@@ -355,9 +356,10 @@ export async function GET(req: NextRequest) {
           pageBreakdown: [...a.pageMetrics.values()],
         }))
         .sort((a, b) => b.spend - a.spend);
-      // Group by unique creative (thumbnail image pathname) so each entry = 1 visual creative
-      // This ensures thumbnail, metrics, and page breakdown all match correctly
-      const globalThumbKey = (url: string): string => {
+      // Group by unique creative (imageHash or pathname) so each entry = 1 visual creative
+      // Use imageHash from Meta API when available for cross-page dedup
+      const globalThumbKey = (url: string, hash?: string): string => {
+        if (hash) return `hash:${hash}`;
         if (!url) return "";
         try { return new URL(url).pathname; } catch { return url; }
       };
@@ -381,8 +383,8 @@ export async function GET(req: NextRequest) {
 
       for (const ad of globalAdRows) {
         const resolvedThumb = globalBestThumb.get(ad.adId) || "";
-        // Group by thumbnail image pathname — each unique image = 1 entry
-        const key = resolvedThumb ? globalThumbKey(resolvedThumb) : `no-thumb-${ad.adId}`;
+        // Group by imageHash (from Meta API) or thumbnail pathname — each unique image = 1 entry
+        const key = resolvedThumb ? globalThumbKey(resolvedThumb, ad.imageHash || undefined) : `no-thumb-${ad.adId}`;
         const pn = pageNameMap.get(ad.pageId) ?? ad.pageId;
         const e = gThumbMap.get(key);
         const isActive = ad.status === "active" ? 1 : 0;

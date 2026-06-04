@@ -185,16 +185,17 @@ async function bulkUpsertContentDaily(rows: any[]) {
   for (let i = 0; i < rows.length; i += BATCH) {
     const batch = rows.slice(i, i + BATCH);
     const values = batch.map(r =>
-      `(${escSql(r.adId)},${escSql(r.date)},${escSql(r.campaignId)},${escSql(r.adAccountId)},${escSql(r.pageId)},${escSql(r.adName)},${escSql(r.campaignName)},${escSql(r.thumbnailUrl || '')},${r.spend},${r.impressions},${r.clicks},${r.inbox},${r.leads},${r.cpi},${r.likes},${r.comments},${r.shares},${r.videoViews},${r.ctr},${escSql(r.status)},NOW(),NOW())`
+      `(${escSql(r.adId)},${escSql(r.date)},${escSql(r.campaignId)},${escSql(r.adAccountId)},${escSql(r.pageId)},${escSql(r.adName)},${escSql(r.campaignName)},${escSql(r.thumbnailUrl || '')},${escSql(r.imageHash || '')},${r.spend},${r.impressions},${r.clicks},${r.inbox},${r.leads},${r.cpi},${r.likes},${r.comments},${r.shares},${r.videoViews},${r.ctr},${escSql(r.status)},NOW(),NOW())`
     ).join(",\n");
 
     await prisma.$executeRawUnsafe(`
-      INSERT INTO "AdsContentDaily" ("adId","date","campaignId","adAccountId","pageId","adName","campaignName","thumbnailUrl","spend","impressions","clicks","inbox","leads","cpi","likes","comments","shares","videoViews","ctr","status","createdAt","updatedAt")
+      INSERT INTO "AdsContentDaily" ("adId","date","campaignId","adAccountId","pageId","adName","campaignName","thumbnailUrl","imageHash","spend","impressions","clicks","inbox","leads","cpi","likes","comments","shares","videoViews","ctr","status","createdAt","updatedAt")
       VALUES ${values}
       ON CONFLICT ("adId","date") DO UPDATE SET
         "campaignId"=EXCLUDED."campaignId","adAccountId"=EXCLUDED."adAccountId","pageId"=EXCLUDED."pageId",
         "adName"=EXCLUDED."adName","campaignName"=EXCLUDED."campaignName",
         "thumbnailUrl"=CASE WHEN EXCLUDED."thumbnailUrl" != '' THEN EXCLUDED."thumbnailUrl" ELSE "AdsContentDaily"."thumbnailUrl" END,
+        "imageHash"=CASE WHEN EXCLUDED."imageHash" != '' THEN EXCLUDED."imageHash" ELSE "AdsContentDaily"."imageHash" END,
         "spend"=EXCLUDED."spend","impressions"=EXCLUDED."impressions","clicks"=EXCLUDED."clicks",
         "inbox"=EXCLUDED."inbox","leads"=EXCLUDED."leads","cpi"=EXCLUDED."cpi",
         "likes"=EXCLUDED."likes","comments"=EXCLUDED."comments","shares"=EXCLUDED."shares",
@@ -296,7 +297,7 @@ export async function GET(req: NextRequest) {
 
     // ── Step 2.5: Fetch ad creative info (thumbnails + page_id) ─────────
     // Always fetch fresh image URLs (Meta CDN URLs expire in 1-2 days)
-    const adCreativeMap = new Map<string, { thumbnailUrl: string; storyPageId: string }>();
+    const adCreativeMap = new Map<string, { thumbnailUrl: string; storyPageId: string; imageHash: string }>();
 
     // All unique ad_ids, grouped by token
     const allAdIds = [...new Set(allInsights.map(r => r.adId))];
@@ -368,17 +369,18 @@ export async function GET(req: NextRequest) {
           await Promise.allSettled(batches2.slice(c, c + CONCURRENCY).map(async (ids) => {
             try {
               const res = await fetch(
-                `${BASE}/?ids=${ids.join(",")}&fields=thumbnail_url&thumbnail_width=480&thumbnail_height=480&access_token=${token}`,
+                `${BASE}/?ids=${ids.join(",")}&fields=thumbnail_url,image_hash&thumbnail_width=480&thumbnail_height=480&access_token=${token}`,
                 { cache: "no-store" }
               );
               if (!res.ok) return;
               const json = await res.json();
               for (const [creativeId, data] of Object.entries(json) as [string, any][]) {
                 const thumbUrl = (data as any).thumbnail_url || "";
+                const imgHash = (data as any).image_hash || "";
                 const relatedAdIds = creativeIdToAdIds.get(creativeId) || [];
                 for (const adId of relatedAdIds) {
                   const info = adCreativeIds.get(adId);
-                  adCreativeMap.set(adId, { thumbnailUrl: thumbUrl, storyPageId: info?.storyPageId || "" });
+                  adCreativeMap.set(adId, { thumbnailUrl: thumbUrl, storyPageId: info?.storyPageId || "", imageHash: imgHash });
                 }
               }
             } catch { /* non-critical */ }
@@ -568,6 +570,7 @@ export async function GET(req: NextRequest) {
         campaignId: row.campaignId, adAccountId: row.accountId,
         pageId: pgId, adName: row.adName, campaignName: row.campaignName,
         thumbnailUrl: creative?.thumbnailUrl || "",
+        imageHash: creative?.imageHash || "",
         spend: row.spend, impressions: row.impressions, clicks: row.clicks,
         inbox: row.inbox, leads: row.leads, cpi: row.cpi,
         likes: row.likes, comments: row.comments, shares: row.shares,
