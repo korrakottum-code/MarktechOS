@@ -89,7 +89,6 @@ async function fetchInsightsForAccount(
       const inbox = actionValue(actions,
         "onsite_conversion.messaging_conversation_started_7d",
         "onsite_conversion.messaging_first_reply",
-        "omni_initiated_checkout",
       );
       const leads = actionValue(actions,
         "lead", "onsite_conversion.lead_grouped",

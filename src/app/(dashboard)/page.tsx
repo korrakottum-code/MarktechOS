@@ -132,13 +132,9 @@ function useAdsData(since: string, until: string) {
 
 // ─── Format helpers ────────────────────────────────────────────────────────────
 function thb(n: number) {
-  if (n >= 1_000_000) return `฿${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000)     return `฿${(n / 1_000).toFixed(1)}K`;
-  return `฿${n.toLocaleString("th-TH", { maximumFractionDigits: 0 })}`;
+  return `฿${n.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 function num(n: number) {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000)     return `${(n / 1_000).toFixed(1)}K`;
   return n.toLocaleString("th-TH");
 }
 function pct(n: number) { return `${n.toFixed(1)}%`; }
