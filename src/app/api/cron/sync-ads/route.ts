@@ -562,22 +562,40 @@ export async function GET(req: NextRequest) {
     console.log(`📝 Upserted ${campaignRows.length} campaign rows (bulk)`);
 
     // ── Step 7: Bulk upsert ad-level (AdsContentDaily) ──────────────────
-    const adRows = allInsights.map(row => {
+    // Deduplicate by (adId, date) — merge metrics for same ad on same day
+    const adRowMap = new Map<string, any>();
+    for (const row of allInsights) {
+      const key = `${row.adId}|${row.date}`;
       const pgId = pgIdMap[row.campaignId] ?? "";
       const creative = adCreativeMap.get(row.adId);
-      return {
-        adId: row.adId, date: row.date,
-        campaignId: row.campaignId, adAccountId: row.accountId,
-        pageId: pgId, adName: row.adName, campaignName: row.campaignName,
-        thumbnailUrl: creative?.thumbnailUrl || "",
-        imageHash: creative?.imageHash || "",
-        spend: row.spend, impressions: row.impressions, clicks: row.clicks,
-        inbox: row.inbox, leads: row.leads, cpi: row.cpi,
-        likes: row.likes, comments: row.comments, shares: row.shares,
-        videoViews: row.videoViews, ctr: row.ctr,
-        status: "active",
-      };
-    });
+      const existing = adRowMap.get(key);
+      if (existing) {
+        existing.spend += row.spend; existing.impressions += row.impressions;
+        existing.clicks += row.clicks; existing.inbox += row.inbox;
+        existing.leads += row.leads; existing.likes += row.likes;
+        existing.comments += row.comments; existing.shares += row.shares;
+        existing.videoViews += row.videoViews;
+        existing.cpi = existing.inbox > 0 ? existing.spend / existing.inbox : 0;
+        existing.ctr = existing.impressions > 0 ? (existing.clicks / existing.impressions) * 100 : 0;
+        if (!existing.pageId && pgId) existing.pageId = pgId;
+        if (!existing.thumbnailUrl && creative?.thumbnailUrl) existing.thumbnailUrl = creative.thumbnailUrl;
+        if (!existing.imageHash && creative?.imageHash) existing.imageHash = creative.imageHash;
+      } else {
+        adRowMap.set(key, {
+          adId: row.adId, date: row.date,
+          campaignId: row.campaignId, adAccountId: row.accountId,
+          pageId: pgId, adName: row.adName, campaignName: row.campaignName,
+          thumbnailUrl: creative?.thumbnailUrl || "",
+          imageHash: creative?.imageHash || "",
+          spend: row.spend, impressions: row.impressions, clicks: row.clicks,
+          inbox: row.inbox, leads: row.leads, cpi: row.cpi,
+          likes: row.likes, comments: row.comments, shares: row.shares,
+          videoViews: row.videoViews, ctr: row.ctr,
+          status: "active",
+        });
+      }
+    }
+    const adRows = [...adRowMap.values()];
 
     await bulkUpsertContentDaily(adRows);
     console.log(`📝 Upserted ${adRows.length} ad rows (bulk)`);
