@@ -14,6 +14,7 @@ import html2canvas from "html2canvas-pro";
 import { jsPDF } from "jspdf";
 import { useAuthSession } from "@/lib/use-auth-session";
 import { isClientRole } from "@/lib/auth/permissions";
+import { useExcludedPages } from "@/lib/use-excluded-pages";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function toISO(d: Date) { 
@@ -242,11 +243,45 @@ function FacebookAdsDashboard() {
   const [since, setSince] = useState(() => searchParams.get("since") || today);
   const [until, setUntil] = useState(() => searchParams.get("until") || today);
 
-  const { metrics: raw, meta, globalAdContent: _globalAdContent, globalAdByContent: _globalAdByContent, loading, error, reload, isStale } = useAdsData(since, until);
+  const { metrics: _rawAll, meta, globalAdContent: _globalAdContentAll, globalAdByContent: _globalAdByContentAll, loading, error, reload, isStale } = useAdsData(since, until);
 
   // ── Auth: check if current user is a client (hide sync, admin features) ────
   const { user: authUser } = useAuthSession();
   const isClient = authUser ? isClientRole(authUser.role) : false;
+
+  // ── Exclude filter: remove hidden pages from all data sources ─────────────
+  const { excludedPages } = useExcludedPages();
+
+  const raw = useMemo(() => {
+    if (excludedPages.size === 0) return _rawAll;
+    return _rawAll.filter(m => !excludedPages.has(m.pageId));
+  }, [_rawAll, excludedPages]);
+
+  // Helper to filter pageBreakdown from global ad items and recalculate metrics
+  const filterExcludedFromGlobal = useCallback((items: GlobalAdItem[]): GlobalAdItem[] => {
+    if (excludedPages.size === 0) return items;
+    return items.map(svc => {
+      if (!svc.pageBreakdown) return svc;
+      const filteredPB = svc.pageBreakdown.filter(pb => !excludedPages.has(pb.pageId));
+      if (filteredPB.length === 0) return null;
+      const totalInbox = filteredPB.reduce((s, p) => s + p.inbox, 0);
+      const totalSpend = filteredPB.reduce((s, p) => s + p.spend, 0);
+      return {
+        ...svc,
+        pageBreakdown: filteredPB,
+        spend: totalSpend,
+        inbox: totalInbox,
+        leads: filteredPB.reduce((s, p) => s + p.leads, 0),
+        impressions: filteredPB.reduce((s: number, p: any) => s + (p.impressions || 0), 0),
+        clicks: filteredPB.reduce((s: number, p: any) => s + (p.clicks || 0), 0),
+        cpi: totalInbox > 0 ? totalSpend / totalInbox : 0,
+        pageCount: filteredPB.length,
+      };
+    }).filter(Boolean) as GlobalAdItem[];
+  }, [excludedPages]);
+
+  const _globalAdContent = useMemo(() => filterExcludedFromGlobal(_globalAdContentAll), [_globalAdContentAll, filterExcludedFromGlobal]);
+  const _globalAdByContent = useMemo(() => filterExcludedFromGlobal(_globalAdByContentAll), [_globalAdByContentAll, filterExcludedFromGlobal]);
 
   const [search, setSearch]   = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("spend");

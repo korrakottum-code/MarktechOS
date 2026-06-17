@@ -3,9 +3,10 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams, useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, X, LayoutDashboard, Monitor, Search, CheckSquare, Square, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, LayoutDashboard, Search, CheckSquare, Users, EyeOff, Eye } from "lucide-react";
 import { useAuthSession } from "@/lib/use-auth-session";
 import { canAccessPath, isClientRole } from "@/lib/auth/permissions";
+import { useExcludedPages } from "@/lib/use-excluded-pages";
 
 interface PageData {
   pageId: string;
@@ -30,6 +31,10 @@ export default function Sidebar({
   const { user } = useAuthSession();
   const [pages, setPages] = useState<PageData[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const { excludedPages, excludedCount, toggleExclude, clearExcluded, isExcluded } = useExcludedPages();
+
+  // Show/hide excluded pages section
+  const [showExcluded, setShowExcluded] = useState(false);
 
   const urlPages = searchParams.get("pages");
   const selectedPages = new Set(urlPages ? urlPages.split(",") : []);
@@ -96,7 +101,17 @@ export default function Sidebar({
     router.replace(`/?${params.toString()}`, { scroll: false });
   }
 
-  const filteredPages = pages.filter(p => p.pageName.toLowerCase().includes(searchQuery.toLowerCase()));
+  // Filter by search AND exclude hidden pages from the main list
+  const filteredPages = pages.filter(p => {
+    if (!p.pageName.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    if (isExcluded(p.pageId)) return false;
+    return true;
+  });
+
+  // Pages that are currently excluded (for the excluded list)
+  const excludedPagesList = pages.filter(p => 
+    isExcluded(p.pageId) && p.pageName.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <aside
@@ -210,24 +225,108 @@ export default function Sidebar({
                 const showLabel = !collapsed || mobileOpen;
 
                 return (
-                  <button
+                  <div
                     key={page.pageId}
-                    onClick={() => togglePage(page.pageId)}
-                    className={`w-full group flex items-center gap-3 rounded-lg px-2 py-2 text-sm transition-all duration-200 ${
+                    className={`w-full group flex items-center gap-2 rounded-lg px-2 py-2 text-sm transition-all duration-200 ${
                       !showLabel ? "justify-center" : ""
                     } hover:bg-navy-800 ${isSelected ? "text-foreground" : "text-foreground-muted"}`}
-                    title={page.pageName}
                   >
-                    <div className={`shrink-0 flex items-center justify-center w-5 h-5 rounded border ${isSelected ? "bg-gold-500 border-gold-500 text-navy-950" : "border-border bg-navy-900 group-hover:border-gold-500/50"}`}>
-                      {isSelected && <CheckSquare size={14} className="hidden" />}
-                      {isSelected ? <CheckSquare size={16} className="absolute" /> : null}
-                    </div>
-                    {showLabel && <span className="truncate text-left text-xs">{page.pageName}</span>}
-                  </button>
+                    {/* Select checkbox */}
+                    <button
+                      onClick={() => togglePage(page.pageId)}
+                      className="shrink-0 flex items-center justify-center"
+                      title={`เลือก ${page.pageName}`}
+                    >
+                      <div className={`flex items-center justify-center w-5 h-5 rounded border ${isSelected ? "bg-gold-500 border-gold-500 text-navy-950" : "border-border bg-navy-900 group-hover:border-gold-500/50"}`}>
+                        {isSelected && <CheckSquare size={16} className="absolute" />}
+                      </div>
+                    </button>
+                    
+                    {/* Page name */}
+                    {showLabel && (
+                      <button 
+                        onClick={() => togglePage(page.pageId)}
+                        className="truncate text-left text-xs flex-1"
+                        title={page.pageName}
+                      >
+                        {page.pageName}
+                      </button>
+                    )}
+                    
+                    {/* Exclude button */}
+                    {showLabel && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleExclude(page.pageId);
+                        }}
+                        className="shrink-0 opacity-0 group-hover:opacity-100 p-1 rounded-md hover:bg-red-500/20 text-foreground-muted hover:text-red-400 transition-all"
+                        title={`ซ่อน ${page.pageName}`}
+                      >
+                        <EyeOff size={12} />
+                      </button>
+                    )}
+                  </div>
                 );
               })}
               {filteredPages.length === 0 && (!collapsed || mobileOpen) && (
                 <div className="text-center py-4 text-xs text-foreground-muted">ไม่พบข้อมูล</div>
+              )}
+
+              {/* Excluded Pages Section */}
+              {excludedCount > 0 && (!collapsed || mobileOpen) && (
+                <div className="mt-3 pt-3 border-t border-white/5">
+                  <div 
+                    onClick={() => setShowExcluded(!showExcluded)}
+                    className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-navy-800 transition-colors cursor-pointer"
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <div className="flex items-center gap-2">
+                      <EyeOff size={12} className="text-red-400/70" />
+                      <span className="text-[10px] font-bold text-red-400/70 uppercase tracking-wide">
+                        ซ่อนอยู่ ({excludedCount})
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          clearExcluded();
+                        }}
+                        className="text-[10px] text-red-400/60 hover:text-red-300 px-1 cursor-pointer"
+                        role="button"
+                        tabIndex={0}
+                      >
+                        เลิกซ่อนทั้งหมด
+                      </span>
+                      <ChevronRight size={12} className={`text-foreground-muted transition-transform ${showExcluded ? 'rotate-90' : ''}`} />
+                    </div>
+                  </div>
+                  
+                  {showExcluded && (
+                    <div className="mt-1 space-y-0.5 animate-fade-in">
+                      {excludedPagesList.map((page) => (
+                        <div
+                          key={page.pageId}
+                          className="w-full group flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-all duration-200 hover:bg-navy-800 text-foreground-muted/50"
+                        >
+                          <EyeOff size={12} className="text-red-400/40 shrink-0" />
+                          <span className="truncate text-left text-xs flex-1 line-through decoration-red-400/30" title={page.pageName}>
+                            {page.pageName}
+                          </span>
+                          <button
+                            onClick={() => toggleExclude(page.pageId)}
+                            className="shrink-0 opacity-0 group-hover:opacity-100 p-1 rounded-md hover:bg-emerald-500/20 text-foreground-muted hover:text-emerald-400 transition-all"
+                            title={`เลิกซ่อน ${page.pageName}`}
+                          >
+                            <Eye size={12} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </div>
