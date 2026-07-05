@@ -157,21 +157,33 @@ async function fetchInsightsForAccount(
 // ── Scrape page name from Facebook mobile (fallback when API fails) ─────────
 async function scrapePageName(pageId: string): Promise<string | null> {
   try {
-    const res = await fetch(`https://www.facebook.com/${pageId}`, {
+    const res = await fetch(`https://m.facebook.com/${pageId}`, {
       headers: {
-        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1",
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
       },
       redirect: "follow",
       cache: "no-store",
     });
     if (!res.ok) return null;
     const html = await res.text();
-    const match = html.match(/<title>([^<]+)<\/title>/);
+    // Try og:title first (more reliable), then <title>
+    const match = html.match(/property="og:title"\s+content="([^"]+)"/)
+      || html.match(/content="([^"]+)"\s+property="og:title"/)
+      || html.match(/<title>([^<]+)<\/title>/);
     if (!match) return null;
     let name = match[1].trim()
-      .replace(/&#039;/g, "'").replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"');
-    if (name === "Facebook" || name === "Log in to Facebook" || name === "เกิดข้อผิดพลาด" || !name) return null;
+      // Decode HTML entities: named, hex (&#xHH;), and decimal (&#DDD;)
+      .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+      .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec)))
+      .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"').replace(/&#039;/g, "'");
+    // Reject known Facebook login/error page titles
+    const invalidNames = [
+      "facebook", "log in to facebook", "log into facebook",
+      "เข้าสู่ระบบ facebook", "เกิดข้อผิดพลาด", "page not found",
+      "content not found", "ลงชื่อเข้าใช้ facebook",
+    ];
+    if (!name || invalidNames.includes(name.toLowerCase())) return null;
     // Remove " | City" suffix only (keep the rest of the name)
     name = name.replace(/\s*\|\s*[^|]+$/, "").trim();
     return name || null;
@@ -265,8 +277,25 @@ export async function GET(req: NextRequest) {
 
     const allPageNames = await prisma.pageNameCache.findMany();
     const pageNameMap = new Map<string, string>();
-    for (const p of allPageNames) pageNameMap.set(p.pageId, p.pageName);
-    console.log(`📦 Loaded ${allPageNames.length} cached page names`);
+    // Clean up invalid page names that were scraped from login/error pages
+    const invalidPageNames = [
+      "facebook", "log in to facebook", "log into facebook",
+      "เข้าสู่ระบบ facebook", "เกิดข้อผิดพลาด", "page not found",
+      "content not found", "ลงชื่อเข้าใช้ facebook",
+    ];
+    const invalidCacheIds: string[] = [];
+    for (const p of allPageNames) {
+      if (invalidPageNames.includes(p.pageName.toLowerCase())) {
+        invalidCacheIds.push(p.pageId);
+      } else {
+        pageNameMap.set(p.pageId, p.pageName);
+      }
+    }
+    if (invalidCacheIds.length > 0) {
+      await prisma.pageNameCache.deleteMany({ where: { pageId: { in: invalidCacheIds } } });
+      console.log(`🧹 Cleaned ${invalidCacheIds.length} invalid page names from cache: ${invalidCacheIds.join(", ")}`);
+    }
+    console.log(`📦 Loaded ${pageNameMap.size} cached page names`);
 
     // ── Step 1: Get all ad accounts from ALL tokens ─────────────────────
     // Each token may have different ad accounts — deduplicate by account_id
@@ -608,6 +637,76 @@ export async function GET(req: NextRequest) {
       );
       const scraped = scrapeResults.filter(r => r.status === "fulfilled" && r.value).length;
       console.log(`📛 Scraped ${scraped}/${stillUnknown.length} page names`);
+    }
+
+    // ── Step 4.6: Ad preview fallback for deleted/restricted pages ────────
+    // Pages that can't be resolved via API or scrape may be deleted/unpublished.
+    // Their names can still be extracted from ad preview iframes.
+    const previewUnknown = uniquePageIds.filter(id => !pageNameMap.has(id));
+    if (previewUnknown.length > 0) {
+      console.log(`🎬 Trying ad preview fallback for ${previewUnknown.length} pages...`);
+      // Build pageId → adAccountId map from allInsights
+      const pageToAccount = new Map<string, string>();
+      for (const row of allInsights) {
+        const pid = pgIdMap[row.campaignId];
+        if (pid && !pageToAccount.has(pid)) {
+          pageToAccount.set(pid, row.accountId);
+        }
+      }
+
+      for (const pid of previewUnknown.slice(0, 5)) {
+        const accountId = pageToAccount.get(pid);
+        if (!accountId) continue;
+        try {
+          // Get one ad from the account
+          const adsRes = await fetch(
+            `${BASE}/act_${accountId}/ads?fields=id&limit=1&access_token=${tokens[0]}`,
+            { cache: "no-store" }
+          );
+          if (!adsRes.ok) continue;
+          const adsData = await adsRes.json();
+          const adId = adsData.data?.[0]?.id;
+          if (!adId) continue;
+
+          // Get ad preview iframe
+          const prevRes = await fetch(
+            `${BASE}/${adId}/previews?ad_format=MOBILE_FEED_STANDARD&access_token=${tokens[0]}`,
+            { cache: "no-store" }
+          );
+          if (!prevRes.ok) continue;
+          const prevData = await prevRes.json();
+          const iframeSrc = prevData.data?.[0]?.body?.match(/src="([^"]+)"/)?.[1]?.replace(/&amp;/g, "&");
+          if (!iframeSrc) continue;
+
+          // Fetch iframe content and extract page name
+          const iframeRes = await fetch(iframeSrc, {
+            headers: { "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)" },
+          });
+          if (!iframeRes.ok) continue;
+          const html = await iframeRes.text();
+          const nameMatch = html.match(/<strong[^>]*class="[^"]*"[^>]*>([^<]+)<\/strong>/);
+          if (nameMatch) {
+            let name = nameMatch[1].trim()
+              .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)))
+              .replace(/&#(\d+);/g, (_, dec: string) => String.fromCharCode(parseInt(dec)))
+              .replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#039;/g, "'");
+            if (name && name.length > 2) {
+              pageNameMap.set(pid, name);
+              try {
+                await prisma.$executeRawUnsafe(
+                  `INSERT INTO "PageNameCache" ("pageId","pageName","source","createdAt","updatedAt")
+                   VALUES ($1,$2,'preview',NOW(),NOW())
+                   ON CONFLICT ("pageId") DO UPDATE SET "pageName"=$2,"source"='preview',"updatedAt"=NOW()`,
+                  pid, name
+                );
+              } catch { /* non-critical */ }
+              console.log(`  ✅ ${pid} → ${name} (via ad preview)`);
+            }
+          }
+        } catch { /* non-critical */ }
+      }
+      const previewResolved = previewUnknown.filter(id => pageNameMap.has(id)).length;
+      console.log(`📛 Preview resolved ${previewResolved}/${previewUnknown.length} page names`);
     }
 
     // ── Step 5: Aggregate campaign-level data from ad insights ───────────
