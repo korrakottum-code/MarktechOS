@@ -157,20 +157,26 @@ async function fetchInsightsForAccount(
 // ── Scrape page name from Facebook mobile (fallback when API fails) ─────────
 async function scrapePageName(pageId: string): Promise<string | null> {
   try {
-    const res = await fetch(`https://www.facebook.com/${pageId}`, {
+    const res = await fetch(`https://m.facebook.com/${pageId}`, {
       headers: {
-        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1",
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
       },
       redirect: "follow",
       cache: "no-store",
     });
     if (!res.ok) return null;
     const html = await res.text();
-    const match = html.match(/<title>([^<]+)<\/title>/);
+    // Try og:title first (more reliable), then <title>
+    const match = html.match(/property="og:title"\s+content="([^"]+)"/)
+      || html.match(/content="([^"]+)"\s+property="og:title"/)
+      || html.match(/<title>([^<]+)<\/title>/);
     if (!match) return null;
     let name = match[1].trim()
-      .replace(/&#039;/g, "'").replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"');
+      // Decode HTML entities: named, hex (&#xHH;), and decimal (&#DDD;)
+      .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+      .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec)))
+      .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"').replace(/&#039;/g, "'");
     // Reject known Facebook login/error page titles
     const invalidNames = [
       "facebook", "log in to facebook", "log into facebook",
