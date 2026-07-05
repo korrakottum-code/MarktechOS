@@ -639,6 +639,76 @@ export async function GET(req: NextRequest) {
       console.log(`📛 Scraped ${scraped}/${stillUnknown.length} page names`);
     }
 
+    // ── Step 4.6: Ad preview fallback for deleted/restricted pages ────────
+    // Pages that can't be resolved via API or scrape may be deleted/unpublished.
+    // Their names can still be extracted from ad preview iframes.
+    const previewUnknown = uniquePageIds.filter(id => !pageNameMap.has(id));
+    if (previewUnknown.length > 0) {
+      console.log(`🎬 Trying ad preview fallback for ${previewUnknown.length} pages...`);
+      // Build pageId → adAccountId map from allInsights
+      const pageToAccount = new Map<string, string>();
+      for (const row of allInsights) {
+        const pid = pgIdMap[row.campaignId];
+        if (pid && !pageToAccount.has(pid)) {
+          pageToAccount.set(pid, row.accountId);
+        }
+      }
+
+      for (const pid of previewUnknown.slice(0, 5)) {
+        const accountId = pageToAccount.get(pid);
+        if (!accountId) continue;
+        try {
+          // Get one ad from the account
+          const adsRes = await fetch(
+            `${BASE}/act_${accountId}/ads?fields=id&limit=1&access_token=${tokens[0]}`,
+            { cache: "no-store" }
+          );
+          if (!adsRes.ok) continue;
+          const adsData = await adsRes.json();
+          const adId = adsData.data?.[0]?.id;
+          if (!adId) continue;
+
+          // Get ad preview iframe
+          const prevRes = await fetch(
+            `${BASE}/${adId}/previews?ad_format=MOBILE_FEED_STANDARD&access_token=${tokens[0]}`,
+            { cache: "no-store" }
+          );
+          if (!prevRes.ok) continue;
+          const prevData = await prevRes.json();
+          const iframeSrc = prevData.data?.[0]?.body?.match(/src="([^"]+)"/)?.[1]?.replace(/&amp;/g, "&");
+          if (!iframeSrc) continue;
+
+          // Fetch iframe content and extract page name
+          const iframeRes = await fetch(iframeSrc, {
+            headers: { "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)" },
+          });
+          if (!iframeRes.ok) continue;
+          const html = await iframeRes.text();
+          const nameMatch = html.match(/<strong[^>]*class="[^"]*"[^>]*>([^<]+)<\/strong>/);
+          if (nameMatch) {
+            let name = nameMatch[1].trim()
+              .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)))
+              .replace(/&#(\d+);/g, (_, dec: string) => String.fromCharCode(parseInt(dec)))
+              .replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#039;/g, "'");
+            if (name && name.length > 2) {
+              pageNameMap.set(pid, name);
+              try {
+                await prisma.$executeRawUnsafe(
+                  `INSERT INTO "PageNameCache" ("pageId","pageName","source","createdAt","updatedAt")
+                   VALUES ($1,$2,'preview',NOW(),NOW())
+                   ON CONFLICT ("pageId") DO UPDATE SET "pageName"=$2,"source"='preview',"updatedAt"=NOW()`,
+                  pid, name
+                );
+              } catch { /* non-critical */ }
+              console.log(`  ✅ ${pid} → ${name} (via ad preview)`);
+            }
+          }
+        } catch { /* non-critical */ }
+      }
+      const previewResolved = previewUnknown.filter(id => pageNameMap.has(id)).length;
+      console.log(`📛 Preview resolved ${previewResolved}/${previewUnknown.length} page names`);
+    }
+
     // ── Step 5: Aggregate campaign-level data from ad insights ───────────
     type CampaignKey = string;
     const campaignAgg = new Map<CampaignKey, {
