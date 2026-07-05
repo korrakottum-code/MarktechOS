@@ -84,7 +84,7 @@ export async function GET(req: NextRequest) {
     }
 
     // ── Recalculate derived metrics ───────────────────────────────────────
-    const adsMetrics = [...campaignMap.values()].map(m => ({
+    const adsMetricsRaw = [...campaignMap.values()].map(m => ({
       id:          m.campaignId,
       clinic:      m.clinic,
       pageName:    m.pageName,
@@ -103,6 +103,47 @@ export async function GET(req: NextRequest) {
       creative:    "",
       status:      m.status as "active" | "paused" | "ended",
     }));
+
+    // ── Fill missing page names from PageNameCache ────────────────────────
+    // Many rows may have empty pageName or pageName = clinic (ad account name).
+    // Look up real names from PageNameCache to ensure proper display.
+    const INVALID_PAGE_NAMES = new Set([
+      "facebook", "log in to facebook", "log into facebook",
+      "เข้าสู่ระบบ facebook", "เกิดข้อผิดพลาด", "page not found",
+      "content not found", "ลงชื่อเข้าใช้ facebook",
+    ]);
+    const isInvalidPageName = (n: string) => !n || INVALID_PAGE_NAMES.has(n.toLowerCase());
+
+    const pageIdsNeedingName = new Set<string>();
+    for (const m of adsMetricsRaw) {
+      if (m.pageId && (!m.pageName || m.pageName === m.clinic || m.pageName === m.pageId || isInvalidPageName(m.pageName))) {
+        pageIdsNeedingName.add(m.pageId);
+      }
+    }
+
+    let pageNameLookup = new Map<string, string>();
+    if (pageIdsNeedingName.size > 0) {
+      const cached = await prisma.pageNameCache.findMany({
+        where: { pageId: { in: [...pageIdsNeedingName] } },
+      });
+      for (const c of cached) {
+        if (c.pageName && !isInvalidPageName(c.pageName)) {
+          pageNameLookup.set(c.pageId, c.pageName);
+        }
+      }
+    }
+
+    const adsMetrics = adsMetricsRaw.map(m => {
+      // Use cached name if available
+      if (m.pageId && pageNameLookup.has(m.pageId)) {
+        return { ...m, pageName: pageNameLookup.get(m.pageId)! };
+      }
+      // Clear invalid page names so frontend falls back to pageId
+      if (isInvalidPageName(m.pageName)) {
+        return { ...m, pageName: "" };
+      }
+      return m;
+    });
 
     // ── Data availability metadata ───────────────────────────────────────
     let dataMinDate = "";
@@ -301,14 +342,14 @@ export async function GET(req: NextRequest) {
       // Build pageId → pageName map from adsMetrics + PageNameCache
       const pageNameMap = new Map<string, string>();
       for (const m of adsMetrics) {
-        if (m.pageId && m.pageName && m.pageName !== m.pageId) {
+        if (m.pageId && m.pageName && m.pageName !== m.pageId && !isInvalidPageName(m.pageName)) {
           pageNameMap.set(m.pageId, m.pageName);
         }
       }
       // Also pull from PageNameCache for any pageIds not in metrics
       const cachedNames = await prisma.pageNameCache.findMany();
       for (const c of cachedNames) {
-        if (!pageNameMap.has(c.pageId) && c.pageName) {
+        if (!pageNameMap.has(c.pageId) && c.pageName && !isInvalidPageName(c.pageName)) {
           pageNameMap.set(c.pageId, c.pageName);
         }
       }

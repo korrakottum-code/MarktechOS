@@ -171,7 +171,13 @@ async function scrapePageName(pageId: string): Promise<string | null> {
     let name = match[1].trim()
       .replace(/&#039;/g, "'").replace(/&amp;/g, "&")
       .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"');
-    if (name === "Facebook" || name === "Log in to Facebook" || name === "เกิดข้อผิดพลาด" || !name) return null;
+    // Reject known Facebook login/error page titles
+    const invalidNames = [
+      "facebook", "log in to facebook", "log into facebook",
+      "เข้าสู่ระบบ facebook", "เกิดข้อผิดพลาด", "page not found",
+      "content not found", "ลงชื่อเข้าใช้ facebook",
+    ];
+    if (!name || invalidNames.includes(name.toLowerCase())) return null;
     // Remove " | City" suffix only (keep the rest of the name)
     name = name.replace(/\s*\|\s*[^|]+$/, "").trim();
     return name || null;
@@ -265,8 +271,25 @@ export async function GET(req: NextRequest) {
 
     const allPageNames = await prisma.pageNameCache.findMany();
     const pageNameMap = new Map<string, string>();
-    for (const p of allPageNames) pageNameMap.set(p.pageId, p.pageName);
-    console.log(`📦 Loaded ${allPageNames.length} cached page names`);
+    // Clean up invalid page names that were scraped from login/error pages
+    const invalidPageNames = [
+      "facebook", "log in to facebook", "log into facebook",
+      "เข้าสู่ระบบ facebook", "เกิดข้อผิดพลาด", "page not found",
+      "content not found", "ลงชื่อเข้าใช้ facebook",
+    ];
+    const invalidCacheIds: string[] = [];
+    for (const p of allPageNames) {
+      if (invalidPageNames.includes(p.pageName.toLowerCase())) {
+        invalidCacheIds.push(p.pageId);
+      } else {
+        pageNameMap.set(p.pageId, p.pageName);
+      }
+    }
+    if (invalidCacheIds.length > 0) {
+      await prisma.pageNameCache.deleteMany({ where: { pageId: { in: invalidCacheIds } } });
+      console.log(`🧹 Cleaned ${invalidCacheIds.length} invalid page names from cache: ${invalidCacheIds.join(", ")}`);
+    }
+    console.log(`📦 Loaded ${pageNameMap.size} cached page names`);
 
     // ── Step 1: Get all ad accounts from ALL tokens ─────────────────────
     // Each token may have different ad accounts — deduplicate by account_id
