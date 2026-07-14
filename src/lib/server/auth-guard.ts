@@ -31,10 +31,10 @@ export async function requireSession(
     };
   }
 
-  // Hardcoded CEO privilege for the primary admin email
+  // Hardcoded administrator privilege for the primary owner email
   let role: UserRole = "am"; // Default role
   if (user.email === "korrakottum@gmail.com") {
-    role = "ceo";
+    role = "admin";
   } else {
     // In a real app, you'd fetch this from your 'Admin' table in Prisma
     // For now, we'll use the metadata or default to AM

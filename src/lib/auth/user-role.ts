@@ -6,7 +6,7 @@ export function getRoleFromSupabaseUser(user: User): UserRole {
   // Keep the primary owner override consistent with the server auth guard.
   // This account may predate app_metadata roles and must not be downgraded to
   // a client simply because its metadata is incomplete.
-  if (user.email === "korrakottum@gmail.com") return "ceo";
+  if (user.email === "korrakottum@gmail.com") return "admin";
 
   const appMetaRole = parseUserRole(
     typeof user.app_metadata?.role === "string" ? user.app_metadata.role : undefined
