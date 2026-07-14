@@ -3,6 +3,7 @@ import { prisma } from "@/lib/server/prisma";
 import { Prisma } from "@prisma/client";
 import { createHash } from "crypto";
 import sharp from "sharp";
+import { createClient } from "@/utils/supabase/server";
 
 // Compute perceptual hash (dHash 16x16) from image buffer
 // dHash compares adjacent pixel brightness — much better than aHash for similar-color images
@@ -34,6 +35,9 @@ async function computePHashFromBuffer(buffer: Buffer): Promise<string | null> {
 
 const API_VERSION = "v20.0";
 const BASE = `https://graph.facebook.com/${API_VERSION}`;
+const META_TIMEOUT_MS = 30_000;
+const META_RETRY_ATTEMPTS = 3;
+const SYNC_LEASE_MS = 6 * 60 * 1000;
 
 // Allow up to 5 minutes for heavy sync (Vercel Pro)
 export const maxDuration = 300;
@@ -44,8 +48,59 @@ function getTokens(): string[] {
   if (t1) tokens.push(t1);
   const t2 = process.env.META_SYSTEM_USER_TOKEN_2;
   if (t2) tokens.push(t2);
+  const t3 = process.env.META_SYSTEM_USER_TOKEN_3;
+  if (t3) tokens.push(t3);
   if (tokens.length === 0) throw new Error("META_SYSTEM_USER_TOKEN ยังไม่ได้ตั้งค่าใน .env.local");
   return tokens;
+}
+
+async function requireSyncAuthorization(req: NextRequest): Promise<NextResponse | null> {
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret && req.headers.get("authorization") === `Bearer ${cronSecret}`) return null;
+
+  const supabase = await createClient();
+  const { data: { user }, error } = await supabase.auth.getUser();
+  const role = user?.app_metadata?.role;
+  if (!error && user && (user.email === "korrakottum@gmail.com" || role === "ceo" || role === "admin")) return null;
+
+  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+}
+
+async function fetchMeta(url: string): Promise<Response> {
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt < META_RETRY_ATTEMPTS; attempt++) {
+    try {
+      const res = await fetch(url, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(META_TIMEOUT_MS),
+      });
+      if (res.ok || (res.status < 500 && res.status !== 429)) return res;
+      lastError = new Error(`Meta HTTP ${res.status}`);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error("Meta request failed");
+    }
+    await new Promise(resolve => setTimeout(resolve, 500 * 2 ** attempt));
+  }
+  throw lastError ?? new Error("Meta request failed");
+}
+
+function normalizedStatus(status: unknown): "active" | "paused" | "ended" | "unknown" {
+  switch (String(status || "").toUpperCase()) {
+    case "ACTIVE": return "active";
+    case "PAUSED": return "paused";
+    case "DELETED":
+    case "ARCHIVED":
+    case "COMPLETED":
+    case "ENDED": return "ended";
+    default: return "unknown";
+  }
+}
+
+function aggregateStatus(statuses: Set<string>): "active" | "paused" | "ended" | "unknown" {
+  if (statuses.has("active")) return "active";
+  if (statuses.has("paused")) return "paused";
+  if (statuses.has("ended")) return "ended";
+  return "unknown";
 }
 
 function actionValue(actions: any[], ...types: string[]): number {
@@ -78,6 +133,7 @@ interface AccountInsight {
   shares: number;
   videoViews: number;
   date: string;
+  status: "active" | "paused" | "ended" | "unknown";
 }
 
 async function fetchInsightsForAccount(
@@ -93,18 +149,14 @@ async function fetchInsightsForAccount(
 
   const insights: AccountInsight[] = [];
   let nextUrl: string | null = url;
-  let pages = 0;
-
-  while (nextUrl && pages < 10) {
-    const res: Response = await fetch(nextUrl, { cache: "no-store" });
+  while (nextUrl) {
+    const res = await fetchMeta(nextUrl);
     if (!res.ok) {
-      console.warn(`⚠️ ${accountName}: HTTP ${res.status}`);
-      break;
+      throw new Error(`${accountName}: Meta HTTP ${res.status}`);
     }
     const data = await res.json();
     if (data.error) {
-      console.warn(`⚠️ ${accountName}: ${data.error.message}`);
-      break;
+      throw new Error(`${accountName}: ${data.error.message ?? "Meta API error"}`);
     }
 
     for (const row of data.data || []) {
@@ -144,11 +196,13 @@ async function fetchInsightsForAccount(
         shares: actionValue(actions, "post"),
         videoViews: actionValue(actions, "video_view"),
         date: row.date_start || since,
+        // Insight rows do not include effective_status. This is filled from the
+        // ad object during the creative lookup below.
+        status: "unknown",
       });
     }
 
     nextUrl = data.paging?.next || null;
-    pages++;
   }
 
   return insights;
@@ -197,7 +251,7 @@ function escSql(v: any): string {
   return `'${String(v).replace(/'/g, "''")}'`;
 }
 
-async function bulkUpsertMetricDaily(rows: any[]) {
+async function bulkUpsertMetricDaily(rows: any[], client: Prisma.TransactionClient | typeof prisma = prisma) {
   if (rows.length === 0) return;
   const BATCH = 500;
   for (let i = 0; i < rows.length; i += BATCH) {
@@ -206,7 +260,7 @@ async function bulkUpsertMetricDaily(rows: any[]) {
       `(${escSql(c.campaignId)},${escSql(c.date)},${escSql(c.clinicName)},${escSql(c.pageName)},${escSql(c.pageId)},${escSql(c.adAccountId)},${escSql(c.campaign)},${c.spend},${c.inbox},${c.leads},${c.cpl},${c.cpi},${c.impressions},${c.clicks},${c.ctr},${escSql(c.status)},NOW(),NOW())`
     ).join(",\n");
 
-    await prisma.$executeRawUnsafe(`
+    await client.$executeRawUnsafe(`
       INSERT INTO "AdsMetricDaily" ("campaignId","date","clinicName","pageName","pageId","adAccountId","campaign","spend","inbox","leads","cpl","cpi","impressions","clicks","ctr","status","createdAt","updatedAt")
       VALUES ${values}
       ON CONFLICT ("campaignId","date") DO UPDATE SET
@@ -215,12 +269,13 @@ async function bulkUpsertMetricDaily(rows: any[]) {
         "spend"=EXCLUDED."spend","inbox"=EXCLUDED."inbox","leads"=EXCLUDED."leads",
         "cpl"=EXCLUDED."cpl","cpi"=EXCLUDED."cpi",
         "impressions"=EXCLUDED."impressions","clicks"=EXCLUDED."clicks","ctr"=EXCLUDED."ctr",
+        "status"=EXCLUDED."status",
         "updatedAt"=NOW()
     `);
   }
 }
 
-async function bulkUpsertContentDaily(rows: any[]) {
+async function bulkUpsertContentDaily(rows: any[], client: Prisma.TransactionClient | typeof prisma = prisma) {
   if (rows.length === 0) return;
   const BATCH = 500;
   for (let i = 0; i < rows.length; i += BATCH) {
@@ -229,7 +284,7 @@ async function bulkUpsertContentDaily(rows: any[]) {
       `(${escSql(r.adId)},${escSql(r.date)},${escSql(r.campaignId)},${escSql(r.adAccountId)},${escSql(r.pageId)},${escSql(r.adName)},${escSql(r.campaignName)},${escSql(r.thumbnailUrl || '')},${escSql(r.imageHash || '')},${escSql(r.perceptualHash || '')},${r.spend},${r.impressions},${r.clicks},${r.inbox},${r.leads},${r.cpi},${r.likes},${r.comments},${r.shares},${r.videoViews},${r.ctr},${escSql(r.status)},NOW(),NOW())`
     ).join(",\n");
 
-    await prisma.$executeRawUnsafe(`
+    await client.$executeRawUnsafe(`
       INSERT INTO "AdsContentDaily" ("adId","date","campaignId","adAccountId","pageId","adName","campaignName","thumbnailUrl","imageHash","perceptualHash","spend","impressions","clicks","inbox","leads","cpi","likes","comments","shares","videoViews","ctr","status","createdAt","updatedAt")
       VALUES ${values}
       ON CONFLICT ("adId","date") DO UPDATE SET
@@ -241,7 +296,7 @@ async function bulkUpsertContentDaily(rows: any[]) {
         "spend"=EXCLUDED."spend","impressions"=EXCLUDED."impressions","clicks"=EXCLUDED."clicks",
         "inbox"=EXCLUDED."inbox","leads"=EXCLUDED."leads","cpi"=EXCLUDED."cpi",
         "likes"=EXCLUDED."likes","comments"=EXCLUDED."comments","shares"=EXCLUDED."shares",
-        "videoViews"=EXCLUDED."videoViews","ctr"=EXCLUDED."ctr",
+        "videoViews"=EXCLUDED."videoViews","ctr"=EXCLUDED."ctr","status"=EXCLUDED."status",
         "updatedAt"=NOW()
     `);
   }
@@ -249,8 +304,37 @@ async function bulkUpsertContentDaily(rows: any[]) {
 
 // ── GET /api/cron/sync-ads ──────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
+  const unauthorized = await requireSyncAuthorization(req);
+  if (unauthorized) return unauthorized;
+
+  if (req.nextUrl.searchParams.get("status") === "1") {
+    const latest = await prisma.adsSyncRun.findFirst({ orderBy: { startedAt: "desc" } });
+    const activeLock = await prisma.adsSyncLock.findUnique({ where: { key: "meta-ads" } });
+    return NextResponse.json({
+      latest,
+      running: Boolean(activeLock && activeLock.lockedUntil > new Date()),
+    });
+  }
+
   const start = Date.now();
   console.log("📊 Starting Meta Ads Sync...");
+  const now = new Date();
+  const leaseUntil = new Date(now.getTime() + SYNC_LEASE_MS);
+  const lock = await prisma.$queryRaw<{ key: string }[]>(Prisma.sql`
+    INSERT INTO "AdsSyncLock" ("key", "lockedUntil", "updatedAt")
+    VALUES ('meta-ads', ${leaseUntil}, ${now})
+    ON CONFLICT ("key") DO UPDATE
+      SET "lockedUntil" = EXCLUDED."lockedUntil", "updatedAt" = EXCLUDED."updatedAt"
+      WHERE "AdsSyncLock"."lockedUntil" < ${now}
+    RETURNING "key"
+  `);
+  if (lock.length === 0) {
+    return NextResponse.json({ error: "A Meta sync is already running" }, { status: 409 });
+  }
+
+  let syncRunId: string | null = null;
+  let accountsTotal = 0;
+  let accountsFailed = 0;
 
   try {
     const tokens = getTokens();
@@ -264,6 +348,13 @@ export async function GET(req: NextRequest) {
     const threeDaysAgo = new Date(today.getTime() - 3 * 86400000);
     const since = searchParams.get("since") || toISO(threeDaysAgo);
     const until = searchParams.get("until") || toISO(today);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(since) || !/^\d{4}-\d{2}-\d{2}$/.test(until) || since > until) {
+      return NextResponse.json({ error: "Invalid date range" }, { status: 400 });
+    }
+    const rangeDays = Math.floor((Date.parse(`${until}T00:00:00Z`) - Date.parse(`${since}T00:00:00Z`)) / 86400000) + 1;
+    if (rangeDays > 31) return NextResponse.json({ error: "Sync range is limited to 31 days" }, { status: 400 });
+    const syncRun = await prisma.adsSyncRun.create({ data: { since, until, status: "running" } });
+    syncRunId = syncRun.id;
 
     console.log(`📅 ${since} → ${until}`);
 
@@ -303,29 +394,29 @@ export async function GET(req: NextRequest) {
 
     await Promise.all(tokens.map(async (token, idx) => {
       try {
-        const res = await fetch(
-          `${BASE}/me/adaccounts?fields=name,account_id,account_status&limit=100&access_token=${token}`,
-          { cache: "no-store" }
-        );
-        if (!res.ok) { console.warn(`⚠️ Token ${idx + 1}: HTTP ${res.status}`); return; }
-        const json = await res.json();
-        if (json.error) { console.warn(`⚠️ Token ${idx + 1}: ${json.error.message}`); return; }
-        for (const acc of (json.data ?? [])) {
-          if (acc.account_status === 2) continue; // skip disabled
-          if (!accountTokenMap.has(acc.account_id)) {
-            accountTokenMap.set(acc.account_id, { acc, token });
+        let nextUrl: string | null =
+          `${BASE}/me/adaccounts?fields=name,account_id,account_status&limit=100&access_token=${token}`;
+        let count = 0;
+        while (nextUrl) {
+          const res = await fetchMeta(nextUrl);
+          const json = await res.json();
+          if (json.error) throw new Error(json.error.message ?? "Meta API error");
+          for (const acc of (json.data ?? [])) {
+            if (acc.account_status === 2) continue;
+            if (!accountTokenMap.has(acc.account_id)) accountTokenMap.set(acc.account_id, { acc, token });
+            count++;
           }
+          nextUrl = json.paging?.next ?? null;
         }
-        console.log(`🔑 Token ${idx + 1}: ${(json.data ?? []).length} accounts`);
+        console.log(`🔑 Token ${idx + 1}: ${count} accounts`);
       } catch (e: any) {
-        console.warn(`⚠️ Token ${idx + 1} failed: ${e.message}`);
+        throw new Error(`Token ${idx + 1} failed: ${e.message}`);
       }
     }));
 
     const allAccountEntries = [...accountTokenMap.values()];
-    if (allAccountEntries.length === 0) {
-      return NextResponse.json({ message: "ไม่พบ Ad Account", results: [] });
-    }
+    if (allAccountEntries.length === 0) throw new Error("No accessible ad accounts found");
+    accountsTotal = allAccountEntries.length;
 
     console.log(`📋 Found ${allAccountEntries.length} unique ad accounts (from ${tokens.length} tokens)`);
 
@@ -350,13 +441,21 @@ export async function GET(req: NextRequest) {
         accountSummary.push({ name: accName, rows: 0, status: "❌", error: String(result.reason) });
       }
     }
+    const failedAccounts = accountSummary.filter(item => item.status === "❌");
+    accountsFailed = failedAccounts.length;
+    if (failedAccounts.length > 0) {
+      throw new Error(`Sync aborted: ${failedAccounts.length}/${allAccountEntries.length} account(s) failed`);
+    }
 
     const fetchElapsed = ((Date.now() - start) / 1000).toFixed(1);
     console.log(`⚡ Fetched ${allInsights.length} rows from ${allAccountEntries.length} accounts in ${fetchElapsed}s`);
 
     // ── Step 2.5: Fetch ad creative info (thumbnails + page_id) ─────────
     // Always fetch fresh image URLs (Meta CDN URLs expire in 1-2 days)
-    const adCreativeMap = new Map<string, { thumbnailUrl: string; storyPageId: string; imageHash: string }>();
+    const adCreativeMap = new Map<string, {
+      thumbnailUrl: string; storyPageId: string; imageHash: string;
+      status: "active" | "paused" | "ended" | "unknown";
+    }>();
 
     // All unique ad_ids, grouped by token
     const allAdIds = [...new Set(allInsights.map(r => r.adId))];
@@ -385,16 +484,18 @@ export async function GET(req: NextRequest) {
 
       for (const [token, adIds] of tokenGroups) {
         // Step A: Get creative IDs + story IDs from ads (nested fields ok)
-        const adCreativeIds = new Map<string, { creativeId: string; storyPageId: string }>();
+        const adCreativeIds = new Map<string, {
+          creativeId: string; storyPageId: string;
+          status: "active" | "paused" | "ended" | "unknown";
+        }>();
         const batches1: string[][] = [];
         for (let i = 0; i < adIds.length; i += BATCH_SIZE) batches1.push(adIds.slice(i, i + BATCH_SIZE));
 
         for (let c = 0; c < batches1.length; c += CONCURRENCY) {
           await Promise.allSettled(batches1.slice(c, c + CONCURRENCY).map(async (ids) => {
             try {
-              const res = await fetch(
-                `${BASE}/?ids=${ids.join(",")}&fields=creative{id,effective_object_story_id}&access_token=${token}`,
-                { cache: "no-store" }
+              const res = await fetchMeta(
+                `${BASE}/?ids=${ids.join(",")}&fields=effective_status,creative{id,effective_object_story_id}&access_token=${token}`
               );
               if (!res.ok) return;
               const json = await res.json();
@@ -406,7 +507,11 @@ export async function GET(req: NextRequest) {
                   if (parts.length >= 2 && /^\d+$/.test(parts[0])) storyPageId = parts[0];
                 }
                 if (creative.id) {
-                  adCreativeIds.set(adId, { creativeId: creative.id, storyPageId });
+                  adCreativeIds.set(adId, {
+                    creativeId: creative.id,
+                    storyPageId,
+                    status: normalizedStatus(data.effective_status),
+                  });
                 }
               }
             } catch { /* non-critical */ }
@@ -427,9 +532,8 @@ export async function GET(req: NextRequest) {
         for (let c = 0; c < batches2.length; c += CONCURRENCY) {
           await Promise.allSettled(batches2.slice(c, c + CONCURRENCY).map(async (ids) => {
             try {
-              const res = await fetch(
-                `${BASE}/?ids=${ids.join(",")}&fields=thumbnail_url,image_hash&thumbnail_width=480&thumbnail_height=480&access_token=${token}`,
-                { cache: "no-store" }
+              const res = await fetchMeta(
+                `${BASE}/?ids=${ids.join(",")}&fields=thumbnail_url,image_hash&thumbnail_width=480&thumbnail_height=480&access_token=${token}`
               );
               if (!res.ok) return;
               const json = await res.json();
@@ -439,7 +543,12 @@ export async function GET(req: NextRequest) {
                 const relatedAdIds = creativeIdToAdIds.get(creativeId) || [];
                 for (const adId of relatedAdIds) {
                   const info = adCreativeIds.get(adId);
-                  adCreativeMap.set(adId, { thumbnailUrl: thumbUrl, storyPageId: info?.storyPageId || "", imageHash: imgHash });
+                  adCreativeMap.set(adId, {
+                    thumbnailUrl: thumbUrl,
+                    storyPageId: info?.storyPageId || "",
+                    imageHash: imgHash,
+                    status: info?.status || "unknown",
+                  });
                 }
               }
             } catch { /* non-critical */ }
@@ -468,7 +577,7 @@ export async function GET(req: NextRequest) {
       for (const batch of urlBatches) {
         await Promise.allSettled(batch.map(async ([url, adIds]) => {
           try {
-            const res = await fetch(url, { cache: "no-store" });
+            const res = await fetchMeta(url);
             if (!res.ok) return;
             const buffer = await res.arrayBuffer();
             const hash = "thumb:" + createHash("sha256").update(Buffer.from(buffer)).digest("hex").slice(0, 16);
@@ -500,7 +609,7 @@ export async function GET(req: NextRequest) {
         const batch = pEntries.slice(i, i + 20);
         await Promise.allSettled(batch.map(async ([url, adIds]) => {
           try {
-            const res = await fetch(url, { cache: "no-store" });
+            const res = await fetchMeta(url);
             if (!res.ok) return;
             const buffer = Buffer.from(await res.arrayBuffer());
             const ph = await computePHashFromBuffer(buffer);
@@ -548,18 +657,21 @@ export async function GET(req: NextRequest) {
       await Promise.allSettled(
         [...accountsWithNewAndToken.entries()].map(async ([accId, accToken]) => {
           try {
-            const res = await fetch(
-              `${BASE}/act_${accId}/adsets?fields=campaign_id,promoted_object{page_id}&limit=500&access_token=${accToken}`,
-              { cache: "no-store" }
-            );
-            if (!res.ok) return;
-            const json = await res.json();
-            for (const adset of json.data ?? []) {
-              if (adset.promoted_object?.page_id && !pgIdMap[adset.campaign_id]) {
-                pgIdMap[adset.campaign_id] = adset.promoted_object.page_id;
+            let nextUrl: string | null =
+              `${BASE}/act_${accId}/adsets?fields=campaign_id,promoted_object{page_id}&limit=500&access_token=${accToken}`;
+            while (nextUrl) {
+              const res = await fetchMeta(nextUrl);
+              if (!res.ok) throw new Error(`Meta HTTP ${res.status}`);
+              const json = await res.json();
+              if (json.error) throw new Error(json.error.message ?? "Meta API error");
+              for (const adset of json.data ?? []) {
+                if (adset.promoted_object?.page_id && !pgIdMap[adset.campaign_id]) {
+                  pgIdMap[adset.campaign_id] = adset.promoted_object.page_id;
+                }
               }
+              nextUrl = json.paging?.next ?? null;
             }
-          } catch { /* non-critical */ }
+          } catch (error) { console.warn(`Could not resolve adsets for ${accId}:`, error); }
         })
       );
     } else {
@@ -576,9 +688,8 @@ export async function GET(req: NextRequest) {
       for (const token of tokens) {
         if (remaining.length === 0) break;
         try {
-          const batchRes = await fetch(
-            `${BASE}/?ids=${remaining.join(",")}&fields=name&access_token=${token}`,
-            { cache: "no-store" }
+          const batchRes = await fetchMeta(
+            `${BASE}/?ids=${remaining.join(",")}&fields=name&access_token=${token}`
           );
           if (batchRes.ok) {
             const batchData = await batchRes.json();
@@ -659,9 +770,8 @@ export async function GET(req: NextRequest) {
         if (!accountId) continue;
         try {
           // Get one ad from the account
-          const adsRes = await fetch(
-            `${BASE}/act_${accountId}/ads?fields=id&limit=1&access_token=${tokens[0]}`,
-            { cache: "no-store" }
+          const adsRes = await fetchMeta(
+            `${BASE}/act_${accountId}/ads?fields=id&limit=1&access_token=${tokens[0]}`
           );
           if (!adsRes.ok) continue;
           const adsData = await adsRes.json();
@@ -669,9 +779,8 @@ export async function GET(req: NextRequest) {
           if (!adId) continue;
 
           // Get ad preview iframe
-          const prevRes = await fetch(
-            `${BASE}/${adId}/previews?ad_format=MOBILE_FEED_STANDARD&access_token=${tokens[0]}`,
-            { cache: "no-store" }
+          const prevRes = await fetchMeta(
+            `${BASE}/${adId}/previews?ad_format=MOBILE_FEED_STANDARD&access_token=${tokens[0]}`
           );
           if (!prevRes.ok) continue;
           const prevData = await prevRes.json();
@@ -681,6 +790,7 @@ export async function GET(req: NextRequest) {
           // Fetch iframe content and extract page name
           const iframeRes = await fetch(iframeSrc, {
             headers: { "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)" },
+            signal: AbortSignal.timeout(META_TIMEOUT_MS),
           });
           if (!iframeRes.ok) continue;
           const html = await iframeRes.text();
@@ -716,6 +826,7 @@ export async function GET(req: NextRequest) {
       accountId: string; accountName: string;
       spend: number; impressions: number; clicks: number;
       inbox: number; leads: number;
+      statuses: Set<string>;
     }>();
 
     for (const row of allInsights) {
@@ -727,6 +838,7 @@ export async function GET(req: NextRequest) {
         existing.clicks += row.clicks;
         existing.inbox += row.inbox;
         existing.leads += row.leads;
+        existing.statuses.add(adCreativeMap.get(row.adId)?.status ?? row.status);
       } else {
         campaignAgg.set(key, {
           campaignId: row.campaignId, date: row.date,
@@ -734,6 +846,7 @@ export async function GET(req: NextRequest) {
           accountId: row.accountId, accountName: row.accountName,
           spend: row.spend, impressions: row.impressions, clicks: row.clicks,
           inbox: row.inbox, leads: row.leads,
+          statuses: new Set([adCreativeMap.get(row.adId)?.status ?? row.status]),
         });
       }
     }
@@ -751,12 +864,9 @@ export async function GET(req: NextRequest) {
         adAccountId: c.accountId, campaign: c.campaignName,
         spend: c.spend, inbox: c.inbox, leads: c.leads, cpi, cpl,
         impressions: c.impressions, clicks: c.clicks, ctr,
-        status: "active",
+        status: aggregateStatus(c.statuses),
       };
     });
-
-    await bulkUpsertMetricDaily(campaignRows);
-    console.log(`📝 Upserted ${campaignRows.length} campaign rows (bulk)`);
 
     // ── Step 7: Bulk upsert ad-level (AdsContentDaily) ──────────────────
     // Deduplicate by (adId, date) — merge metrics for same ad on same day
@@ -777,6 +887,7 @@ export async function GET(req: NextRequest) {
         if (!existing.pageId && pgId) existing.pageId = pgId;
         if (!existing.thumbnailUrl && creative?.thumbnailUrl) existing.thumbnailUrl = creative.thumbnailUrl;
         if (!existing.imageHash && creative?.imageHash) existing.imageHash = creative.imageHash;
+        existing.statuses.add(creative?.status ?? row.status);
       } else {
         adRowMap.set(key, {
           adId: row.adId, date: row.date,
@@ -789,17 +900,39 @@ export async function GET(req: NextRequest) {
           inbox: row.inbox, leads: row.leads, cpi: row.cpi,
           likes: row.likes, comments: row.comments, shares: row.shares,
           videoViews: row.videoViews, ctr: row.ctr,
-          status: "active",
+          status: creative?.status ?? row.status,
+          statuses: new Set([creative?.status ?? row.status]),
         });
       }
     }
-    const adRows = [...adRowMap.values()];
+    const adRows = [...adRowMap.values()].map(({ statuses, ...row }) => ({
+      ...row,
+      status: aggregateStatus(statuses),
+    }));
 
-    await bulkUpsertContentDaily(adRows);
-    console.log(`📝 Upserted ${adRows.length} ad rows (bulk)`);
+    // All accounts completed successfully, so this date range is authoritative.
+    // Replace it atomically to remove rows for ads/campaigns that no longer exist.
+    await prisma.$transaction(async (tx) => {
+      await tx.adsMetricDaily.deleteMany({ where: { date: { gte: since, lte: until } } });
+      await tx.adsContentDaily.deleteMany({ where: { date: { gte: since, lte: until } } });
+      await bulkUpsertMetricDaily(campaignRows, tx);
+      await bulkUpsertContentDaily(adRows, tx);
+    }, { timeout: 60_000 });
+    console.log(`📝 Reconciled ${campaignRows.length} campaign rows and ${adRows.length} ad rows (atomic)`);
 
     const elapsed = ((Date.now() - start) / 1000).toFixed(1);
     console.log(`🏁 Done in ${elapsed}s — ${allAccountEntries.length} accounts, ${campaignRows.length} campaigns, ${adRows.length} ads`);
+
+    await prisma.adsSyncRun.update({
+      where: { id: syncRunId },
+      data: {
+        status: "completed",
+        accountsTotal,
+        campaignRows: campaignRows.length,
+        contentRows: adRows.length,
+        completedAt: new Date(),
+      },
+    });
 
     return NextResponse.json({
       message: `✅ Sync ${since} → ${until} — ${allAccountEntries.length} accounts (${tokens.length} tokens), ${campaignRows.length} campaign rows, ${adRows.length} ad rows (${elapsed}s)`,
@@ -808,6 +941,21 @@ export async function GET(req: NextRequest) {
 
   } catch (err: any) {
     console.error("❌ Sync error:", err.message);
+    if (syncRunId) {
+      await prisma.adsSyncRun.update({
+        where: { id: syncRunId },
+        data: {
+          status: "failed",
+          accountsTotal,
+          accountsFailed,
+          error: String(err.message || err).slice(0, 2_000),
+          completedAt: new Date(),
+        },
+      }).catch((updateError: unknown) => console.error("Could not record failed sync:", updateError));
+    }
     return NextResponse.json({ error: err.message }, { status: 500 });
+  } finally {
+    await prisma.adsSyncLock.delete({ where: { key: "meta-ads" } })
+      .catch((lockError: unknown) => console.error("Could not release sync lock:", lockError));
   }
 }

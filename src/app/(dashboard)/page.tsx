@@ -10,8 +10,6 @@ import {
   ChevronLeft, ChevronRight, Zap, AlertCircle, Calendar,
   Image, Filter, X, ZoomIn, Play, Trophy, TrendingDown, MousePointerClick, Award, BarChart3, ArrowRight, Eye, MessageSquare, Download
 } from "lucide-react";
-import html2canvas from "html2canvas-pro";
-import { jsPDF } from "jspdf";
 import { useAuthSession } from "@/lib/use-auth-session";
 import { isClientRole } from "@/lib/auth/permissions";
 import { useExcludedPages } from "@/lib/use-excluded-pages";
@@ -66,6 +64,8 @@ function useAdsData(since: string, until: string) {
   const [globalAdByContent, setGlobalAdByContent] = useState<GlobalAdItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const activeRequest = useRef<AbortController | null>(null);
+  const requestVersion = useRef(0);
 
   const applyPayload = useCallback((p: AdsDataPayload) => {
     setMetrics(p.metrics);
@@ -90,9 +90,14 @@ function useAdsData(since: string, until: string) {
       }
     }
 
+    activeRequest.current?.abort();
+    const controller = new AbortController();
+    activeRequest.current = controller;
+    const version = ++requestVersion.current;
+
     try {
       if (!silent) setLoading(true);
-      const res = await fetch(`/api/ads-data?since=${s}&until=${u}`);
+      const res = await fetch(`/api/ads-data?since=${s}&until=${u}`, { signal: controller.signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       if (json.error) throw new Error(json.error);
@@ -106,17 +111,22 @@ function useAdsData(since: string, until: string) {
           lastSyncedAt: json.lastSyncedAt ?? null,
         },
       };
-      adsDataCache.set(key, payload);
-      adsDataCacheTime.set(key, Date.now());
-      applyPayload(payload);
+      if (version === requestVersion.current) {
+        adsDataCache.set(key, payload);
+        adsDataCacheTime.set(key, Date.now());
+        applyPayload(payload);
+      }
     } catch (e: any) {
-      setError(e.message);
+      if (e.name !== "AbortError" && version === requestVersion.current) setError(e.message);
     } finally {
-      setLoading(false);
+      if (version === requestVersion.current) setLoading(false);
     }
   }, [applyPayload]);
 
-  useEffect(() => { load(since, until); }, [since, until, load]);
+  useEffect(() => {
+    load(since, until);
+    return () => activeRequest.current?.abort();
+  }, [since, until, load]);
 
   useEffect(() => {
     const interval = setInterval(() => load(since, until, { silent: true, force: true }), AUTO_REFRESH_MS);
@@ -160,17 +170,20 @@ interface PageRow {
 
 function groupByPage(metrics: AdsMetric[]): PageRow[] {
   const map = new Map<string, {
-    pageId: string; adAccountId: string;
+    pageId: string; pageName: string; adAccountId: string;
     spend: number; inbox: number; leads: number;
     active: number; paused: number; count: number;
     impressions: number; clicks: number;
   }>();
 
   for (const m of metrics) {
-    const key = m.pageName || m.clinic;
-    const e   = map.get(key) ?? { pageId: "", adAccountId: "", spend: 0, inbox: 0, leads: 0, active: 0, paused: 0, count: 0, impressions: 0, clicks: 0 };
+    // Names are labels, not identifiers: two different Facebook pages can
+    // legitimately share a name, so pageId is the aggregation key.
+    const key = m.pageId || m.pageName || m.clinic;
+    const e = map.get(key) ?? { pageId: "", pageName: "", adAccountId: "", spend: 0, inbox: 0, leads: 0, active: 0, paused: 0, count: 0, impressions: 0, clicks: 0 };
     map.set(key, {
       pageId:      m.pageId      || e.pageId,
+      pageName:    m.pageName    || e.pageName || m.clinic,
       adAccountId: m.adAccountId || e.adAccountId,
       spend:  e.spend  + m.spend,
       inbox:  e.inbox  + m.inbox,
@@ -183,8 +196,8 @@ function groupByPage(metrics: AdsMetric[]): PageRow[] {
     });
   }
 
-  return [...map.entries()].map(([pageName, d]) => ({
-    pageName,
+  return [...map.values()].map((d) => ({
+    pageName:       d.pageName,
     pageId:         d.pageId,
     adAccountId:    d.adAccountId,
     spend:          d.spend,
@@ -358,7 +371,7 @@ function FacebookAdsDashboard() {
   }, [baseGlobalAdContent]);
 
   const allUniquePages = useMemo(() => {
-    return Array.from(new Map(raw.flatMap(a => a.pageName ? [[a.pageName, { id: a.pageName, name: a.pageName }]] : [])).values())
+    return Array.from(new Map(raw.flatMap(a => a.pageId ? [[a.pageId, { id: a.pageId, name: a.pageName || a.pageId }]] : [])).values())
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [raw]);
 
@@ -620,6 +633,11 @@ function FacebookAdsDashboard() {
     let originalScroll = 0;
     
     try {
+      // Keep the heavy PDF/canvas libraries out of the dashboard's initial JS.
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import("html2canvas-pro"),
+        import("jspdf"),
+      ]);
       const container = document.getElementById("export-container");
       if (!container) throw new Error("ไม่พบ Container");
 
@@ -1318,7 +1336,7 @@ function FacebookAdsDashboard() {
                 const base = "text-foreground/80 font-medium";
 
                 return (
-                <tr key={p.pageName}
+                <tr key={p.pageId || p.pageName}
                   className="border-b border-border/30 hover:bg-navy-800/40 transition-colors animate-fade-in"
                   style={{ animationDelay: `${Math.min(i * 20, 400)}ms` }}>
                   <td className="px-1 sm:px-2 py-2">
@@ -1690,5 +1708,3 @@ function FacebookAdsDashboard() {
     </div>
   );
 }
-
-

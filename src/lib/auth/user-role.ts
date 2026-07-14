@@ -3,13 +3,20 @@ import type { User } from "@supabase/supabase-js";
 import { parseUserRole, type UserRole } from "@/lib/auth/permissions";
 
 export function getRoleFromSupabaseUser(user: User): UserRole {
+  // Keep the primary owner override consistent with the server auth guard.
+  // This account may predate app_metadata roles and must not be downgraded to
+  // a client simply because its metadata is incomplete.
+  if (user.email === "korrakottum@gmail.com") return "admin";
+
   const appMetaRole = parseUserRole(
     typeof user.app_metadata?.role === "string" ? user.app_metadata.role : undefined
   );
 
   if (appMetaRole) return appMetaRole;
 
-  return "admin";
+  // Missing/invalid authorization metadata must never grant administrator
+  // access. A client with no assigned pages consequently sees no ad data.
+  return "client";
 }
 
 /**
@@ -45,4 +52,3 @@ export function getDisplayNameFromSupabaseUser(user: User): string {
 
   return user.id;
 }
-
