@@ -48,6 +48,8 @@ function getTokens(): string[] {
   if (t1) tokens.push(t1);
   const t2 = process.env.META_SYSTEM_USER_TOKEN_2;
   if (t2) tokens.push(t2);
+  const t3 = process.env.META_SYSTEM_USER_TOKEN_3;
+  if (t3) tokens.push(t3);
   if (tokens.length === 0) throw new Error("META_SYSTEM_USER_TOKEN ยังไม่ได้ตั้งค่าใน .env.local");
   return tokens;
 }
