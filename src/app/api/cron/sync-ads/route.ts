@@ -38,9 +38,37 @@ const BASE = `https://graph.facebook.com/${API_VERSION}`;
 const META_TIMEOUT_MS = 30_000;
 const META_RETRY_ATTEMPTS = 3;
 const SYNC_LEASE_MS = 6 * 60 * 1000;
+const ACCOUNT_FETCH_CONCURRENCY = 8;
+const HASH_CACHE_BATCH_SIZE = 500;
+const DB_TRANSACTION_TIMEOUT_MS = 120_000;
 
 // Allow up to 5 minutes for heavy sync (Vercel Pro)
 export const maxDuration = 300;
+
+async function allSettledWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T, index: number) => Promise<R>,
+): Promise<PromiseSettledResult<R>[]> {
+  const results = new Array<PromiseSettledResult<R>>(items.length);
+  let nextIndex = 0;
+
+  async function runWorker() {
+    while (true) {
+      const index = nextIndex++;
+      if (index >= items.length) return;
+      try {
+        results[index] = { status: "fulfilled", value: await worker(items[index], index) };
+      } catch (reason) {
+        results[index] = { status: "rejected", reason };
+      }
+    }
+  }
+
+  const workerCount = Math.min(Math.max(1, concurrency), items.length);
+  await Promise.all(Array.from({ length: workerCount }, () => runWorker()));
+  return results;
+}
 
 function getTokens(): string[] {
   const tokens: string[] = [];
@@ -317,7 +345,8 @@ export async function GET(req: NextRequest) {
   }
 
   const start = Date.now();
-  console.log("📊 Starting Meta Ads Sync...");
+  const requestId = req.headers.get("x-vercel-id") || `local-${start}`;
+  console.log(JSON.stringify({ event: "meta_ads_sync_started", requestId }));
   const now = new Date();
   const leaseUntil = new Date(now.getTime() + SYNC_LEASE_MS);
   const lock = await prisma.$queryRaw<{ key: string }[]>(Prisma.sql`
@@ -420,11 +449,13 @@ export async function GET(req: NextRequest) {
 
     console.log(`📋 Found ${allAccountEntries.length} unique ad accounts (from ${tokens.length} tokens)`);
 
-    // ── Step 2: Fetch insights for ALL accounts in parallel ─────────────
-    const results = await Promise.allSettled(
-      allAccountEntries.map(({ acc, token }) =>
-        fetchInsightsForAccount(acc.account_id, acc.name ?? acc.account_id, since, until, token)
-      )
+    // ── Step 2: Fetch insights with bounded concurrency ────────────────
+    // Avoid a burst of 60+ simultaneous requests, which increases Meta 429s.
+    const results = await allSettledWithConcurrency(
+      allAccountEntries,
+      ACCOUNT_FETCH_CONCURRENCY,
+      ({ acc, token }) =>
+        fetchInsightsForAccount(acc.account_id, acc.name ?? acc.account_id, since, until, token),
     );
 
     const allInsights: AccountInsight[] = [];
@@ -454,12 +485,35 @@ export async function GET(req: NextRequest) {
     // Always fetch fresh image URLs (Meta CDN URLs expire in 1-2 days)
     const adCreativeMap = new Map<string, {
       thumbnailUrl: string; storyPageId: string; imageHash: string;
+      perceptualHash: string;
       status: "active" | "paused" | "ended" | "unknown";
     }>();
 
     // All unique ad_ids, grouped by token
     const allAdIds = [...new Set(allInsights.map(r => r.adId))];
     console.log(`🖼️ Fetching creative info for ${allAdIds.length} ads (URLs expire, no cache)`);
+
+    // Hashes do not expire with Meta CDN URLs. Reuse known values so recurring
+    // syncs only download thumbnails for genuinely new ads.
+    const cachedHashes = new Map<string, { imageHash: string; perceptualHash: string }>();
+    for (let i = 0; i < allAdIds.length; i += HASH_CACHE_BATCH_SIZE) {
+      const adIdBatch = allAdIds.slice(i, i + HASH_CACHE_BATCH_SIZE);
+      const rows = await prisma.adsContentDaily.groupBy({
+        by: ["adId"],
+        where: {
+          adId: { in: adIdBatch },
+          OR: [{ imageHash: { not: "" } }, { perceptualHash: { not: "" } }],
+        },
+        _max: { imageHash: true, perceptualHash: true },
+      });
+      for (const row of rows) {
+        cachedHashes.set(row.adId, {
+          imageHash: row._max.imageHash || "",
+          perceptualHash: row._max.perceptualHash || "",
+        });
+      }
+    }
+    console.log(`🧠 Reusing cached hashes for ${cachedHashes.size}/${allAdIds.length} ads`);
 
     if (allAdIds.length > 0) {
       // Group ad IDs by token (based on which account they belong to)
@@ -543,10 +597,12 @@ export async function GET(req: NextRequest) {
                 const relatedAdIds = creativeIdToAdIds.get(creativeId) || [];
                 for (const adId of relatedAdIds) {
                   const info = adCreativeIds.get(adId);
+                  const cached = cachedHashes.get(adId);
                   adCreativeMap.set(adId, {
                     thumbnailUrl: thumbUrl,
                     storyPageId: info?.storyPageId || "",
-                    imageHash: imgHash,
+                    imageHash: imgHash || cached?.imageHash || "",
+                    perceptualHash: cached?.perceptualHash || "",
                     status: info?.status || "unknown",
                   });
                 }
@@ -596,7 +652,7 @@ export async function GET(req: NextRequest) {
     const pHashMap = new Map<string, string>(); // url → phash
     const allThumbUrls = new Map<string, string[]>(); // url → adIds
     for (const [adId, info] of adCreativeMap) {
-      if (info.thumbnailUrl) {
+      if (info.thumbnailUrl && !info.perceptualHash) {
         const list = allThumbUrls.get(info.thumbnailUrl) || [];
         list.push(adId);
         allThumbUrls.set(info.thumbnailUrl, list);
@@ -617,7 +673,7 @@ export async function GET(req: NextRequest) {
               pHashMap.set(url, ph);
               for (const adId of adIds) {
                 const info = adCreativeMap.get(adId);
-                if (info) (info as any).perceptualHash = ph;
+                if (info) info.perceptualHash = ph;
               }
             }
           } catch { /* non-critical */ }
@@ -895,7 +951,7 @@ export async function GET(req: NextRequest) {
           pageId: pgId, adName: row.adName, campaignName: row.campaignName,
           thumbnailUrl: creative?.thumbnailUrl || "",
           imageHash: creative?.imageHash || "",
-          perceptualHash: (creative as any)?.perceptualHash || "",
+          perceptualHash: creative?.perceptualHash || "",
           spend: row.spend, impressions: row.impressions, clicks: row.clicks,
           inbox: row.inbox, leads: row.leads, cpi: row.cpi,
           likes: row.likes, comments: row.comments, shares: row.shares,
@@ -910,6 +966,25 @@ export async function GET(req: NextRequest) {
       status: aggregateStatus(statuses),
     }));
 
+    // Run completeness gates before the destructive half of the transaction.
+    // A failed mapping/API response must never replace good data with blanks.
+    const campaignsWithoutPage = campaignRows.filter(row => !row.pageId).length;
+    const adsWithoutPage = adRows.filter(row => !row.pageId).length;
+    if (campaignsWithoutPage > 0 || adsWithoutPage > 0) {
+      throw new Error(
+        `Completeness check failed: ${campaignsWithoutPage} campaign rows and ${adsWithoutPage} ad rows have no pageId`,
+      );
+    }
+
+    const campaignSpend = campaignRows.reduce((total, row) => total + row.spend, 0);
+    const contentSpend = adRows.reduce((total, row) => total + row.spend, 0);
+    const spendDifference = Math.abs(campaignSpend - contentSpend);
+    if (spendDifference > 0.02) {
+      throw new Error(
+        `Completeness check failed: campaign/content spend differs by ${spendDifference.toFixed(2)}`,
+      );
+    }
+
     // All accounts completed successfully, so this date range is authoritative.
     // Replace it atomically to remove rows for ads/campaigns that no longer exist.
     await prisma.$transaction(async (tx) => {
@@ -917,11 +992,25 @@ export async function GET(req: NextRequest) {
       await tx.adsContentDaily.deleteMany({ where: { date: { gte: since, lte: until } } });
       await bulkUpsertMetricDaily(campaignRows, tx);
       await bulkUpsertContentDaily(adRows, tx);
-    }, { timeout: 60_000 });
+    }, { timeout: DB_TRANSACTION_TIMEOUT_MS });
     console.log(`📝 Reconciled ${campaignRows.length} campaign rows and ${adRows.length} ad rows (atomic)`);
 
     const elapsed = ((Date.now() - start) / 1000).toFixed(1);
-    console.log(`🏁 Done in ${elapsed}s — ${allAccountEntries.length} accounts, ${campaignRows.length} campaigns, ${adRows.length} ads`);
+    const syncMetrics = {
+      event: "meta_ads_sync_completed",
+      requestId,
+      since,
+      until,
+      elapsedSeconds: Number(elapsed),
+      accounts: allAccountEntries.length,
+      campaignRows: campaignRows.length,
+      contentRows: adRows.length,
+      creativeCoverage: allAdIds.length > 0 ? adCreativeMap.size / allAdIds.length : 1,
+      cachedHashes: cachedHashes.size,
+      campaignSpend: Number(campaignSpend.toFixed(2)),
+      contentSpend: Number(contentSpend.toFixed(2)),
+    };
+    console.log(JSON.stringify(syncMetrics));
 
     await prisma.adsSyncRun.update({
       where: { id: syncRunId },
@@ -936,11 +1025,18 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       message: `✅ Sync ${since} → ${until} — ${allAccountEntries.length} accounts (${tokens.length} tokens), ${campaignRows.length} campaign rows, ${adRows.length} ad rows (${elapsed}s)`,
-      results: accountSummary, since, until,
+      results: accountSummary, since, until, metrics: syncMetrics,
     });
 
   } catch (err: any) {
-    console.error("❌ Sync error:", err.message);
+    console.error(JSON.stringify({
+      event: "meta_ads_sync_failed",
+      requestId,
+      elapsedSeconds: Number(((Date.now() - start) / 1000).toFixed(1)),
+      accountsTotal,
+      accountsFailed,
+      error: String(err.message || err),
+    }));
     if (syncRunId) {
       await prisma.adsSyncRun.update({
         where: { id: syncRunId },
