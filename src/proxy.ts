@@ -5,6 +5,7 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isAuthPage = pathname.startsWith("/login") || pathname.startsWith("/auth/callback");
   const isStaticFile = pathname.match(/\.(.*)$/) || pathname.startsWith("/_next");
+  const isCronOrWebhook = pathname.startsWith("/api/cron/") || pathname.startsWith("/api/webhooks/");
 
   // Skip auth logic for static files to save execution time
   if (isStaticFile) return NextResponse.next();
@@ -15,10 +16,7 @@ export async function proxy(request: NextRequest) {
 
   if (!supabaseUrl || !supabaseKey) {
     console.error("❌ Missing Supabase Environment Variables");
-    // If auth pages, allow them to render (they should have their own error handling)
-    if (isAuthPage) return NextResponse.next();
-    // Otherwise redirect to login as a safe fallback or allow Next.js to handle the error
-    return NextResponse.next();
+    return NextResponse.json({ error: "Authentication service is unavailable" }, { status: 503 });
   }
 
   // Create an unmodified response for potential cookie updates
@@ -58,11 +56,10 @@ export async function proxy(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     // Auth Protection Logic
-    const isCronOrWebhook =
-      pathname.startsWith("/api/cron/") ||
-      pathname.startsWith("/api/webhooks/");
-
     if (!user && !isAuthPage && !isCronOrWebhook) {
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
       const loginUrl = new URL("/login", request.url);
       if (pathname !== "/") {
         loginUrl.searchParams.set("next", pathname);
@@ -75,7 +72,12 @@ export async function proxy(request: NextRequest) {
     }
   } catch (error) {
     console.error("🛡️ Auth Proxy Error:", error);
-    // Allow the request to proceed; individual pages will handle their own data-fetching errors
+    if (!isAuthPage && !isCronOrWebhook) {
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json({ error: "Authentication service is unavailable" }, { status: 503 });
+      }
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
   }
 
   return response;

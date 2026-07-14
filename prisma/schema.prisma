@@ -33,6 +33,7 @@ model AdsMetricDaily {
   @@index([date])
   @@index([adAccountId])
   @@index([pageId])
+  @@index([pageId, date])
 }
 
 // ── Ad-level daily data (creative + engagement) ───────────────────────────────
@@ -68,6 +69,7 @@ model AdsContentDaily {
   @@index([campaignId])
   @@index([pageId])
   @@index([date])
+  @@index([pageId, date])
 }
 
 // ── Page name cache (persistent) ──────────────────────────────────────────────
@@ -77,4 +79,28 @@ model PageNameCache {
   source    String   @default("api")  // "api" | "scrape" | "manual"
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ── Operational audit trail for Meta syncs ───────────────────────────────────
+model AdsSyncRun {
+  id             String   @id @default(cuid())
+  since          String
+  until          String
+  status         String   // running | succeeded | failed
+  accountsTotal  Int      @default(0)
+  accountsFailed Int      @default(0)
+  campaignRows   Int      @default(0)
+  contentRows    Int      @default(0)
+  error          String   @default("")
+  startedAt      DateTime @default(now())
+  completedAt    DateTime?
+
+  @@index([status, startedAt])
+}
+
+// Database-backed lease prevents concurrent cron/manual syncs across instances.
+model AdsSyncLock {
+  key         String   @id
+  lockedUntil DateTime
+  updatedAt   DateTime @updatedAt
 }

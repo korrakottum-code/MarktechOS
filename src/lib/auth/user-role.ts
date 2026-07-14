@@ -9,7 +9,9 @@ export function getRoleFromSupabaseUser(user: User): UserRole {
 
   if (appMetaRole) return appMetaRole;
 
-  return "admin";
+  // Missing/invalid authorization metadata must never grant administrator
+  // access. A client with no assigned pages consequently sees no ad data.
+  return "client";
 }
 
 /**
@@ -45,4 +47,3 @@ export function getDisplayNameFromSupabaseUser(user: User): string {
 
   return user.id;
 }
-

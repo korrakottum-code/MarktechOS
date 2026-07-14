@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/server/prisma";
-import { getAllowedPagesForCurrentUser } from "@/lib/server/allowed-pages";
+import { AuthenticationError, getPageAccessForCurrentUser } from "@/lib/server/allowed-pages";
 
 // ── GET /api/ads-data?since=YYYY-MM-DD&until=YYYY-MM-DD&pageId=xxx ───────────
 // Queries daily rows from AdsMetricDaily and aggregates per campaign.
@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
 
   try {
     // ── Check user's allowed pages (page-level access control) ────────────
-    const allowedPages = await getAllowedPagesForCurrentUser();
+    const { allowedPages } = await getPageAccessForCurrentUser();
 
     // Build date filter
     const where: any = {};
@@ -524,6 +524,9 @@ export async function GET(req: NextRequest) {
     );
   } catch (err: any) {
     console.error("❌ ads-data error:", err.message);
+    if (err instanceof AuthenticationError) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

@@ -1,5 +1,13 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Production data sync
+
+Copy `.env.example` to your deployment environment. `DATABASE_URL` must use the
+Supabase connection pooler; reserve `DIRECT_URL` for migrations. Set a long,
+random `CRON_SECRET` and send it as `Authorization: Bearer <CRON_SECRET>` for
+scheduled calls to `/api/cron/sync-ads`. Sync state can be inspected with
+`/api/cron/sync-ads?status=1` by an authorized administrator.
+
 ## Getting Started
 
 First, run the development server:
