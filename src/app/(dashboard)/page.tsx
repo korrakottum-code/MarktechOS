@@ -354,7 +354,7 @@ function FacebookAdsDashboard() {
 
   const [expandedServices, setExpandedServices] = useState<Set<string>>(new Set());
   const [lightbox, setLightbox] = useState<{ url: string; name: string; spend: number; inbox: number; cpi: number; mediaType?: string; pageNames?: string[] } | null>(null);
-  const [view, setView] = useState<'overview' | 'pages' | 'service' | 'content'>('overview');
+  const [view, setView] = useState<'overview' | 'pages' | 'campaign' | 'service' | 'content'>('overview');
   const [creativeTab, setCreativeTab] = useState<'inbox'|'leads'>('inbox');
   const [svcSort, setSvcSort] = useState<{ key: keyof GlobalAdItem; dir: 'asc' | 'desc' }>({ key: 'inbox', dir: 'desc' });
   const [isExporting, setIsExporting] = useState(false);
@@ -483,6 +483,52 @@ function FacebookAdsDashboard() {
       return sortDir === "desc" ? bv - av : av - bv;
     });
   }, [raw, globalAdContent, search, serviceFilter, selectedPages, sortKey, sortDir]);
+
+  // ── Per-campaign table (one row per Facebook campaign) ────────────────────────
+  const campaigns = useMemo(() => {
+    let rows = raw.map(m => ({
+      id: m.id,
+      campaign: m.campaign || "Untitled",
+      pageId: m.pageId,
+      pageName: m.pageName || m.clinic,
+      adAccountId: m.adAccountId,
+      status: m.status,
+      spend: m.spend,
+      inbox: m.inbox,
+      cpi: m.cpi,
+      leads: m.leads,
+      cpl: m.cpl,
+      leadInboxRatio: m.inbox > 0 ? (m.leads / m.inbox) * 100 : 0,
+    }));
+    if (search) {
+      const q = search.toLowerCase();
+      rows = rows.filter(c =>
+        c.campaign.toLowerCase().includes(q) ||
+        c.pageName.toLowerCase().includes(q) ||
+        c.adAccountId.includes(search)
+      );
+    }
+    if (selectedPages.size > 0) {
+      rows = rows.filter(c => selectedPages.has(c.pageId));
+    }
+    return rows.sort((a, b) => {
+      const av = a[sortKey as keyof typeof a] as number ?? 0;
+      const bv = b[sortKey as keyof typeof b] as number ?? 0;
+      return sortDir === "desc" ? bv - av : av - bv;
+    });
+  }, [raw, search, selectedPages, sortKey, sortDir]);
+
+  const campaignKpis = useMemo(() => {
+    const totalSpend = campaigns.reduce((s, c) => s + c.spend, 0);
+    const totalInbox = campaigns.reduce((s, c) => s + c.inbox, 0);
+    const totalLeads = campaigns.reduce((s, c) => s + c.leads, 0);
+    return {
+      totalSpend, totalInbox, totalLeads,
+      avgCPI: totalInbox > 0 ? totalSpend / totalInbox : 0,
+      avgCPL: totalLeads > 0 ? totalSpend / totalLeads : 0,
+      ratio: totalInbox > 0 ? (totalLeads / totalInbox) * 100 : 0,
+    };
+  }, [campaigns]);
 
   const kpis = useMemo(() => {
     // When filters are active, derive from the filtered pages array
@@ -918,6 +964,7 @@ function FacebookAdsDashboard() {
             {([
               ['overview', 'Overview Dashboard'],
               ['pages',   `รายเพจ (${pages.length})`],
+              ['campaign', `Campaign (${campaigns.length})`],
               ['service', `Service (${serviceNames.length})`],
               ['content', `Content (${globalAdByContent.length})`],
             ] as [typeof view, string][]).map(([key, label]) => (
@@ -1389,6 +1436,129 @@ function FacebookAdsDashboard() {
                   <td className="px-3 py-4 text-right font-bold">
                     <span className={`px-2 py-1 rounded-lg text-xs ${kpis.ratio >= 20 ? "bg-emerald-500/10 text-emerald-400" : kpis.ratio >= 10 ? "bg-amber-500/10 text-amber-400" : "bg-red-500/10 text-red-400"}`}>
                       {pct(kpis.ratio)}
+                    </span>
+                  </td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
+      )}
+
+      {/* ── Per-campaign table ── */}
+      {view === 'campaign' && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-navy-950/40">
+              <tr className="border-b border-white/10">
+                <th className="px-1 sm:px-3 py-2 text-left text-[10px] font-bold text-foreground-muted uppercase tracking-wider max-w-[140px] sm:max-w-[260px]">Campaign</th>
+                {([
+                  ["spend",          "Spend"],
+                  ["inbox",          "Inbox"],
+                  ["cpi",            "CPI"],
+                  ["leads",          "Lead"],
+                  ["cpl",            "CPL"],
+                  ["leadInboxRatio", "% L/I"],
+                ] as [SortKey, string][]).map(([key, label]) => (
+                  <th key={key} onClick={() => toggleSort(key)}
+                    className="px-1 sm:px-2 py-2 text-[9px] sm:text-[10px] font-bold text-foreground-muted uppercase tracking-wider text-right cursor-pointer hover:text-gold-400 select-none transition-colors whitespace-nowrap">
+                    <div className="flex items-center justify-end gap-1">
+                      {label}
+                      {sortKey === key
+                        ? sortDir === "desc" ? <ChevronDown size={11} className="text-gold-400" /> : <ChevronUp size={11} className="text-gold-400" />
+                        : <ChevronDown size={11} className="opacity-15" />}
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+
+            <tbody>
+              {campaigns.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-16 text-center">
+                    <div className="flex flex-col items-center gap-3 text-foreground-muted">
+                      <Zap size={28} className="opacity-20" />
+                      <p className="text-sm">{search ? `ไม่พบ campaign ที่ตรงกับ "${search}"` : "ยังไม่มีข้อมูล — เลือกช่วงวันที่แล้วกด Sync"}</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : campaigns.map((c, i) => {
+                const avgSpend = campaignKpis.totalSpend / campaigns.length;
+                const avgInbox = campaignKpis.totalInbox / campaigns.length;
+                const avgLeads = campaignKpis.totalLeads / campaigns.length;
+
+                const spendGood = c.spend > 0 && c.spend < avgSpend * 0.85;
+                const spendBad  = c.spend > avgSpend * 1.15;
+                const inboxGood = c.inbox > avgInbox * 1.15;
+                const inboxBad  = c.inbox > 0 && c.inbox < avgInbox * 0.85;
+                const cpiGood   = c.cpi > 0 && c.cpi < campaignKpis.avgCPI * 0.85;
+                const cpiBad    = c.cpi > campaignKpis.avgCPI * 1.15;
+                const leadGood  = c.leads > avgLeads * 1.15;
+                const leadBad   = c.leads > 0 && c.leads < avgLeads * 0.85;
+                const cplGood   = c.cpl > 0 && c.cpl < campaignKpis.avgCPL * 0.85;
+                const cplBad    = c.cpl > campaignKpis.avgCPL * 1.15;
+                const ratioGood = c.leadInboxRatio > campaignKpis.ratio * 1.15;
+                const ratioBad  = c.leadInboxRatio > 0 && c.leadInboxRatio < campaignKpis.ratio * 0.85;
+
+                const good = "text-emerald-400 font-bold";
+                const bad  = "text-red-400 font-bold ring-1 ring-red-500/40 rounded px-1.5 py-0.5 bg-red-500/10";
+                const base = "text-foreground/80 font-medium";
+
+                const statusDot = c.status === "active" ? "bg-emerald-400 animate-pulse" : c.status === "paused" ? "bg-amber-400" : "bg-gray-500";
+
+                return (
+                <tr key={c.id}
+                  className="border-b border-border/30 hover:bg-navy-800/40 transition-colors animate-fade-in"
+                  style={{ animationDelay: `${Math.min(i * 20, 400)}ms` }}>
+                  <td className="px-1 sm:px-2 py-2">
+                    <div className="flex items-start gap-1.5">
+                      <span className={`mt-1 w-1.5 h-1.5 rounded-full shrink-0 ${statusDot}`} title={c.status} />
+                      <div className="min-w-0">
+                        <p className="font-semibold text-foreground text-[10px] sm:text-[11px] leading-tight truncate max-w-[140px] sm:max-w-[240px]" title={c.campaign}>{c.campaign}</p>
+                        <p className="text-[9px] text-foreground-muted/60 truncate max-w-[140px] sm:max-w-[240px]" title={c.pageName}>{c.pageName}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-1 sm:px-2 py-2 text-right whitespace-nowrap text-[10px] sm:text-[11px]">
+                    <span className={spendGood ? good : spendBad ? bad : base}>{thb(c.spend)}</span>
+                  </td>
+                  <td className="px-1 sm:px-2 py-2 text-right whitespace-nowrap text-[10px] sm:text-[11px]">
+                    <span className={inboxGood ? good : inboxBad ? bad : base}>{num(c.inbox)}</span>
+                  </td>
+                  <td className="px-1 sm:px-2 py-2 text-right whitespace-nowrap text-[10px] sm:text-[11px]">
+                    <span className={cpiGood ? good : cpiBad ? bad : base}>{thb(c.cpi)}</span>
+                  </td>
+                  <td className="px-1 sm:px-2 py-2 text-right whitespace-nowrap text-[10px] sm:text-[11px]">
+                    <span className={leadGood ? good : leadBad ? bad : base}>{c.leads}</span>
+                  </td>
+                  <td className="px-1 sm:px-2 py-2 text-right whitespace-nowrap text-[10px] sm:text-[11px]">
+                    <span className={cplGood ? good : cplBad ? bad : base}>{thb(c.cpl)}</span>
+                  </td>
+                  <td className="px-1 sm:px-2 py-2 text-right whitespace-nowrap text-[10px] sm:text-[11px]">
+                    <span className={c.inbox > 0 ? (ratioGood ? good : ratioBad ? bad : base) : "text-foreground-muted/30"}>
+                      {c.inbox > 0 ? pct(c.leadInboxRatio) : "—"}
+                    </span>
+                  </td>
+                </tr>
+                );
+              })}
+            </tbody>
+
+            {campaigns.length > 0 && (
+              <tfoot>
+                <tr className="border-t border-white/10 bg-navy-950/40">
+                  <td className="px-4 py-4 text-xs font-bold text-foreground-muted uppercase">
+                    รวม {campaigns.length} campaign
+                  </td>
+                  <td className="px-3 py-4 text-right font-bold text-gold-400 text-sm">{thb(campaignKpis.totalSpend)}</td>
+                  <td className="px-3 py-4 text-right font-bold text-blue-400 text-sm">{num(campaignKpis.totalInbox)}</td>
+                  <td className="px-3 py-4 text-right font-medium text-cyan-400/80 text-[11px]">avg {thb(campaignKpis.avgCPI)}</td>
+                  <td className="px-3 py-4 text-right font-bold text-purple-400 text-sm">{num(campaignKpis.totalLeads)}</td>
+                  <td className="px-3 py-4 text-right font-medium text-orange-400/80 text-[11px]">avg {thb(campaignKpis.avgCPL)}</td>
+                  <td className="px-3 py-4 text-right font-bold">
+                    <span className={`px-2 py-1 rounded-lg text-xs ${campaignKpis.ratio >= 20 ? "bg-emerald-500/10 text-emerald-400" : campaignKpis.ratio >= 10 ? "bg-amber-500/10 text-amber-400" : "bg-red-500/10 text-red-400"}`}>
+                      {pct(campaignKpis.ratio)}
                     </span>
                   </td>
                 </tr>
