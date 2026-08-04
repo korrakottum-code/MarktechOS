@@ -179,11 +179,12 @@ async function fetchInsightsForAccount(
   let nextUrl: string | null = url;
   while (nextUrl) {
     const res = await fetchMeta(nextUrl);
+    const data = await res.json().catch(() => null);
     if (!res.ok) {
-      throw new Error(`${accountName}: Meta HTTP ${res.status}`);
+      const detail = data?.error?.message ?? data?.error?.error_user_msg ?? `HTTP ${res.status}`;
+      throw new Error(`${accountName}: ${detail}`);
     }
-    const data = await res.json();
-    if (data.error) {
+    if (data?.error) {
       throw new Error(`${accountName}: ${data.error.message ?? "Meta API error"}`);
     }
 
