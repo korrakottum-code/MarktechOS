@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useAuthSession } from "@/lib/use-auth-session";
 import { isClientRole } from "@/lib/auth/permissions";
+import SyncTab from "./SyncTab";
 
 interface UserItem {
   id: string;
@@ -44,6 +45,7 @@ function getRoleBadge(role: string) {
 function AdminContent() {
   const router = useRouter();
   const { user: authUser, loading: authLoading } = useAuthSession();
+  const [tab, setTab] = useState<"users" | "sync">("users");
   const [users, setUsers] = useState<UserItem[]>([]);
   const [allPages, setAllPages] = useState<PageOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -203,7 +205,10 @@ function AdminContent() {
     p.pageName.toLowerCase().includes(pageSearchQuery.toLowerCase())
   );
 
-  if (authLoading || loading) {
+  // Only the "users" tab depends on this fetch — a failure here (e.g. a
+  // missing SUPABASE_SERVICE_ROLE_KEY in local dev) shouldn't block the
+  // Sync tab, so this no longer gates the whole page.
+  if (authLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-4">
         <div className="relative w-14 h-14">
@@ -211,17 +216,6 @@ function AdminContent() {
           <div className="absolute inset-0 border-2 border-gold-500 border-t-transparent rounded-full animate-spin" />
         </div>
         <p className="text-sm text-foreground-muted animate-pulse">กำลังโหลด...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="flex items-center gap-3 px-6 py-4 bg-red-500/10 border border-red-500/20 rounded-2xl">
-          <AlertCircle size={20} className="text-red-400" />
-          <p className="text-sm text-red-400">{error}</p>
-        </div>
       </div>
     );
   }
@@ -235,19 +229,60 @@ function AdminContent() {
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gold-500/20 to-gold-600/10 flex items-center justify-center border border-gold-500/20">
               <Users size={20} className="text-gold-400" />
             </div>
-            จัดการผู้ใช้งาน
+            จัดการระบบ
           </h1>
-          <p className="text-sm text-foreground-muted mt-1">กำหนดสิทธิ์การเข้าถึง Page สำหรับแต่ละผู้ใช้</p>
+          <p className="text-sm text-foreground-muted mt-1">
+            {tab === "users" ? "กำหนดสิทธิ์การเข้าถึง Page สำหรับแต่ละผู้ใช้" : "เลือกบัญชีและช่วงวันที่ก่อนดึงข้อมูลจาก Meta"}
+          </p>
         </div>
-        <button
-          onClick={openCreateModal}
-          className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-br from-gold-400 to-gold-600 text-navy-950 rounded-xl text-sm font-bold hover:from-gold-300 hover:to-gold-500 transition-all shadow-lg shadow-gold-500/20 active:scale-[0.97]"
-        >
-          <Plus size={16} />
-          เพิ่มผู้ใช้ใหม่
-        </button>
+        {tab === "users" && (
+          <button
+            onClick={openCreateModal}
+            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-br from-gold-400 to-gold-600 text-navy-950 rounded-xl text-sm font-bold hover:from-gold-300 hover:to-gold-500 transition-all shadow-lg shadow-gold-500/20 active:scale-[0.97]"
+          >
+            <Plus size={16} />
+            เพิ่มผู้ใช้ใหม่
+          </button>
+        )}
       </div>
 
+      {/* Tabs */}
+      <div className="flex gap-1.5 border-b border-border">
+        {([
+          ["users", "ผู้ใช้งาน"],
+          ["sync", "Sync ข้อมูล Ads"],
+        ] as const).map(([value, label]) => (
+          <button key={value} type="button" onClick={() => setTab(value)}
+            className={`px-4 py-2.5 text-sm font-bold border-b-2 -mb-px transition-colors ${
+              tab === value ? "text-gold-400 border-gold-500" : "text-foreground-muted border-transparent hover:text-foreground"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "sync" && <SyncTab />}
+
+      {tab === "users" && (
+      <>
+      {loading ? (
+        <div className="flex flex-col items-center justify-center h-64 gap-4">
+          <div className="relative w-14 h-14">
+            <div className="absolute inset-0 border-2 border-gold-500/20 rounded-full" />
+            <div className="absolute inset-0 border-2 border-gold-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+          <p className="text-sm text-foreground-muted animate-pulse">กำลังโหลด...</p>
+        </div>
+      ) : error ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="flex items-center gap-3 px-6 py-4 bg-red-500/10 border border-red-500/20 rounded-2xl">
+            <AlertCircle size={20} className="text-red-400" />
+            <p className="text-sm text-red-400">{error}</p>
+          </div>
+        </div>
+      ) : (
+      <>
       {/* Success Message */}
       {successMsg && (
         <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-medium animate-fade-in shadow-lg">
@@ -530,6 +565,10 @@ function AdminContent() {
             </form>
           </div>
         </div>
+      )}
+      </>
+      )}
+      </>
       )}
     </div>
   );

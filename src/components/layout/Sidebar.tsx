@@ -174,7 +174,7 @@ export default function Sidebar({
           title={collapsed && !mobileOpen ? "ภาพรวมทั้งหมด" : undefined}
         >
           <LayoutDashboard size={20} className={`shrink-0 ${pathname === "/" && selectedPages.size === 0 ? "text-gold-400" : "text-foreground-muted group-hover:text-foreground"}`} />
-          {(!collapsed || mobileOpen) && <span className="truncate">{isClient ? "ภาพรวมของฉัน" : "ภาพรวมทุกสาขา"}</span>}
+          {(!collapsed || mobileOpen) && <span className="truncate">{isClient ? "ภาพรวมของฉัน" : "เลือกชุดที่ดู"}</span>}
           {pathname === "/" && selectedPages.size === 0 && <div className="absolute left-0 w-1 h-8 rounded-r-full bg-gold-400" />}
         </button>
         )}

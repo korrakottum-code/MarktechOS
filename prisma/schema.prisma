@@ -104,3 +104,23 @@ model AdsSyncLock {
   lockedUntil DateTime
   updatedAt   DateTime @updatedAt
 }
+
+// ── Saved page groupings for the team home-page report picker ───────────────
+// Distinct from AdsReportSet below: this groups clinic pageIds for VIEWING
+// the dashboard, not Meta ad accountIds for syncing.
+model PageReportSet {
+  id        String   @id @default(cuid())
+  name      String
+  pageIds   String[] @default([])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ── Saved account selections for manual/on-demand syncs ─────────────────────
+model AdsReportSet {
+  id         String   @id @default(cuid())
+  name       String
+  accountIds String[] @default([])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
