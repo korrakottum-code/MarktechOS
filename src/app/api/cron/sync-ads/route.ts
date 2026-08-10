@@ -446,8 +446,18 @@ export async function GET(req: NextRequest) {
       }
     }));
 
-    const allAccountEntries = [...accountTokenMap.values()];
-    if (allAccountEntries.length === 0) throw new Error("No accessible ad accounts found");
+    const discoveredAccountEntries = [...accountTokenMap.values()];
+    if (discoveredAccountEntries.length === 0) throw new Error("No accessible ad accounts found");
+
+    // Optional manual filter (?accounts=id1,id2) — used by the admin sync picker.
+    // The scheduled cron never sends this param, so its behavior is unchanged.
+    const accountsParam = searchParams.get("accounts");
+    const allAccountEntries = accountsParam
+      ? discoveredAccountEntries.filter(({ acc }) => accountsParam.split(",").includes(acc.account_id))
+      : discoveredAccountEntries;
+    if (allAccountEntries.length === 0) {
+      throw new Error("No accessible ad accounts matched the requested `accounts` filter");
+    }
     accountsTotal = allAccountEntries.length;
 
     console.log(`📋 Found ${allAccountEntries.length} unique ad accounts (from ${tokens.length} tokens)`);

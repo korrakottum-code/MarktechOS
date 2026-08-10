@@ -13,6 +13,7 @@ import {
 import { useAuthSession } from "@/lib/use-auth-session";
 import { isClientRole } from "@/lib/auth/permissions";
 import { useExcludedPages } from "@/lib/use-excluded-pages";
+import ReportSetGallery from "./ReportSetGallery";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function toISO(d: Date) { 
@@ -244,9 +245,31 @@ function timeAgo(iso: string | null): string {
 export default function FacebookAdsDashboardPage() {
   return (
     <Suspense fallback={<div className="flex items-center justify-center min-h-[50vh]"><div className="text-foreground-muted">Loading...</div></div>}>
-      <FacebookAdsDashboard />
+      <FacebookAdsDashboardGate />
     </Suspense>
   );
+}
+
+// Team members (everyone except role "client") land on a report-set picker
+// instead of an immediate all-pages fetch — picking a set (or "all") sets the
+// `pages` URL param, which is what actually gates the dashboard below.
+// Clients keep going straight to their (already page-restricted) dashboard.
+function FacebookAdsDashboardGate() {
+  const searchParams = useSearchParams();
+  const { user: authUser, loading: authLoading } = useAuthSession();
+  const urlPages = searchParams.get("pages");
+
+  if (authLoading) {
+    return <div className="flex items-center justify-center min-h-[50vh]"><div className="text-foreground-muted">Loading...</div></div>;
+  }
+
+  const isClient = authUser ? isClientRole(authUser.role) : false;
+  if (!isClient && !urlPages) {
+    const canManage = authUser?.role === "admin" || authUser?.role === "ceo";
+    return <ReportSetGallery canManage={canManage} />;
+  }
+
+  return <FacebookAdsDashboard />;
 }
 
 function FacebookAdsDashboard() {
