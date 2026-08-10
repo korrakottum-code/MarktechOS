@@ -269,7 +269,9 @@ async function scrapePageName(pageId: string): Promise<string | null> {
     if (!name || invalidNames.includes(name.toLowerCase())) return null;
     // Remove " | City" suffix only (keep the rest of the name)
     name = name.replace(/\s*\|\s*[^|]+$/, "").trim();
-    return name || null;
+    // Re-check after stripping: "Log into Facebook | Facebook" → "Log into Facebook"
+    if (!name || invalidNames.includes(name.toLowerCase())) return null;
+    return name;
   } catch { return null; }
 }
 

@@ -19,10 +19,20 @@ export async function GET() {
       where.pageId = { in: allowedPages.filter(pageId => observedPages.some(page => page.pageId === pageId)) };
     }
 
-    const pages = await prisma.pageNameCache.findMany({
+    const cached = await prisma.pageNameCache.findMany({
       where,
       orderBy: { pageName: "asc" }
     });
+    // Fall back to pageId for names scraped off Facebook login/error pages so
+    // the page stays selectable instead of showing e.g. "Log into Facebook".
+    const INVALID_PAGE_NAMES = new Set([
+      "facebook", "log in to facebook", "log into facebook",
+      "เข้าสู่ระบบ facebook", "เกิดข้อผิดพลาด", "page not found",
+      "content not found", "ลงชื่อเข้าใช้ facebook",
+    ]);
+    const pages = cached.map(p =>
+      INVALID_PAGE_NAMES.has(p.pageName.toLowerCase()) ? { ...p, pageName: p.pageId } : p
+    );
     return NextResponse.json({ pages });
   } catch (error: any) {
     if (error instanceof AuthenticationError) {
