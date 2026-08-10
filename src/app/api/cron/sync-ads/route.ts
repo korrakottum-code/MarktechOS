@@ -94,6 +94,12 @@ async function requireSyncAuthorization(req: NextRequest): Promise<NextResponse 
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }
 
+// Meta error codes for transient rate limits (app/user/page/custom). Meta
+// returns these as HTTP 400, not 429, so a status-code-only check treats them
+// as permanent failures and never retries — that's what silently dropped
+// whole accounts' data during heavy sync periods.
+const META_RATE_LIMIT_CODES = new Set([4, 17, 32, 613]);
+
 async function fetchMeta(url: string): Promise<Response> {
   let lastError: Error | null = null;
   for (let attempt = 0; attempt < META_RETRY_ATTEMPTS; attempt++) {
@@ -102,8 +108,19 @@ async function fetchMeta(url: string): Promise<Response> {
         cache: "no-store",
         signal: AbortSignal.timeout(META_TIMEOUT_MS),
       });
-      if (res.ok || (res.status < 500 && res.status !== 429)) return res;
-      lastError = new Error(`Meta HTTP ${res.status}`);
+      if (res.ok) return res;
+
+      let errorCode: number | undefined;
+      let errorMessage = `Meta HTTP ${res.status}`;
+      try {
+        const body = await res.clone().json();
+        errorCode = body?.error?.code;
+        if (body?.error?.message) errorMessage = body.error.message;
+      } catch { /* non-JSON error body */ }
+
+      const isRateLimited = res.status === 429 || (errorCode !== undefined && META_RATE_LIMIT_CODES.has(errorCode));
+      if (!isRateLimited && res.status < 500) return res;
+      lastError = new Error(errorMessage);
     } catch (error) {
       lastError = error instanceof Error ? error : new Error("Meta request failed");
     }
@@ -473,13 +490,16 @@ export async function GET(req: NextRequest) {
 
     const allInsights: AccountInsight[] = [];
     const accountSummary: any[] = [];
+    const succeededAccountIds: string[] = [];
 
     for (let i = 0; i < results.length; i++) {
       const result = results[i];
-      const accName = allAccountEntries[i].acc.name ?? allAccountEntries[i].acc.account_id;
+      const accId = allAccountEntries[i].acc.account_id;
+      const accName = allAccountEntries[i].acc.name ?? accId;
       if (result.status === "fulfilled") {
         allInsights.push(...result.value);
         accountSummary.push({ name: accName, rows: result.value.length, status: "✅" });
+        succeededAccountIds.push(accId);
       } else {
         console.warn(`❌ ${accName}: ${result.reason}`);
         accountSummary.push({ name: accName, rows: 0, status: "❌", error: String(result.reason) });
@@ -1001,11 +1021,13 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // All accounts completed successfully, so this date range is authoritative.
-    // Replace it atomically to remove rows for ads/campaigns that no longer exist.
+    // Replace this date range atomically, but only for accounts that actually
+    // fetched successfully this run — scoping the delete this way means an
+    // account that fails (e.g. a rate limit) keeps its last-good data instead
+    // of being wiped with nothing to replace it.
     await prisma.$transaction(async (tx) => {
-      await tx.adsMetricDaily.deleteMany({ where: { date: { gte: since, lte: until } } });
-      await tx.adsContentDaily.deleteMany({ where: { date: { gte: since, lte: until } } });
+      await tx.adsMetricDaily.deleteMany({ where: { date: { gte: since, lte: until }, adAccountId: { in: succeededAccountIds } } });
+      await tx.adsContentDaily.deleteMany({ where: { date: { gte: since, lte: until }, adAccountId: { in: succeededAccountIds } } });
       await bulkUpsertMetricDaily(campaignRows, tx);
       await bulkUpsertContentDaily(adRows, tx);
     }, { timeout: DB_TRANSACTION_TIMEOUT_MS });
