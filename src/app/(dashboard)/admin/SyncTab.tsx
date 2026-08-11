@@ -139,7 +139,7 @@ export default function SyncTab() {
   }
 
   async function deleteSet(id: string) {
-    if (!confirm("ลบชุดนี้?")) return;
+    if (!confirm("ลบชุดบัญชีนี้?")) return;
     const res = await fetch(`/api/admin/report-sets?id=${id}`, { method: "DELETE" });
     if (res.ok) loadReportSets();
   }
@@ -339,7 +339,7 @@ export default function SyncTab() {
             {/* Save as set */}
             <div className="flex items-center gap-2 pt-1">
               <input
-                type="text" placeholder="ตั้งชื่อชุด แล้วบันทึกไว้ใช้ซ้ำ..."
+                type="text" placeholder="ตั้งชื่อชุดบัญชี แล้วบันทึกไว้ใช้ซ้ำ..."
                 value={newSetName} onChange={e => setNewSetName(e.target.value)}
                 className="flex-1 bg-background/50 border border-border rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-foreground-muted/30 focus:outline-none focus:border-gold-500/50"
               />
@@ -347,7 +347,7 @@ export default function SyncTab() {
                 disabled={savingSet || !newSetName.trim() || selected.size === 0}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold text-gold-text border border-gold-500/30 hover:bg-gold-500/10 disabled:opacity-40 transition-colors">
                 {savingSet ? <Loader2 size={12} className="animate-spin" /> : <Bookmark size={12} />}
-                บันทึกเป็นชุด
+                บันทึกเป็นชุดบัญชี
               </button>
             </div>
           </>

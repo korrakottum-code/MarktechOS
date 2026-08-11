@@ -7,7 +7,7 @@ import {
   Search, AlertCircle, Loader2, Eye, EyeOff, ChevronDown
 } from "lucide-react";
 import { useAuthSession } from "@/lib/use-auth-session";
-import { isClientRole } from "@/lib/auth/permissions";
+import { canAccessPath } from "@/lib/auth/permissions";
 import SyncTab from "./SyncTab";
 
 interface UserItem {
@@ -89,7 +89,7 @@ function AdminContent() {
 
   useEffect(() => {
     if (!authLoading) {
-      if (!authUser || isClientRole(authUser.role)) {
+      if (!authUser || !canAccessPath("/admin", authUser.role)) {
         router.replace("/");
         return;
       }

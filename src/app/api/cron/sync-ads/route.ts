@@ -124,7 +124,9 @@ async function fetchMeta(url: string): Promise<Response> {
     } catch (error) {
       lastError = error instanceof Error ? error : new Error("Meta request failed");
     }
-    await new Promise(resolve => setTimeout(resolve, 500 * 2 ** attempt));
+    if (attempt < META_RETRY_ATTEMPTS - 1) {
+      await new Promise(resolve => setTimeout(resolve, 500 * 2 ** attempt));
+    }
   }
   throw lastError ?? new Error("Meta request failed");
 }
@@ -1055,6 +1057,7 @@ export async function GET(req: NextRequest) {
       data: {
         status: "completed",
         accountsTotal,
+        accountsFailed,
         campaignRows: campaignRows.length,
         contentRows: adRows.length,
         completedAt: new Date(),

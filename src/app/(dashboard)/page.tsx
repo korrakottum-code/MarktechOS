@@ -58,7 +58,7 @@ const adsDataCache = new Map<string, AdsDataPayload>();
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const adsDataCacheTime = new Map<string, number>();
 
-function useAdsData(since: string, until: string) {
+function useAdsData(since: string, until: string, pages: string) {
   const [metrics, setMetrics] = useState<AdsMetric[]>([]);
   const [meta, setMeta] = useState<AdsDataMeta | null>(null);
   const [globalAdContent, setGlobalAdContent] = useState<GlobalAdItem[]>([]);
@@ -76,9 +76,9 @@ function useAdsData(since: string, until: string) {
     setError(null);
   }, []);
 
-  const load = useCallback(async (s: string, u: string, opts: { silent?: boolean; force?: boolean } = {}) => {
+  const load = useCallback(async (s: string, u: string, p: string, opts: { silent?: boolean; force?: boolean } = {}) => {
     const { silent = false, force = false } = opts;
-    const key = `${s}|${u}`;
+    const key = `${s}|${u}|${p}`;
 
     // Serve from cache when fresh (skipped on force = sync/manual refresh)
     if (!force) {
@@ -98,7 +98,8 @@ function useAdsData(since: string, until: string) {
 
     try {
       if (!silent) setLoading(true);
-      const res = await fetch(`/api/ads-data?since=${s}&until=${u}`, { signal: controller.signal });
+      const url = `/api/ads-data?since=${s}&until=${u}${p ? `&pages=${encodeURIComponent(p)}` : ""}`;
+      const res = await fetch(url, { signal: controller.signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       if (json.error) throw new Error(json.error);
@@ -125,16 +126,16 @@ function useAdsData(since: string, until: string) {
   }, [applyPayload]);
 
   useEffect(() => {
-    load(since, until);
+    load(since, until, pages);
     return () => activeRequest.current?.abort();
-  }, [since, until, load]);
+  }, [since, until, pages, load]);
 
   useEffect(() => {
-    const interval = setInterval(() => load(since, until, { silent: true, force: true }), AUTO_REFRESH_MS);
+    const interval = setInterval(() => load(since, until, pages, { silent: true, force: true }), AUTO_REFRESH_MS);
     return () => clearInterval(interval);
-  }, [since, until, load]);
+  }, [since, until, pages, load]);
 
-  const reload = useCallback(() => load(since, until, { force: true }), [load, since, until]);
+  const reload = useCallback(() => load(since, until, pages, { force: true }), [load, since, until, pages]);
 
   const isStale = useMemo(() => {
     if (!meta?.lastSyncedAt) return true;
@@ -263,9 +264,20 @@ function FacebookAdsDashboardGate() {
     return <div className="flex items-center justify-center min-h-[50vh]"><div className="text-foreground-muted">Loading...</div></div>;
   }
 
-  const isClient = authUser ? isClientRole(authUser.role) : false;
+  // authUser can resolve to null here even for a real, logged-in client —
+  // this route only renders because proxy.ts already confirmed a session
+  // server-side, so a null client-side result is a transient hiccup, not
+  // "not a client." Fail safe to the normal dashboard rather than guessing
+  // "team member" and showing a client a picker they'll immediately get a
+  // Forbidden error from — the dashboard's own data fetch independently
+  // re-checks page access server-side regardless of what renders here.
+  if (!authUser) {
+    return <FacebookAdsDashboard />;
+  }
+
+  const isClient = isClientRole(authUser.role);
   if (!isClient && !urlPages) {
-    const canManage = authUser?.role === "admin" || authUser?.role === "ceo";
+    const canManage = authUser.role === "admin" || authUser.role === "ceo";
     return <ReportSetGallery canManage={canManage} />;
   }
 
@@ -278,8 +290,11 @@ function FacebookAdsDashboard() {
   const today = toISO(new Date());
   const [since, setSince] = useState(() => searchParams.get("since") || today);
   const [until, setUntil] = useState(() => searchParams.get("until") || today);
+  // The active report set (comma-separated pageIds) — narrows the /api/ads-data
+  // query itself, not just what's rendered, once a set/all is picked.
+  const urlPages = searchParams.get("pages") ?? "";
 
-  const { metrics: _rawAll, meta, globalAdContent: _globalAdContentAll, globalAdByContent: _globalAdByContentAll, loading, error, reload, isStale } = useAdsData(since, until);
+  const { metrics: _rawAll, meta, globalAdContent: _globalAdContentAll, globalAdByContent: _globalAdByContentAll, loading, error, reload, isStale } = useAdsData(since, until, urlPages);
 
   // ── Auth: check if current user is a client (hide sync, admin features) ────
   const { user: authUser } = useAuthSession();
@@ -292,6 +307,14 @@ function FacebookAdsDashboard() {
     if (excludedPages.size === 0) return _rawAll;
     return _rawAll.filter(m => !excludedPages.has(m.pageId));
   }, [_rawAll, excludedPages]);
+
+  // Ad accounts behind the currently loaded (already page-scoped) rows —
+  // lets the manual Sync button below re-sync just this report set's
+  // accounts instead of every account in the agency.
+  const scopedAccountIds = useMemo(
+    () => [...new Set(raw.map(m => m.adAccountId).filter(Boolean))],
+    [raw],
+  );
 
   // Helper to filter pageBreakdown from global ad items and recalculate metrics
   const filterExcludedFromGlobal = useCallback((items: GlobalAdItem[]): GlobalAdItem[] => {
@@ -372,7 +395,6 @@ function FacebookAdsDashboard() {
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [showExtraCols, setShowExtraCols] = useState(false);
   const [serviceFilter, setServiceFilter] = useState<string | null>(null);
-  const urlPages = searchParams.get("pages");
   const selectedPages = useMemo(() => new Set(urlPages ? urlPages.split(",") : []), [urlPages]);
 
   const [expandedServices, setExpandedServices] = useState<Set<string>>(new Set());
@@ -624,8 +646,12 @@ function FacebookAdsDashboard() {
       setTimeout(() => setSyncMsg(null), 8000);
     };
 
-    // Fire the sync request (don't await — proxy may drop long connections)
-    fetch(`/api/cron/sync-ads?since=${since}&until=${until}&t=${Date.now()}`, { cache: 'no-store' })
+    // Fire the sync request (don't await — proxy may drop long connections).
+    // Scoped to the accounts behind the currently viewed report set, not
+    // every account in the agency — matches the picker's date/account scope
+    // instead of silently re-pulling everything.
+    const accountsQuery = scopedAccountIds.length > 0 ? `&accounts=${scopedAccountIds.join(",")}` : "";
+    fetch(`/api/cron/sync-ads?since=${since}&until=${until}&t=${Date.now()}${accountsQuery}`, { cache: 'no-store' })
       .then(async (res) => {
         if (done) return;
         try {
@@ -672,7 +698,7 @@ function FacebookAdsDashboard() {
       }
     }, 5000);
 
-  }, [since, until, reload, meta?.lastSyncedAt]);
+  }, [since, until, reload, meta?.lastSyncedAt, scopedAccountIds]);
 
   // ── Stale data: show banner instead of auto-syncing ─────────────────────────
   // (auto-sync removed — the heavy Meta API sync should be user-initiated)
@@ -854,6 +880,7 @@ function FacebookAdsDashboard() {
             <div className="flex gap-2 shrink-0 sm:hidden">
               {!isClient && (
               <button onClick={handleSync} disabled={syncing}
+                title={`Sync ชุดนี้จาก Meta (${scopedAccountIds.length} บัญชี)`}
                 className="flex items-center gap-2 px-3 py-1.5 bg-gold-500 text-navy-950 rounded-xl text-xs font-bold hover:bg-gold-400 transition-all shadow-lg shadow-gold-500/20 disabled:opacity-60">
                 <RefreshCw size={12} className={syncing ? "animate-spin" : ""} />
               </button>
@@ -899,6 +926,7 @@ function FacebookAdsDashboard() {
           <div className="hidden sm:flex items-center ml-1">
             {!isClient && (
             <button onClick={handleSync} disabled={syncing}
+              title={`Sync ชุดนี้จาก Meta (${scopedAccountIds.length} บัญชี) — ดึงเฉพาะบัญชีที่อยู่ในชุดที่กำลังดูอยู่`}
               className="flex items-center gap-2 px-4 py-1.5 bg-gold-500 text-navy-950 rounded-xl text-sm font-bold hover:bg-gold-400 transition-all shadow-lg shadow-gold-500/20 disabled:opacity-60">
               <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />
               {syncing ? "Syncing" : "Sync"}
@@ -931,7 +959,7 @@ function FacebookAdsDashboard() {
         <div className="mb-6 flex items-center gap-3 px-4 py-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 animate-fade-in shadow-lg">
           <AlertCircle size={16} className="text-amber-400 shrink-0" />
           <p className="text-sm text-amber-400 flex-1 font-medium">
-            ข้อมูลเก่ากว่า 1 ชม. ({timeAgo(meta?.lastSyncedAt ?? null)}) — กด Sync เพื่ออัปเดตจาก Meta
+            ข้อมูลเก่ากว่า 1 ชม. ({timeAgo(meta?.lastSyncedAt ?? null)}) — กด Sync เพื่ออัปเดตชุดนี้จาก Meta ({scopedAccountIds.length} บัญชี)
           </p>
           <button onClick={handleSync}
             className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 rounded-xl text-xs font-bold text-amber-300 transition-colors">

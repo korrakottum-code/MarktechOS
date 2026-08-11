@@ -74,6 +74,29 @@ export async function POST(req: NextRequest) {
   }
 }
 
+// ── PUT /api/report-sets — rename / change pages in a saved set (admin/ceo) ─
+export async function PUT(req: NextRequest) {
+  const admin = await requireAdmin();
+  if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  try {
+    const body = await req.json();
+    const id = String(body.id || "");
+    if (!id) return NextResponse.json({ error: "ไม่พบ id" }, { status: 400 });
+
+    const name = String(body.name || "").trim();
+    const pageIds = Array.isArray(body.pageIds) ? body.pageIds.map(String) : [];
+    if (!name) return NextResponse.json({ error: "กรุณาตั้งชื่อชุด" }, { status: 400 });
+    if (pageIds.length === 0) return NextResponse.json({ error: "กรุณาเลือกอย่างน้อย 1 เพจ" }, { status: 400 });
+
+    const set = await prisma.pageReportSet.update({ where: { id }, data: { name, pageIds } });
+    return NextResponse.json({ set });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
 // ── DELETE /api/report-sets?id=... — remove a saved set (admin/ceo only) ────
 export async function DELETE(req: NextRequest) {
   const admin = await requireAdmin();
