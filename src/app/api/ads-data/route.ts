@@ -10,10 +10,19 @@ export async function GET(req: NextRequest) {
   const since  = searchParams.get("since") ?? "";
   const until  = searchParams.get("until") ?? "";
   const pageId = searchParams.get("pageId") ?? "";
+  const pagesParam = searchParams.get("pages") ?? "";
+  const requestedPages = pagesParam ? pagesParam.split(",").filter(Boolean) : null;
 
   try {
     // ── Check user's allowed pages (page-level access control) ────────────
     const { allowedPages } = await getPageAccessForCurrentUser();
+
+    // A report-set's `pages` narrows the query itself (not just what's
+    // rendered client-side) — always intersected with allowedPages so a
+    // hand-edited URL can never widen a client's actual access.
+    const effectivePages = requestedPages
+      ? (allowedPages ? requestedPages.filter(id => allowedPages.includes(id)) : requestedPages)
+      : allowedPages;
 
     // Build date filter
     const where: any = {};
@@ -26,9 +35,8 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: "Access denied to this page" }, { status: 403 });
       }
       where.pageId = pageId;
-    } else if (allowedPages) {
-      // No specific page requested, but user has page restrictions
-      where.pageId = { in: allowedPages };
+    } else if (effectivePages) {
+      where.pageId = { in: effectivePages };
     }
 
     const rows = await prisma.adsMetricDaily.findMany({
@@ -331,8 +339,8 @@ export async function GET(req: NextRequest) {
     // ── Global ad content (when no pageId — for main dashboard) ──────────
     if (!pageId && since && until) {
       const globalAdWhere: any = { date: { gte: since, lte: until } };
-      if (allowedPages) {
-        globalAdWhere.pageId = { in: allowedPages };
+      if (effectivePages) {
+        globalAdWhere.pageId = { in: effectivePages };
       }
       const globalAdRows = await prisma.adsContentDaily.findMany({
         where: globalAdWhere,

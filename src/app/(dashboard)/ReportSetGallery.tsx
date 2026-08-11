@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
-  LayoutGrid, Plus, Search, Check, Loader2, AlertCircle, Trash2,
+  LayoutGrid, Plus, Search, Check, Loader2, AlertCircle, Trash2, Pencil,
   DollarSign, MessageCircle, Users as UsersIcon, X,
 } from "lucide-react";
 
@@ -38,6 +38,7 @@ export default function ReportSetGallery({ canManage }: { canManage: boolean }) 
   const [allPages, setAllPages] = useState<PageOption[]>([]);
 
   const [creating, setCreating] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
   const [newPageIds, setNewPageIds] = useState<Set<string>>(new Set());
   const [pageSearch, setPageSearch] = useState("");
@@ -78,6 +79,7 @@ export default function ReportSetGallery({ canManage }: { canManage: boolean }) 
   }
 
   function viewAll() {
+    if (allPages.length === 0) return; // still loading, or genuinely no pages yet
     openSet(allPages.map(p => p.pageId));
   }
 
@@ -88,21 +90,42 @@ export default function ReportSetGallery({ canManage }: { canManage: boolean }) 
     if (res.ok) loadSets();
   }
 
+  function startCreate() {
+    setCreating(true);
+    setEditingId(null);
+    setNewName("");
+    setNewPageIds(new Set());
+    setPageSearch("");
+  }
+
+  function startEdit(set: ReportSet, e: React.MouseEvent) {
+    e.stopPropagation();
+    setCreating(true);
+    setEditingId(set.id);
+    setNewName(set.name);
+    setNewPageIds(new Set(set.pageIds));
+    setPageSearch("");
+  }
+
+  function closeCreatePanel() {
+    setCreating(false);
+    setEditingId(null);
+    setNewName("");
+    setNewPageIds(new Set());
+  }
+
   async function saveNewSet() {
     if (!newName.trim() || newPageIds.size === 0) return;
     setSaving(true);
     try {
       const res = await fetch("/api/report-sets", {
-        method: "POST",
+        method: editingId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newName.trim(), pageIds: [...newPageIds] }),
+        body: JSON.stringify({ id: editingId, name: newName.trim(), pageIds: [...newPageIds] }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "บันทึกไม่สำเร็จ");
-      setCreating(false);
-      setNewName("");
-      setNewPageIds(new Set());
-      setPageSearch("");
+      closeCreatePanel();
       loadSets();
     } catch (e) {
       alert(e instanceof Error ? e.message : String(e));
@@ -134,8 +157,8 @@ export default function ReportSetGallery({ canManage }: { canManage: boolean }) 
       </div>
 
       {/* View all */}
-      <button type="button" onClick={viewAll}
-        className="w-full flex items-center justify-between px-5 py-4 rounded-2xl bg-gradient-to-br from-gold-500/10 to-gold-600/5 border border-gold-500/25 hover:border-gold-500/50 transition-colors text-left group"
+      <button type="button" onClick={viewAll} disabled={allPages.length === 0}
+        className="w-full flex items-center justify-between px-5 py-4 rounded-2xl bg-gradient-to-br from-gold-500/10 to-gold-600/5 border border-gold-500/25 hover:border-gold-500/50 transition-colors text-left group disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-gold-500/25"
       >
         <div>
           <p className="text-sm font-bold text-gold-text">ดูภาพรวมทุกสาขา</p>
@@ -159,14 +182,21 @@ export default function ReportSetGallery({ canManage }: { canManage: boolean }) 
               className="text-left p-5 rounded-2xl bg-surface/50 border border-border hover:border-gold-500/40 transition-colors space-y-3 group relative"
             >
               {canManage && (
-                <span onClick={(e) => deleteSet(set.id, e)}
-                  className="absolute top-3 right-3 p-1.5 rounded-lg text-foreground-muted opacity-0 group-hover:opacity-100 hover:bg-red-500/15 hover:text-red-400 transition-all"
-                >
-                  <Trash2 size={13} />
-                </span>
+                <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                  <span onClick={(e) => startEdit(set, e)}
+                    className="p-1.5 rounded-lg text-foreground-muted hover:bg-gold-500/15 hover:text-gold-text"
+                  >
+                    <Pencil size={13} />
+                  </span>
+                  <span onClick={(e) => deleteSet(set.id, e)}
+                    className="p-1.5 rounded-lg text-foreground-muted hover:bg-red-500/15 hover:text-red-400"
+                  >
+                    <Trash2 size={13} />
+                  </span>
+                </div>
               )}
               <div>
-                <p className="font-bold text-foreground pr-6">{set.name}</p>
+                <p className="font-bold text-foreground pr-12">{set.name}</p>
                 <p className="text-xs text-foreground-muted mt-0.5">{fmtNames(set.pageNames)}</p>
               </div>
               <div className="flex items-center gap-4 pt-2 border-t border-border/50 text-xs">
@@ -185,7 +215,7 @@ export default function ReportSetGallery({ canManage }: { canManage: boolean }) 
           ))}
 
           {canManage && !creating && (
-            <button type="button" onClick={() => setCreating(true)}
+            <button type="button" onClick={startCreate}
               className="flex flex-col items-center justify-center gap-2 p-5 rounded-2xl border border-dashed border-border hover:border-gold-500/50 text-foreground-muted hover:text-gold-text transition-colors min-h-[140px]"
             >
               <Plus size={20} />
@@ -203,8 +233,8 @@ export default function ReportSetGallery({ canManage }: { canManage: boolean }) 
       {creating && (
         <div className="p-5 rounded-2xl bg-surface/50 border border-gold-500/30 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-foreground">สร้างชุดใหม่</h2>
-            <button type="button" onClick={() => { setCreating(false); setNewName(""); setNewPageIds(new Set()); }}
+            <h2 className="text-sm font-bold text-foreground">{editingId ? "แก้ไขชุด" : "สร้างชุดใหม่"}</h2>
+            <button type="button" onClick={closeCreatePanel}
               className="p-1 rounded-lg hover:bg-surface-hover text-foreground-muted">
               <X size={16} />
             </button>
@@ -250,7 +280,7 @@ export default function ReportSetGallery({ canManage }: { canManage: boolean }) 
               className="flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-gold-400 to-gold-600 text-navy-950 rounded-xl text-xs font-bold hover:from-gold-300 hover:to-gold-500 transition-all disabled:opacity-40"
             >
               {saving ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
-              บันทึกชุด
+              {editingId ? "บันทึกการแก้ไข" : "บันทึกชุด"}
             </button>
           </div>
         </div>
