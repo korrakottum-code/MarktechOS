@@ -36,13 +36,20 @@ export default function ReportSetGallery({ canManage }: { canManage: boolean }) 
   const [error, setError] = useState<string | null>(null);
 
   const [allPages, setAllPages] = useState<PageOption[]>([]);
+  const [pagesLoading, setPagesLoading] = useState(true);
 
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
   const [newPageIds, setNewPageIds] = useState<Set<string>>(new Set());
   const [pageSearch, setPageSearch] = useState("");
+  const [showSelectedOnly, setShowSelectedOnly] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  // While the panel is open (creating or editing), other cards' edit/delete
+  // controls are disabled — switching targets mid-edit silently discarded
+  // whatever was in progress, with no warning.
+  const cardActionsLocked = creating || deletingId !== null;
 
   const loadSets = useCallback(async () => {
     setLoading(true);
@@ -60,10 +67,15 @@ export default function ReportSetGallery({ canManage }: { canManage: boolean }) 
   }, []);
 
   const loadAllPages = useCallback(async () => {
-    const res = await fetch("/api/pages");
-    if (res.ok) {
-      const data = await res.json();
-      setAllPages(data.pages || []);
+    setPagesLoading(true);
+    try {
+      const res = await fetch("/api/pages");
+      if (res.ok) {
+        const data = await res.json();
+        setAllPages(data.pages || []);
+      }
+    } finally {
+      setPagesLoading(false);
     }
   }, []);
 
@@ -83,11 +95,22 @@ export default function ReportSetGallery({ canManage }: { canManage: boolean }) 
     openSet(allPages.map(p => p.pageId));
   }
 
-  async function deleteSet(id: string, e: React.MouseEvent) {
+  async function deleteSet(set: ReportSet, e: React.MouseEvent) {
     e.stopPropagation();
-    if (!confirm("ลบชุดนี้?")) return;
-    const res = await fetch(`/api/report-sets?id=${id}`, { method: "DELETE" });
-    if (res.ok) loadSets();
+    if (cardActionsLocked) return;
+    if (!confirm(`ลบชุด "${set.name}"?`)) return;
+    setDeletingId(set.id);
+    try {
+      const res = await fetch(`/api/report-sets?id=${set.id}`, { method: "DELETE" });
+      if (res.ok) {
+        // If this set's edit panel happened to be open, close it — its id no
+        // longer exists, so saving afterward would just fail.
+        if (editingId === set.id) closeCreatePanel();
+        loadSets();
+      }
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   function startCreate() {
@@ -96,15 +119,18 @@ export default function ReportSetGallery({ canManage }: { canManage: boolean }) 
     setNewName("");
     setNewPageIds(new Set());
     setPageSearch("");
+    setShowSelectedOnly(false);
   }
 
   function startEdit(set: ReportSet, e: React.MouseEvent) {
     e.stopPropagation();
+    if (cardActionsLocked) return;
     setCreating(true);
     setEditingId(set.id);
     setNewName(set.name);
     setNewPageIds(new Set(set.pageIds));
     setPageSearch("");
+    setShowSelectedOnly(true); // editing — show what's already in the set first
   }
 
   function closeCreatePanel() {
@@ -112,6 +138,8 @@ export default function ReportSetGallery({ canManage }: { canManage: boolean }) 
     setEditingId(null);
     setNewName("");
     setNewPageIds(new Set());
+    setShowSelectedOnly(false);
+    setPageSearch("");
   }
 
   async function saveNewSet() {
@@ -142,7 +170,10 @@ export default function ReportSetGallery({ canManage }: { canManage: boolean }) 
     });
   }
 
-  const filteredPages = allPages.filter(p => p.pageName.toLowerCase().includes(pageSearch.toLowerCase()));
+  const filteredPages = allPages.filter(p =>
+    (!showSelectedOnly || newPageIds.has(p.pageId)) &&
+    p.pageName.toLowerCase().includes(pageSearch.toLowerCase())
+  );
 
   return (
     <div className="py-6 space-y-6 max-w-5xl mx-auto">
@@ -178,21 +209,23 @@ export default function ReportSetGallery({ canManage }: { canManage: boolean }) 
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {sets.map(set => (
-            <button key={set.id} type="button" onClick={() => openSet(set.pageIds)}
-              className="text-left p-5 rounded-2xl bg-surface/50 border border-border hover:border-gold-500/40 transition-colors space-y-3 group relative"
+            <button key={set.id} type="button" onClick={() => openSet(set.pageIds)} disabled={cardActionsLocked}
+              className={`text-left p-5 rounded-2xl bg-surface/50 border transition-colors space-y-3 group relative disabled:cursor-not-allowed ${
+                editingId === set.id ? "border-gold-500/50" : "border-border hover:border-gold-500/40"
+              }`}
             >
               {canManage && (
                 <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                  <span onClick={(e) => startEdit(set, e)}
-                    className="p-1.5 rounded-lg text-foreground-muted hover:bg-gold-500/15 hover:text-gold-text"
+                  <button type="button" onClick={(e) => startEdit(set, e)} disabled={cardActionsLocked}
+                    className="p-1.5 rounded-lg text-foreground-muted hover:bg-gold-500/15 hover:text-gold-text disabled:opacity-30 disabled:pointer-events-none"
                   >
                     <Pencil size={13} />
-                  </span>
-                  <span onClick={(e) => deleteSet(set.id, e)}
-                    className="p-1.5 rounded-lg text-foreground-muted hover:bg-red-500/15 hover:text-red-400"
+                  </button>
+                  <button type="button" onClick={(e) => deleteSet(set, e)} disabled={cardActionsLocked}
+                    className="p-1.5 rounded-lg text-foreground-muted hover:bg-red-500/15 hover:text-red-400 disabled:opacity-30 disabled:pointer-events-none"
                   >
-                    <Trash2 size={13} />
-                  </span>
+                    {deletingId === set.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                  </button>
                 </div>
               )}
               <div>
@@ -215,8 +248,9 @@ export default function ReportSetGallery({ canManage }: { canManage: boolean }) 
           ))}
 
           {canManage && !creating && (
-            <button type="button" onClick={startCreate}
-              className="flex flex-col items-center justify-center gap-2 p-5 rounded-2xl border border-dashed border-border hover:border-gold-500/50 text-foreground-muted hover:text-gold-text transition-colors min-h-[140px]"
+            <button type="button" onClick={startCreate} disabled={deletingId !== null}
+              title={deletingId !== null ? "รอลบชุดเดิมให้เสร็จก่อน" : undefined}
+              className="flex flex-col items-center justify-center gap-2 p-5 rounded-2xl border border-dashed border-border hover:border-gold-500/50 text-foreground-muted hover:text-gold-text transition-colors min-h-[140px] disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Plus size={20} />
               <span className="text-sm font-medium">สร้างชุดใหม่</span>
@@ -240,38 +274,61 @@ export default function ReportSetGallery({ canManage }: { canManage: boolean }) 
             </button>
           </div>
 
-          <input
-            type="text" placeholder="ตั้งชื่อชุด เช่น ภาคเหนือ, ลูกค้า VIP..."
-            value={newName} onChange={e => setNewName(e.target.value)}
-            className="w-full bg-background/50 border border-border rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-foreground-muted/30 focus:outline-none focus:border-gold-500/50"
-          />
-
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-2.5 text-foreground-muted" />
+          <div>
             <input
-              type="text" placeholder="ค้นหาเพจ..."
-              value={pageSearch} onChange={e => setPageSearch(e.target.value)}
-              className="w-full bg-background/50 border border-border rounded-lg pl-8 pr-3 py-2 text-xs text-foreground placeholder:text-foreground-muted/30 focus:outline-none focus:border-gold-500/50"
+              type="text" placeholder="ตั้งชื่อชุด เช่น ภาคเหนือ, ลูกค้า VIP..."
+              value={newName} onChange={e => setNewName(e.target.value)}
+              className="w-full bg-background/50 border border-border rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-foreground-muted/30 focus:outline-none focus:border-gold-500/50"
             />
+            {newName.length > 0 && !newName.trim() && (
+              <p className="text-[11px] text-red-400 mt-1">ชื่อชุดต้องไม่เป็นช่องว่างล้วน</p>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search size={14} className="absolute left-3 top-2.5 text-foreground-muted" />
+              <input
+                type="text" placeholder="ค้นหาเพจ..."
+                value={pageSearch} onChange={e => setPageSearch(e.target.value)}
+                className="w-full bg-background/50 border border-border rounded-lg pl-8 pr-3 py-2 text-xs text-foreground placeholder:text-foreground-muted/30 focus:outline-none focus:border-gold-500/50"
+              />
+            </div>
+            <button type="button" onClick={() => setShowSelectedOnly(v => !v)}
+              className={`shrink-0 px-3 py-2 rounded-lg text-xs font-bold border transition-colors ${
+                showSelectedOnly ? "bg-gold-500/15 text-gold-text border-gold-500/30" : "text-foreground-muted border-border hover:border-gold-500/50"
+              }`}
+            >
+              เลือกแล้ว {newPageIds.size}
+            </button>
           </div>
 
           <div className="max-h-56 overflow-y-auto space-y-1 border border-border rounded-xl p-2 bg-background/30">
-            {filteredPages.map(page => {
-              const selected = newPageIds.has(page.pageId);
-              return (
-                <button key={page.pageId} type="button" onClick={() => togglePage(page.pageId)}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-all ${
-                    selected ? "bg-gold-500/10 text-foreground border border-gold-500/20" : "text-foreground-muted hover:bg-surface-hover border border-transparent"
-                  }`}
-                >
-                  <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${selected ? "bg-gold-500 border-gold-500" : "border-border"}`}>
-                    {selected && <Check size={10} className="text-navy-950" />}
-                  </div>
-                  <span className="truncate text-left">{page.pageName}</span>
-                </button>
-              );
-            })}
-            {filteredPages.length === 0 && <p className="text-center py-4 text-xs text-foreground-muted">ไม่พบเพจ</p>}
+            {pagesLoading ? (
+              <div className="flex items-center justify-center gap-2 py-4 text-xs text-foreground-muted">
+                <Loader2 size={12} className="animate-spin" /> กำลังโหลดรายชื่อเพจ...
+              </div>
+            ) : filteredPages.length === 0 ? (
+              <p className="text-center py-4 text-xs text-foreground-muted">
+                {showSelectedOnly && newPageIds.size === 0 ? "ยังไม่ได้เลือกเพจ" : "ไม่พบเพจ"}
+              </p>
+            ) : (
+              filteredPages.map(page => {
+                const selected = newPageIds.has(page.pageId);
+                return (
+                  <button key={page.pageId} type="button" onClick={() => togglePage(page.pageId)}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-all ${
+                      selected ? "bg-gold-500/10 text-foreground border border-gold-500/20" : "text-foreground-muted hover:bg-surface-hover border border-transparent"
+                    }`}
+                  >
+                    <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${selected ? "bg-gold-500 border-gold-500" : "border-border"}`}>
+                      {selected && <Check size={10} className="text-navy-950" />}
+                    </div>
+                    <span className="truncate text-left">{page.pageName}</span>
+                  </button>
+                );
+              })
+            )}
           </div>
 
           <div className="flex items-center justify-between">

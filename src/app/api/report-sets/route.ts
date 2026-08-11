@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/server/prisma";
 import { requireAdmin } from "@/lib/server/require-admin";
 import { requireTeamMember } from "@/lib/server/require-team";
@@ -92,6 +93,10 @@ export async function PUT(req: NextRequest) {
     const set = await prisma.pageReportSet.update({ where: { id }, data: { name, pageIds } });
     return NextResponse.json({ set });
   } catch (err) {
+    // Someone else deleted this set (or it never existed) between load and save.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2025") {
+      return NextResponse.json({ error: "ไม่พบชุดนี้แล้ว — อาจถูกลบไปแล้ว" }, { status: 404 });
+    }
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: message }, { status: 500 });
   }
