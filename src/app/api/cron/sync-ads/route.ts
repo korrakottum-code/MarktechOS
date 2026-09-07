@@ -265,14 +265,21 @@ async function scrapePageName(pageId: string): Promise<string | null> {
       },
       redirect: "follow",
       cache: "no-store",
+      signal: AbortSignal.timeout(META_TIMEOUT_MS),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.warn(`  ⚠️ scrape ${pageId}: HTTP ${res.status}`);
+      return null;
+    }
     const html = await res.text();
     // Try og:title first (more reliable), then <title>
     const match = html.match(/property="og:title"\s+content="([^"]+)"/)
       || html.match(/content="([^"]+)"\s+property="og:title"/)
       || html.match(/<title>([^<]+)<\/title>/);
-    if (!match) return null;
+    if (!match) {
+      console.warn(`  ⚠️ scrape ${pageId}: no title/og:title found in response (${html.length} bytes)`);
+      return null;
+    }
     let name = match[1].trim()
       // Decode HTML entities: named, hex (&#xHH;), and decimal (&#DDD;)
       .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
@@ -285,13 +292,22 @@ async function scrapePageName(pageId: string): Promise<string | null> {
       "เข้าสู่ระบบ facebook", "เกิดข้อผิดพลาด", "page not found",
       "content not found", "ลงชื่อเข้าใช้ facebook",
     ];
-    if (!name || invalidNames.includes(name.toLowerCase())) return null;
+    if (!name || invalidNames.includes(name.toLowerCase())) {
+      console.warn(`  ⚠️ scrape ${pageId}: matched a login/error page title ("${name}") — likely blocked`);
+      return null;
+    }
     // Remove " | City" suffix only (keep the rest of the name)
     name = name.replace(/\s*\|\s*[^|]+$/, "").trim();
     // Re-check after stripping: "Log into Facebook | Facebook" → "Log into Facebook"
-    if (!name || invalidNames.includes(name.toLowerCase())) return null;
+    if (!name || invalidNames.includes(name.toLowerCase())) {
+      console.warn(`  ⚠️ scrape ${pageId}: matched a login/error page title after stripping suffix`);
+      return null;
+    }
     return name;
-  } catch { return null; }
+  } catch (err) {
+    console.warn(`  ⚠️ scrape ${pageId}: ${err instanceof Error ? err.message : String(err)}`);
+    return null;
+  }
 }
 
 // ── Bulk Upsert helpers ─────────────────────────────────────────────────────
@@ -454,6 +470,9 @@ export async function GET(req: NextRequest) {
           if (json.error) throw new Error(json.error.message ?? "Meta API error");
           for (const acc of (json.data ?? [])) {
             if (acc.account_status === 2) continue;
+            if (!acc.name) {
+              console.warn(`  ⚠️ Token ${idx + 1}: account ${acc.account_id} has no name field (status=${acc.account_status}) — will show as its raw ID`);
+            }
             if (!accountTokenMap.has(acc.account_id)) accountTokenMap.set(acc.account_id, { acc, token });
             count++;
           }
@@ -777,10 +796,12 @@ export async function GET(req: NextRequest) {
     const unknownPageIds = uniquePageIds.filter(id => !pageNameMap.has(id));
 
     if (unknownPageIds.length > 0) {
+      console.log(`📛 Step 4: resolving ${unknownPageIds.length} unknown page name(s) via Graph API: ${unknownPageIds.join(", ")}`);
       // Try each token to resolve page names (different tokens may have access to different pages)
       let remaining = [...unknownPageIds];
-      for (const token of tokens) {
+      for (let t = 0; t < tokens.length; t++) {
         if (remaining.length === 0) break;
+        const token = tokens[t];
         try {
           const batchRes = await fetchMeta(
             `${BASE}/?ids=${remaining.join(",")}&fields=name&access_token=${token}`
@@ -788,10 +809,15 @@ export async function GET(req: NextRequest) {
           if (batchRes.ok) {
             const batchData = await batchRes.json();
             const newCacheEntries: { pageId: string; pageName: string }[] = [];
-            for (const [id, info] of Object.entries(batchData) as [string, any][]) {
-              if (info.name) {
+            for (const id of remaining) {
+              const info = batchData[id];
+              if (info?.name) {
                 pageNameMap.set(id, info.name);
                 newCacheEntries.push({ pageId: id, pageName: info.name });
+              } else if (info?.error) {
+                console.warn(`  ⚠️ Token ${t + 1} can't read name for page ${id}: ${info.error.message ?? JSON.stringify(info.error)}`);
+              } else {
+                console.warn(`  ⚠️ Token ${t + 1}: page ${id} missing from response entirely — likely no access`);
               }
             }
             // Persist to DB
@@ -805,22 +831,31 @@ export async function GET(req: NextRequest) {
                   VALUES ${vals}
                   ON CONFLICT ("pageId") DO UPDATE SET "pageName"=EXCLUDED."pageName","updatedAt"=NOW()
                 `);
-              } catch { /* non-critical */ }
+              } catch (dbErr) {
+                console.warn(`  ⚠️ Failed to persist ${newCacheEntries.length} resolved page name(s): ${dbErr instanceof Error ? dbErr.message : String(dbErr)}`);
+              }
             }
-            console.log(`📛 Resolved ${newCacheEntries.length} new page names`);
+            console.log(`📛 Token ${t + 1}: resolved ${newCacheEntries.length}/${remaining.length} page names`);
             // Update remaining for next token
             remaining = remaining.filter(id => !pageNameMap.has(id));
+          } else {
+            const body = await batchRes.text().catch(() => "");
+            console.warn(`  ⚠️ Token ${t + 1} page-name batch request failed: HTTP ${batchRes.status} ${body.slice(0, 300)}`);
           }
-        } catch { /* non-critical */ }
+        } catch (err) {
+          console.warn(`  ⚠️ Token ${t + 1} page-name batch request threw: ${err instanceof Error ? err.message : String(err)}`);
+        }
       }
     }
 
     // ── Step 4.5: Scrape fallback for pages API couldn't resolve ─────────
     const stillUnknown = uniquePageIds.filter(id => !pageNameMap.has(id));
     if (stillUnknown.length > 0) {
-      // Limit to 5 per sync to keep it fast — rest will be scraped next sync
-      const toScrape = stillUnknown.slice(0, 5);
-      console.log(`🔍 Scraping ${toScrape.length}/${stillUnknown.length} page names from Facebook...`);
+      // Capped per sync to keep it fast — anything left over is retried next sync.
+      // Raised from 5→15: a brief backlog (e.g. several new accounts added the
+      // same day) used to take multiple sync cycles to fully drain.
+      const toScrape = stillUnknown.slice(0, 15);
+      console.log(`🔍 Scraping ${toScrape.length}/${stillUnknown.length} page names from Facebook: ${toScrape.join(", ")}`);
       const scrapeResults = await Promise.allSettled(
         toScrape.map(async (id) => {
           const name = await scrapePageName(id);
@@ -834,7 +869,9 @@ export async function GET(req: NextRequest) {
                  ON CONFLICT ("pageId") DO UPDATE SET "pageName"=$2,"source"='scrape',"updatedAt"=NOW()`,
                 id, name
               );
-            } catch { /* non-critical */ }
+            } catch (dbErr) {
+              console.warn(`  ⚠️ Failed to persist scraped name for ${id}: ${dbErr instanceof Error ? dbErr.message : String(dbErr)}`);
+            }
             return { id, name };
           }
           return null;
@@ -859,36 +896,57 @@ export async function GET(req: NextRequest) {
         }
       }
 
-      for (const pid of previewUnknown.slice(0, 5)) {
+      for (const pid of previewUnknown.slice(0, 15)) {
         const accountId = pageToAccount.get(pid);
-        if (!accountId) continue;
+        if (!accountId) {
+          console.warn(`  ⚠️ preview fallback for ${pid}: no ad account mapped to this page in this sync's insights`);
+          continue;
+        }
         try {
           // Get one ad from the account
           const adsRes = await fetchMeta(
             `${BASE}/act_${accountId}/ads?fields=id&limit=1&access_token=${tokens[0]}`
           );
-          if (!adsRes.ok) continue;
+          if (!adsRes.ok) {
+            console.warn(`  ⚠️ preview fallback for ${pid}: ads lookup HTTP ${adsRes.status}`);
+            continue;
+          }
           const adsData = await adsRes.json();
           const adId = adsData.data?.[0]?.id;
-          if (!adId) continue;
+          if (!adId) {
+            console.warn(`  ⚠️ preview fallback for ${pid}: account ${accountId} has no ads`);
+            continue;
+          }
 
           // Get ad preview iframe
           const prevRes = await fetchMeta(
             `${BASE}/${adId}/previews?ad_format=MOBILE_FEED_STANDARD&access_token=${tokens[0]}`
           );
-          if (!prevRes.ok) continue;
+          if (!prevRes.ok) {
+            console.warn(`  ⚠️ preview fallback for ${pid}: preview request HTTP ${prevRes.status}`);
+            continue;
+          }
           const prevData = await prevRes.json();
           const iframeSrc = prevData.data?.[0]?.body?.match(/src="([^"]+)"/)?.[1]?.replace(/&amp;/g, "&");
-          if (!iframeSrc) continue;
+          if (!iframeSrc) {
+            console.warn(`  ⚠️ preview fallback for ${pid}: no iframe src in preview body`);
+            continue;
+          }
 
           // Fetch iframe content and extract page name
           const iframeRes = await fetch(iframeSrc, {
             headers: { "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)" },
             signal: AbortSignal.timeout(META_TIMEOUT_MS),
           });
-          if (!iframeRes.ok) continue;
+          if (!iframeRes.ok) {
+            console.warn(`  ⚠️ preview fallback for ${pid}: iframe fetch HTTP ${iframeRes.status}`);
+            continue;
+          }
           const html = await iframeRes.text();
           const nameMatch = html.match(/<strong[^>]*class="[^"]*"[^>]*>([^<]+)<\/strong>/);
+          if (!nameMatch) {
+            console.warn(`  ⚠️ preview fallback for ${pid}: no name match in iframe HTML (${html.length} bytes)`);
+          }
           if (nameMatch) {
             let name = nameMatch[1].trim()
               .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)))
@@ -903,11 +961,15 @@ export async function GET(req: NextRequest) {
                    ON CONFLICT ("pageId") DO UPDATE SET "pageName"=$2,"source"='preview',"updatedAt"=NOW()`,
                   pid, name
                 );
-              } catch { /* non-critical */ }
+              } catch (dbErr) {
+                console.warn(`  ⚠️ Failed to persist preview-resolved name for ${pid}: ${dbErr instanceof Error ? dbErr.message : String(dbErr)}`);
+              }
               console.log(`  ✅ ${pid} → ${name} (via ad preview)`);
             }
           }
-        } catch { /* non-critical */ }
+        } catch (err) {
+          console.warn(`  ⚠️ preview fallback for ${pid}: ${err instanceof Error ? err.message : String(err)}`);
+        }
       }
       const previewResolved = previewUnknown.filter(id => pageNameMap.has(id)).length;
       console.log(`📛 Preview resolved ${previewResolved}/${previewUnknown.length} page names`);
