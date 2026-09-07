@@ -296,24 +296,32 @@ function FacebookAdsDashboard() {
 
   // The custom date inputs below write here on every keystroke/click so the
   // field stays responsive, but only commit into since/until (which trigger
-  // the actual fetch) after a short pause — otherwise every intermediate
-  // click while picking a date fired its own full refetch.
+  // the actual fetch) once the user is actually done — otherwise every
+  // intermediate onChange while picking a date (native pickers fire onChange
+  // per field — e.g. just switching the month — not only on a full pick)
+  // fired its own full refetch.
   const [sinceDraft, setSinceDraft] = useState(since);
   const [untilDraft, setUntilDraft] = useState(until);
   useEffect(() => setSinceDraft(since), [since]);
   useEffect(() => setUntilDraft(until), [until]);
   const dateCommitRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const commitDateRangeNow = useCallback((nextSince: string, nextUntil: string) => {
+    if (dateCommitRef.current) { clearTimeout(dateCommitRef.current); dateCommitRef.current = null; }
+    if (nextSince === since && nextUntil === until) return;
+    setSince(nextSince);
+    setUntil(nextUntil);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("since", nextSince);
+    params.set("until", nextUntil);
+    window.history.pushState(null, "", `/?${params.toString()}`);
+  }, [searchParams, since, until]);
+  // Fallback for keyboard-only edits that never blur the field (e.g. typing
+  // straight through) — blur is the primary trigger since a calendar-picker
+  // pick can pause well past any reasonably short debounce window.
   const commitDateRange = useCallback((nextSince: string, nextUntil: string) => {
     if (dateCommitRef.current) clearTimeout(dateCommitRef.current);
-    dateCommitRef.current = setTimeout(() => {
-      setSince(nextSince);
-      setUntil(nextUntil);
-      const params = new URLSearchParams(searchParams.toString());
-      params.set("since", nextSince);
-      params.set("until", nextUntil);
-      window.history.pushState(null, "", `/?${params.toString()}`);
-    }, 500);
-  }, [searchParams]);
+    dateCommitRef.current = setTimeout(() => commitDateRangeNow(nextSince, nextUntil), 1500);
+  }, [commitDateRangeNow]);
   useEffect(() => () => { if (dateCommitRef.current) clearTimeout(dateCommitRef.current); }, []);
 
   const { metrics: _rawAll, meta, globalAdContent: _globalAdContentAll, globalAdByContent: _globalAdByContentAll, loading, error, reload, isStale } = useAdsData(since, until, urlPages);
@@ -901,6 +909,7 @@ function FacebookAdsDashboard() {
                   setSinceDraft(val);
                   commitDateRange(val, untilDraft);
                 }}
+                onBlur={() => commitDateRangeNow(sinceDraft, untilDraft)}
                 disabled={syncing}
                 className={`bg-transparent text-xs font-medium text-foreground focus:outline-none w-full sm:w-28 ${syncing ? 'opacity-40 cursor-not-allowed' : ''}`}
               />
@@ -911,6 +920,7 @@ function FacebookAdsDashboard() {
                   setUntilDraft(val);
                   commitDateRange(sinceDraft, val);
                 }}
+                onBlur={() => commitDateRangeNow(sinceDraft, untilDraft)}
                 disabled={syncing}
                 className={`bg-transparent text-xs font-medium text-foreground focus:outline-none w-full sm:w-28 ${syncing ? 'opacity-40 cursor-not-allowed' : ''}`}
               />
