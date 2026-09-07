@@ -294,6 +294,28 @@ function FacebookAdsDashboard() {
   // query itself, not just what's rendered, once a set/all is picked.
   const urlPages = searchParams.get("pages") ?? "";
 
+  // The custom date inputs below write here on every keystroke/click so the
+  // field stays responsive, but only commit into since/until (which trigger
+  // the actual fetch) after a short pause — otherwise every intermediate
+  // click while picking a date fired its own full refetch.
+  const [sinceDraft, setSinceDraft] = useState(since);
+  const [untilDraft, setUntilDraft] = useState(until);
+  useEffect(() => setSinceDraft(since), [since]);
+  useEffect(() => setUntilDraft(until), [until]);
+  const dateCommitRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const commitDateRange = useCallback((nextSince: string, nextUntil: string) => {
+    if (dateCommitRef.current) clearTimeout(dateCommitRef.current);
+    dateCommitRef.current = setTimeout(() => {
+      setSince(nextSince);
+      setUntil(nextUntil);
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("since", nextSince);
+      params.set("until", nextUntil);
+      window.history.pushState(null, "", `/?${params.toString()}`);
+    }, 500);
+  }, [searchParams]);
+  useEffect(() => () => { if (dateCommitRef.current) clearTimeout(dateCommitRef.current); }, []);
+
   const { metrics: _rawAll, meta, globalAdContent: _globalAdContentAll, globalAdByContent: _globalAdByContentAll, loading, error, reload, isStale } = useAdsData(since, until, urlPages);
 
   // ── Auth: check if current user is a client (hide sync, admin features) ────
@@ -850,26 +872,20 @@ function FacebookAdsDashboard() {
             <div className="flex items-center gap-2 px-3 py-1.5 bg-navy-950/50 rounded-xl flex-1 sm:flex-none">
               <Calendar size={14} className="text-gold-400 shrink-0" />
               <input
-                type="date" value={since} onChange={e => {
+                type="date" value={sinceDraft} onChange={e => {
                   const val = e.target.value;
-                  setSince(val);
-                  const params = new URLSearchParams(searchParams.toString());
-                  params.set("since", val);
-                  params.set("until", until);
-                  window.history.pushState(null, "", `/?${params.toString()}`);
+                  setSinceDraft(val);
+                  commitDateRange(val, untilDraft);
                 }}
                 disabled={syncing}
                 className={`bg-transparent text-xs font-medium text-foreground focus:outline-none w-full sm:w-28 ${syncing ? 'opacity-40 cursor-not-allowed' : ''}`}
               />
               <span className="text-foreground-muted text-xs">→</span>
               <input
-                type="date" value={until} onChange={e => {
+                type="date" value={untilDraft} onChange={e => {
                   const val = e.target.value;
-                  setUntil(val);
-                  const params = new URLSearchParams(searchParams.toString());
-                  params.set("since", since);
-                  params.set("until", val);
-                  window.history.pushState(null, "", `/?${params.toString()}`);
+                  setUntilDraft(val);
+                  commitDateRange(sinceDraft, val);
                 }}
                 disabled={syncing}
                 className={`bg-transparent text-xs font-medium text-foreground focus:outline-none w-full sm:w-28 ${syncing ? 'opacity-40 cursor-not-allowed' : ''}`}
