@@ -330,13 +330,37 @@ function FacebookAdsDashboard() {
     return _rawAll.filter(m => !excludedPages.has(m.pageId));
   }, [_rawAll, excludedPages]);
 
-  // Ad accounts behind the currently loaded (already page-scoped) rows —
-  // lets the manual Sync button below re-sync just this report set's
+  // Historical pageId → adAccountId(s) mapping (all-time, not scoped to the
+  // current date range) — needed because a brand-new page/set with zero rows
+  // in the currently viewed range would otherwise leave the Sync button with
+  // no idea which account to target, exactly when a sync is most wanted.
+  const [pageAccountsMap, setPageAccountsMap] = useState<Map<string, string[]>>(new Map());
+  useEffect(() => {
+    fetch("/api/pages")
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (!data?.pages) return;
+        const map = new Map<string, string[]>();
+        for (const p of data.pages) {
+          if (Array.isArray(p.adAccountIds)) map.set(p.pageId, p.adAccountIds);
+        }
+        setPageAccountsMap(map);
+      })
+      .catch(() => { /* non-critical — falls back to loaded-rows-only below */ });
+  }, []);
+
+  // Ad accounts behind the current report set — union of whatever's already
+  // loaded (covers "viewing everything") and the historical mapping for the
+  // selected pageIds (covers a page with no rows in the current date range).
+  // Lets the manual Sync button below re-sync just this report set's
   // accounts instead of every account in the agency.
-  const scopedAccountIds = useMemo(
-    () => [...new Set(raw.map(m => m.adAccountId).filter(Boolean))],
-    [raw],
-  );
+  const scopedAccountIds = useMemo(() => {
+    const ids = new Set(raw.map(m => m.adAccountId).filter(Boolean));
+    for (const pid of (urlPages ? urlPages.split(",") : [])) {
+      for (const accId of pageAccountsMap.get(pid) ?? []) ids.add(accId);
+    }
+    return [...ids];
+  }, [raw, urlPages, pageAccountsMap]);
 
   // Helper to filter pageBreakdown from global ad items and recalculate metrics
   const filterExcludedFromGlobal = useCallback((items: GlobalAdItem[]): GlobalAdItem[] => {
