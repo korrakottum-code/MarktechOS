@@ -6,6 +6,8 @@ export async function proxy(request: NextRequest) {
   const isAuthPage = pathname.startsWith("/login") || pathname.startsWith("/auth/callback");
   const isStaticFile = pathname.match(/\.(.*)$/) || pathname.startsWith("/_next");
   const isCronOrWebhook = pathname.startsWith("/api/cron/") || pathname.startsWith("/api/webhooks/");
+  // หน้าเวลาตอบแชท Pancake — สาธารณะ ไม่ต้อง login ตามที่ขอ
+  const isPublicPage = pathname === "/pancake" || pathname.startsWith("/api/pancake");
 
   // Skip auth logic for static files to save execution time
   if (isStaticFile) return NextResponse.next();
@@ -56,7 +58,7 @@ export async function proxy(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     // Auth Protection Logic
-    if (!user && !isAuthPage && !isCronOrWebhook) {
+    if (!user && !isAuthPage && !isCronOrWebhook && !isPublicPage) {
       if (pathname.startsWith("/api/")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
@@ -72,7 +74,7 @@ export async function proxy(request: NextRequest) {
     }
   } catch (error) {
     console.error("🛡️ Auth Proxy Error:", error);
-    if (!isAuthPage && !isCronOrWebhook) {
+    if (!isAuthPage && !isCronOrWebhook && !isPublicPage) {
       if (pathname.startsWith("/api/")) {
         return NextResponse.json({ error: "Authentication service is unavailable" }, { status: 503 });
       }

@@ -126,3 +126,13 @@ model AdsReportSet {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }
+
+// ── Pancake (pages.fm) pages tracked on the public /pancake response-time page ─
+// Admin-managed via /admin (Pancake tab); pageId is the Facebook Page ID as
+// used by pages.fm. Name is cached at save time so the public page can still
+// label a page even if it's temporarily missing from a live Pancake pages list.
+model PancakeTrackedPage {
+  pageId    String   @id
+  name      String
+  createdAt DateTime @default(now())
+}

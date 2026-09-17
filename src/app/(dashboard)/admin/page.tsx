@@ -9,6 +9,7 @@ import {
 import { useAuthSession } from "@/lib/use-auth-session";
 import { canAccessPath } from "@/lib/auth/permissions";
 import SyncTab from "./SyncTab";
+import PancakeTab from "./PancakeTab";
 
 interface UserItem {
   id: string;
@@ -45,7 +46,7 @@ function getRoleBadge(role: string) {
 function AdminContent() {
   const router = useRouter();
   const { user: authUser, loading: authLoading } = useAuthSession();
-  const [tab, setTab] = useState<"users" | "sync">("users");
+  const [tab, setTab] = useState<"users" | "sync" | "pancake">("users");
   const [users, setUsers] = useState<UserItem[]>([]);
   const [allPages, setAllPages] = useState<PageOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -232,7 +233,11 @@ function AdminContent() {
             จัดการระบบ
           </h1>
           <p className="text-sm text-foreground-muted mt-1">
-            {tab === "users" ? "กำหนดสิทธิ์การเข้าถึง Page สำหรับแต่ละผู้ใช้" : "เลือกบัญชีและช่วงวันที่ก่อนดึงข้อมูลจาก Meta"}
+            {tab === "users"
+              ? "กำหนดสิทธิ์การเข้าถึง Page สำหรับแต่ละผู้ใช้"
+              : tab === "sync"
+              ? "เลือกบัญชีและช่วงวันที่ก่อนดึงข้อมูลจาก Meta"
+              : "เลือกเพจที่จะแสดงบนหน้าเวลาตอบแชท (สาธารณะ)"}
           </p>
         </div>
         {tab === "users" && (
@@ -251,6 +256,7 @@ function AdminContent() {
         {([
           ["users", "ผู้ใช้งาน"],
           ["sync", "Sync ข้อมูล Ads"],
+          ["pancake", "เวลาตอบแชท (Pancake)"],
         ] as const).map(([value, label]) => (
           <button key={value} type="button" onClick={() => setTab(value)}
             className={`px-4 py-2.5 text-sm font-bold border-b-2 -mb-px transition-colors ${
@@ -263,6 +269,8 @@ function AdminContent() {
       </div>
 
       {tab === "sync" && <SyncTab />}
+
+      {tab === "pancake" && <PancakeTab />}
 
       {tab === "users" && (
       <>
