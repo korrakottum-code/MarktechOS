@@ -294,6 +294,36 @@ function FacebookAdsDashboard() {
   // query itself, not just what's rendered, once a set/all is picked.
   const urlPages = searchParams.get("pages") ?? "";
 
+  // The custom date inputs below write here on every keystroke/click so the
+  // field stays responsive, but only commit into since/until (which trigger
+  // the actual fetch) once the user is actually done — otherwise every
+  // intermediate onChange while picking a date (native pickers fire onChange
+  // per field — e.g. just switching the month — not only on a full pick)
+  // fired its own full refetch.
+  const [sinceDraft, setSinceDraft] = useState(since);
+  const [untilDraft, setUntilDraft] = useState(until);
+  useEffect(() => setSinceDraft(since), [since]);
+  useEffect(() => setUntilDraft(until), [until]);
+  const dateCommitRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const commitDateRangeNow = useCallback((nextSince: string, nextUntil: string) => {
+    if (dateCommitRef.current) { clearTimeout(dateCommitRef.current); dateCommitRef.current = null; }
+    if (nextSince === since && nextUntil === until) return;
+    setSince(nextSince);
+    setUntil(nextUntil);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("since", nextSince);
+    params.set("until", nextUntil);
+    window.history.pushState(null, "", `/?${params.toString()}`);
+  }, [searchParams, since, until]);
+  // Fallback for keyboard-only edits that never blur the field (e.g. typing
+  // straight through) — blur is the primary trigger since a calendar-picker
+  // pick can pause well past any reasonably short debounce window.
+  const commitDateRange = useCallback((nextSince: string, nextUntil: string) => {
+    if (dateCommitRef.current) clearTimeout(dateCommitRef.current);
+    dateCommitRef.current = setTimeout(() => commitDateRangeNow(nextSince, nextUntil), 1500);
+  }, [commitDateRangeNow]);
+  useEffect(() => () => { if (dateCommitRef.current) clearTimeout(dateCommitRef.current); }, []);
+
   const { metrics: _rawAll, meta, globalAdContent: _globalAdContentAll, globalAdByContent: _globalAdByContentAll, loading, error, reload, isStale } = useAdsData(since, until, urlPages);
 
   // ── Auth: check if current user is a client (hide sync, admin features) ────
@@ -308,13 +338,37 @@ function FacebookAdsDashboard() {
     return _rawAll.filter(m => !excludedPages.has(m.pageId));
   }, [_rawAll, excludedPages]);
 
-  // Ad accounts behind the currently loaded (already page-scoped) rows —
-  // lets the manual Sync button below re-sync just this report set's
+  // Historical pageId → adAccountId(s) mapping (all-time, not scoped to the
+  // current date range) — needed because a brand-new page/set with zero rows
+  // in the currently viewed range would otherwise leave the Sync button with
+  // no idea which account to target, exactly when a sync is most wanted.
+  const [pageAccountsMap, setPageAccountsMap] = useState<Map<string, string[]>>(new Map());
+  useEffect(() => {
+    fetch("/api/pages")
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (!data?.pages) return;
+        const map = new Map<string, string[]>();
+        for (const p of data.pages) {
+          if (Array.isArray(p.adAccountIds)) map.set(p.pageId, p.adAccountIds);
+        }
+        setPageAccountsMap(map);
+      })
+      .catch(() => { /* non-critical — falls back to loaded-rows-only below */ });
+  }, []);
+
+  // Ad accounts behind the current report set — union of whatever's already
+  // loaded (covers "viewing everything") and the historical mapping for the
+  // selected pageIds (covers a page with no rows in the current date range).
+  // Lets the manual Sync button below re-sync just this report set's
   // accounts instead of every account in the agency.
-  const scopedAccountIds = useMemo(
-    () => [...new Set(raw.map(m => m.adAccountId).filter(Boolean))],
-    [raw],
-  );
+  const scopedAccountIds = useMemo(() => {
+    const ids = new Set(raw.map(m => m.adAccountId).filter(Boolean));
+    for (const pid of (urlPages ? urlPages.split(",") : [])) {
+      for (const accId of pageAccountsMap.get(pid) ?? []) ids.add(accId);
+    }
+    return [...ids];
+  }, [raw, urlPages, pageAccountsMap]);
 
   // Helper to filter pageBreakdown from global ad items and recalculate metrics
   const filterExcludedFromGlobal = useCallback((items: GlobalAdItem[]): GlobalAdItem[] => {
@@ -850,27 +904,23 @@ function FacebookAdsDashboard() {
             <div className="flex items-center gap-2 px-3 py-1.5 bg-navy-950/50 rounded-xl flex-1 sm:flex-none">
               <Calendar size={14} className="text-gold-400 shrink-0" />
               <input
-                type="date" value={since} onChange={e => {
+                type="date" value={sinceDraft} onChange={e => {
                   const val = e.target.value;
-                  setSince(val);
-                  const params = new URLSearchParams(searchParams.toString());
-                  params.set("since", val);
-                  params.set("until", until);
-                  window.history.pushState(null, "", `/?${params.toString()}`);
+                  setSinceDraft(val);
+                  commitDateRange(val, untilDraft);
                 }}
+                onBlur={() => commitDateRangeNow(sinceDraft, untilDraft)}
                 disabled={syncing}
                 className={`bg-transparent text-xs font-medium text-foreground focus:outline-none w-full sm:w-28 ${syncing ? 'opacity-40 cursor-not-allowed' : ''}`}
               />
               <span className="text-foreground-muted text-xs">→</span>
               <input
-                type="date" value={until} onChange={e => {
+                type="date" value={untilDraft} onChange={e => {
                   const val = e.target.value;
-                  setUntil(val);
-                  const params = new URLSearchParams(searchParams.toString());
-                  params.set("since", since);
-                  params.set("until", val);
-                  window.history.pushState(null, "", `/?${params.toString()}`);
+                  setUntilDraft(val);
+                  commitDateRange(sinceDraft, val);
                 }}
+                onBlur={() => commitDateRangeNow(sinceDraft, untilDraft)}
                 disabled={syncing}
                 className={`bg-transparent text-xs font-medium text-foreground focus:outline-none w-full sm:w-28 ${syncing ? 'opacity-40 cursor-not-allowed' : ''}`}
               />
