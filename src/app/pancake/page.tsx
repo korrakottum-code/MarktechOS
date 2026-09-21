@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { RefreshCw, MessageCircle } from "lucide-react";
 import { todayBangkokDateStr } from "@/lib/pancake";
 
@@ -39,43 +39,72 @@ function shiftDateStr(dateStr: string, days: number): string {
   return shifted.toISOString().slice(0, 10);
 }
 
-const QUICK_PRESETS = [
-  { label: "วันนี้", offset: 0 },
-  { label: "เมื่อวาน", offset: -1 },
-  { label: "2 วันก่อน", offset: -2 },
-  { label: "3 วันก่อน", offset: -3 },
-  { label: "7 วันก่อน", offset: -7 },
+function firstOfMonthStr(dateStr: string): string {
+  const [y, m] = dateStr.split("-");
+  return `${y}-${m}-01`;
+}
+
+type Range = { since: string; until: string };
+
+function thisMonthRange(): Range {
+  return { since: firstOfMonthStr(TODAY), until: TODAY };
+}
+
+function lastMonthRange(): Range {
+  const lastDayOfPrevMonth = shiftDateStr(firstOfMonthStr(TODAY), -1);
+  return { since: firstOfMonthStr(lastDayOfPrevMonth), until: lastDayOfPrevMonth };
+}
+
+const QUICK_PRESETS: Array<{ label: string; range: () => Range }> = [
+  { label: "วันนี้", range: () => ({ since: TODAY, until: TODAY }) },
+  { label: "เมื่อวาน", range: () => ({ since: shiftDateStr(TODAY, -1), until: shiftDateStr(TODAY, -1) }) },
+  { label: "7 วันล่าสุด", range: () => ({ since: shiftDateStr(TODAY, -6), until: TODAY }) },
+  { label: "เดือนนี้", range: thisMonthRange },
+  { label: "เดือนที่แล้ว", range: lastMonthRange },
 ];
 
+function sameRange(a: Range, b: Range) {
+  return a.since === b.since && a.until === b.until;
+}
+
 export default function PancakeResponseTimePage() {
-  const [date, setDate] = useState(TODAY);
+  const [range, setRange] = useState<Range>({ since: TODAY, until: TODAY });
   const [pages, setPages] = useState<PageStat[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [fetchedAt, setFetchedAt] = useState<string | null>(null);
 
-  const load = useCallback(async (forDate: string, forceRefresh = false) => {
+  // แก้ since/until ทีละช่อง ทำให้ useEffect ยิง fetch ซ้อนกัน 2 ครั้งได้ — ถ้าคำขอเก่าตอบกลับ
+  // ช้ากว่าคำขอใหม่ ต้องไม่ให้ผลลัพธ์เก่า (รวมถึง error จากช่วงวันที่ผ่านๆ ที่ยังกรอกไม่ครบ) มาทับของใหม่
+  const latestRequestId = useRef(0);
+
+  const load = useCallback(async (forRange: Range, forceRefresh = false) => {
+    const requestId = ++latestRequestId.current;
     setLoading(true);
     setError("");
     setMessage("");
     try {
-      const res = await fetch(`/api/pancake?date=${forDate}${forceRefresh ? "&refresh=1" : ""}`);
+      const res = await fetch(
+        `/api/pancake?since=${forRange.since}&until=${forRange.until}${forceRefresh ? "&refresh=1" : ""}`
+      );
       const data = await res.json();
+      if (requestId !== latestRequestId.current) return;
       if (!res.ok) throw new Error(data.error || "โหลดข้อมูลไม่สำเร็จ");
       setPages(data.pages || []);
       setFetchedAt(data.fetchedAt || null);
       if (data.message) setMessage(data.message);
     } catch (err) {
+      if (requestId !== latestRequestId.current) return;
       setError(err instanceof Error ? err.message : "โหลดข้อมูลไม่สำเร็จ");
     } finally {
-      setLoading(false);
+      if (requestId === latestRequestId.current) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    load(date);
-  }, [load, date]);
+    load(range);
+  }, [load, range]);
 
   const totalWithMsg = pages.reduce((s, p) => s + p.withCustomerMsg, 0);
   const totalNoSeen = pages.reduce((s, p) => s + p.noStaffSeenYet, 0);
@@ -97,7 +126,7 @@ export default function PancakeResponseTimePage() {
             )}
           </div>
           <button
-            onClick={() => load(date, true)}
+            onClick={() => load(range, true)}
             disabled={loading}
             className="flex items-center gap-1.5 sm:gap-2 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 rounded-lg text-xs sm:text-sm font-medium transition-colors"
           >
@@ -109,13 +138,13 @@ export default function PancakeResponseTimePage() {
         <div className="flex items-center gap-2 flex-wrap mb-3">
           <div className="flex gap-1 bg-gray-800 rounded-lg p-1 overflow-x-auto">
             {QUICK_PRESETS.map((p) => {
-              const value = shiftDateStr(TODAY, p.offset);
+              const value = p.range();
               return (
                 <button
                   key={p.label}
-                  onClick={() => setDate(value)}
+                  onClick={() => setRange(value)}
                   className={`px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-colors ${
-                    date === value ? "bg-indigo-600 text-white" : "text-gray-400 hover:text-white"
+                    sameRange(range, value) ? "bg-indigo-600 text-white" : "text-gray-400 hover:text-white"
                   }`}
                 >
                   {p.label}
@@ -123,13 +152,24 @@ export default function PancakeResponseTimePage() {
               );
             })}
           </div>
-          <input
-            type="date"
-            value={date}
-            max={TODAY}
-            onChange={(e) => e.target.value && setDate(e.target.value)}
-            className="px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-xs sm:text-sm text-gray-200 [color-scheme:dark]"
-          />
+          <div className="flex items-center gap-1.5">
+            <input
+              type="date"
+              value={range.since}
+              max={range.until}
+              onChange={(e) => e.target.value && setRange((r) => ({ ...r, since: e.target.value }))}
+              className="px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-xs sm:text-sm text-gray-200 [color-scheme:dark]"
+            />
+            <span className="text-gray-500 text-xs">ถึง</span>
+            <input
+              type="date"
+              value={range.until}
+              min={range.since}
+              max={TODAY}
+              onChange={(e) => e.target.value && setRange((r) => ({ ...r, until: e.target.value }))}
+              className="px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-xs sm:text-sm text-gray-200 [color-scheme:dark]"
+            />
+          </div>
         </div>
 
         {error && (
@@ -154,8 +194,8 @@ export default function PancakeResponseTimePage() {
 
         {!error && anyIncomplete && (
           <div className="mb-3 p-2.5 rounded-lg bg-amber-950/40 border border-amber-800/60 text-amber-300 text-xs">
-            ⚠️ วันที่เลือกย้อนไกลกว่าข้อมูลที่ดึงมาได้สำหรับบางเพจ (Pancake ให้ดึงได้แค่ &ldquo;บทสนทนาล่าสุด&rdquo; ไม่ใช่ตามช่วงวันที่)
-            ตัวเลขของเพจที่ขึ้น <span className="text-amber-200 font-medium">*</span> อาจนับไม่ครบทั้งวัน
+            ⚠️ ช่วงวันที่เลือกย้อนไกลกว่าข้อมูลที่ดึงมาได้สำหรับบางเพจ (Pancake ให้ดึงได้แค่ &ldquo;บทสนทนาล่าสุด&rdquo; ไม่ใช่ตามช่วงวันที่)
+            ตัวเลขของเพจที่ขึ้น <span className="text-amber-200 font-medium">*</span> อาจนับไม่ครบทั้งช่วง
           </div>
         )}
 

@@ -46,6 +46,14 @@ export function bangkokDayRangeMs(dateStr: string): { sinceMs: number; untilMs: 
   return { sinceMs, untilMs };
 }
 
+/** ขอบเขต [since, until) ของช่วงวันที่ (Asia/Bangkok) ตั้งแต่ต้นวัน sinceStr ถึงสิ้นวัน untilStr (รวมวันนั้น) */
+export function bangkokRangeMs(sinceStr: string, untilStr: string): { sinceMs: number; untilMs: number } {
+  return {
+    sinceMs: bangkokDayRangeMs(sinceStr).sinceMs,
+    untilMs: bangkokDayRangeMs(untilStr).untilMs,
+  };
+}
+
 export function todayBangkokDateStr(): string {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: PANCAKE_TZ }).formatToParts(new Date());
   const y = parts.find((p) => p.type === "year")!.value;
@@ -190,7 +198,7 @@ async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T)
 
 /**
  * ดึงบทสนทนาล่าสุดของทุกเพจที่แอดมินตั้งค่าให้ติดตาม (tracked) เป็นก้อนดิบ — ไม่กรองวันที่
- * ให้ผู้เรียก (route) แคชก้อนนี้ไว้ แล้วเรียก statsForDay ซ้ำได้หลายวันที่โดยไม่ต้องยิง Pancake ใหม่
+ * ให้ผู้เรียก (route) แคชก้อนนี้ไว้ แล้วเรียก statsForRange ซ้ำได้หลายช่วงวันที่โดยไม่ต้องยิง Pancake ใหม่
  *
  * เพจที่แอดมิน track ไว้แต่หายไปจากรายการ activated ของ Pancake (ปิดเพจ/token คนละสิทธิ์)
  * จะได้ผลลัพธ์เป็น error แทนที่จะหายไปเงียบๆ — ใช้ชื่อที่บันทึกไว้ตอนตั้งค่าเพราะดึงจาก Pancake ไม่ได้แล้ว
@@ -211,11 +219,11 @@ export async function fetchAllPagesConversations(
   });
 }
 
-/** คำนวณสถิติของทุกเพจสำหรับวันที่ระบุ (Asia/Bangkok) จากก้อนข้อมูลดิบที่ fetchAllPagesConversations ดึงมา */
-export function statsForDay(raw: RawPageConversations[], dateStr: string): PageResponseStats[] {
-  const dayRangeMs = bangkokDayRangeMs(dateStr);
+/** คำนวณสถิติของทุกเพจสำหรับช่วงวันที่ระบุ (Asia/Bangkok, รวมวันเริ่มและวันสิ้นสุด) จากก้อนข้อมูลดิบที่ fetchAllPagesConversations ดึงมา */
+export function statsForRange(raw: RawPageConversations[], sinceStr: string, untilStr: string): PageResponseStats[] {
+  const rangeMs = bangkokRangeMs(sinceStr, untilStr);
   const stats = raw.map((r) => {
-    const s = computeStats(r.pageId, r.name, r.conversations, dayRangeMs);
+    const s = computeStats(r.pageId, r.name, r.conversations, rangeMs);
     return r.error ? { ...s, error: r.error } : s;
   });
   return stats.sort((a, b) => (b.medianMinutes ?? -1) - (a.medianMinutes ?? -1));

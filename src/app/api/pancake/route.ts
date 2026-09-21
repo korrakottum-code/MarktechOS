@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/server/prisma";
-import { fetchAllPagesConversations, statsForDay, todayBangkokDateStr, type RawPageConversations } from "@/lib/pancake";
+import { fetchAllPagesConversations, statsForRange, todayBangkokDateStr, type RawPageConversations } from "@/lib/pancake";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // สาธารณะ ไม่ต้อง login — รายชื่อเพจที่แสดงคุมด้วยตาราง PancakeTrackedPage (ตั้งค่าได้ที่ /admin)
 
-// ก้อนบทสนทนาดิบ (ไม่กรองวันที่) แคชไว้สั้นๆ ในหน่วยความจำของ instance นี้ — สลับดูวันไหนก็
+// ก้อนบทสนทนาดิบ (ไม่กรองวันที่) แคชไว้สั้นๆ ในหน่วยความจำของ instance นี้ — สลับดูช่วงวันไหนก็
 // คำนวณจากก้อนเดียวกัน ไม่ต้องยิง Pancake ใหม่ทุกครั้ง (แคชแบบ per-instance เท่านั้น ไม่ได้แชร์
 // ข้าม serverless instance แต่ TTL สั้นพอที่จะไม่เป็นปัญหา)
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -24,9 +24,14 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const date = req.nextUrl.searchParams.get("date") || todayBangkokDateStr();
-  if (!DATE_RE.test(date)) {
+  const today = todayBangkokDateStr();
+  const since = req.nextUrl.searchParams.get("since") || today;
+  const until = req.nextUrl.searchParams.get("until") || since;
+  if (!DATE_RE.test(since) || !DATE_RE.test(until)) {
     return NextResponse.json({ error: "รูปแบบวันที่ไม่ถูกต้อง (ต้องเป็น YYYY-MM-DD)" }, { status: 400 });
+  }
+  if (since > until) {
+    return NextResponse.json({ error: "วันที่เริ่มต้องไม่มากกว่าวันที่สิ้นสุด" }, { status: 400 });
   }
   const forceRefresh = req.nextUrl.searchParams.get("refresh") === "1";
 
@@ -34,7 +39,8 @@ export async function GET(req: NextRequest) {
     const tracked = await prisma.pancakeTrackedPage.findMany({ orderBy: { name: "asc" } });
     if (tracked.length === 0) {
       return NextResponse.json({
-        date,
+        since,
+        until,
         pages: [],
         fetchedAt: new Date().toISOString(),
         cache: { hit: false },
@@ -48,9 +54,10 @@ export async function GET(req: NextRequest) {
       : await fetchAllPagesConversations(token, tracked.map((t) => ({ pageId: t.pageId, name: t.name })));
     if (!useCache) cache = { raw, fetchedAt: Date.now() };
 
-    const pages = statsForDay(raw, date);
+    const pages = statsForRange(raw, since, until);
     return NextResponse.json({
-      date,
+      since,
+      until,
       pages,
       fetchedAt: new Date(cache!.fetchedAt).toISOString(),
       cache: { hit: !!useCache },
