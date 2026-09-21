@@ -48,7 +48,7 @@ export default function PrivacyPolicyPage() {
 
         <h2 className="text-lg font-semibold text-white mt-8 mb-2">ติดต่อเรา</h2>
         <p className="leading-relaxed">
-          อีเมล: privacy@marktech.media
+          อีเมล: tumwork.bid@gmail.com
           <br />
           เว็บไซต์:{" "}
           <a href="https://marktech.media" className="text-indigo-400 hover:underline">
