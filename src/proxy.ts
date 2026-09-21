@@ -7,7 +7,11 @@ export async function proxy(request: NextRequest) {
   const isStaticFile = pathname.match(/\.(.*)$/) || pathname.startsWith("/_next");
   const isCronOrWebhook = pathname.startsWith("/api/cron/") || pathname.startsWith("/api/webhooks/");
   // หน้าเวลาตอบแชท Pancake — สาธารณะ ไม่ต้อง login ตามที่ขอ
-  const isPublicPage = pathname === "/pancake" || pathname.startsWith("/api/pancake");
+  // หน้า Privacy Policy — ต้องเปิดได้โดยไม่ login เพราะ Google ใช้ตรวจสอบตอนขอสิทธิ์ OAuth
+  const isPublicPage =
+    pathname === "/pancake" ||
+    pathname.startsWith("/api/pancake") ||
+    pathname === "/privacy-policy";
 
   // Skip auth logic for static files to save execution time
   if (isStaticFile) return NextResponse.next();
