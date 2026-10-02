@@ -25,17 +25,13 @@ export async function GET() {
 
   try {
     const supabaseAdmin = createAdminClient();
-    const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers({
-      page: 1,
-      perPage: 100,
-    });
+    // สองอย่างนี้ไม่เกี่ยวกัน ยิงพร้อมกันแทนรอทีละตัว (all available pages feeds the dropdown)
+    const [{ data: { users }, error }, allPages] = await Promise.all([
+      supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 100 }),
+      prisma.pageNameCache.findMany({ orderBy: { pageName: "asc" } }),
+    ]);
 
     if (error) throw error;
-
-    // Also fetch all available pages for the dropdown
-    const allPages = await prisma.pageNameCache.findMany({
-      orderBy: { pageName: "asc" },
-    });
 
     // Format users for the frontend
     const formattedUsers = users.map(u => ({
