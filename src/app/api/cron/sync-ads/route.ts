@@ -317,9 +317,14 @@ function escSql(v: any): string {
   return `'${String(v).replace(/'/g, "''")}'`;
 }
 
+// Postgres เก็บ query ที่ต่างกันที่จำนวนแถวใน VALUES แยกกันใน pg_stat_statements — batch 500 แถวทำให้มี
+// รายการยาว ~75k ตัวอักษรสะสมกว่า 245 MB จน exporter ของ Supabase อ่านไม่ทัน (timeout ทุกนาที) และกิน
+// IO/CPU ของเครื่อง micro batch เล็กลงทำให้ข้อความสั้นและมีรูปแบบต่างกันแค่ไม่กี่สิบแบบ
+const UPSERT_BATCH_ROWS = 50;
+
 async function bulkUpsertMetricDaily(rows: any[], client: Prisma.TransactionClient | typeof prisma = prisma) {
   if (rows.length === 0) return;
-  const BATCH = 500;
+  const BATCH = UPSERT_BATCH_ROWS;
   for (let i = 0; i < rows.length; i += BATCH) {
     const batch = rows.slice(i, i + BATCH);
     const values = batch.map(c =>
@@ -343,7 +348,7 @@ async function bulkUpsertMetricDaily(rows: any[], client: Prisma.TransactionClie
 
 async function bulkUpsertContentDaily(rows: any[], client: Prisma.TransactionClient | typeof prisma = prisma) {
   if (rows.length === 0) return;
-  const BATCH = 500;
+  const BATCH = UPSERT_BATCH_ROWS;
   for (let i = 0; i < rows.length; i += BATCH) {
     const batch = rows.slice(i, i + BATCH);
     const values = batch.map(r =>
