@@ -440,6 +440,13 @@ export async function GET(req: NextRequest) {
     }
     const rangeDays = Math.floor((Date.parse(`${until}T00:00:00Z`) - Date.parse(`${since}T00:00:00Z`)) / 86400000) + 1;
     if (rangeDays > 31) return NextResponse.json({ error: "Sync range is limited to 31 days" }, { status: 400 });
+    // A run the platform killed at the time limit never reaches its catch
+    // block and would stay "running" forever. We hold the lock now, so any
+    // run still marked running is dead.
+    await prisma.adsSyncRun.updateMany({
+      where: { status: "running" },
+      data: { status: "failed", error: "Did not finish (likely hit the function time limit)", completedAt: new Date() },
+    });
     const syncRun = await prisma.adsSyncRun.create({ data: { since, until, status: "running" } });
     syncRunId = syncRun.id;
 
