@@ -3,7 +3,7 @@ import { prisma } from "@/lib/server/prisma";
 import { Prisma } from "@prisma/client";
 import { createHash } from "crypto";
 import sharp from "sharp";
-import { createClient } from "@/utils/supabase/server";
+import { requireSyncAuthorization } from "@/lib/server/sync-auth";
 
 // Compute perceptual hash (dHash 16x16) from image buffer
 // dHash compares adjacent pixel brightness — much better than aHash for similar-color images
@@ -41,6 +41,11 @@ const SYNC_LEASE_MS = 6 * 60 * 1000;
 const ACCOUNT_FETCH_CONCURRENCY = 8;
 const HASH_CACHE_BATCH_SIZE = 500;
 const DB_TRANSACTION_TIMEOUT_MS = 120_000;
+const RECENT_WINDOW_DAYS = 7;
+// "Suspiciously cheap": real CPI is ~฿50–300. An account with many chats but
+// spend this low means Meta returned wrong delivery numbers without an error.
+const SUSPICIOUS_MIN_INBOX = 20;
+const SUSPICIOUS_MAX_CPI = 5;
 
 // Allow up to 5 minutes for heavy sync (Vercel Pro)
 export const maxDuration = 300;
@@ -80,18 +85,6 @@ function getTokens(): string[] {
   if (t3) tokens.push(t3);
   if (tokens.length === 0) throw new Error("META_SYSTEM_USER_TOKEN ยังไม่ได้ตั้งค่าใน .env.local");
   return tokens;
-}
-
-async function requireSyncAuthorization(req: NextRequest): Promise<NextResponse | null> {
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && req.headers.get("authorization") === `Bearer ${cronSecret}`) return null;
-
-  const supabase = await createClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
-  const role = user?.app_metadata?.role;
-  if (!error && user && (user.email === "korrakottum@gmail.com" || role === "ceo" || role === "admin")) return null;
-
-  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }
 
 // Meta error codes for transient rate limits (app/user/page/custom). Meta
@@ -190,11 +183,75 @@ async function fetchInsightsForAccount(
   until: string,
   token: string
 ): Promise<AccountInsight[]> {
-  const fields = "ad_id,ad_name,campaign_id,campaign_name,spend,impressions,clicks,ctr,actions";
   const timeRange = encodeURIComponent(JSON.stringify({ since, until }));
-  const url = `${BASE}/act_${accountId}/insights?level=ad&time_increment=1&fields=${fields}&time_range=${timeRange}&limit=1000&access_token=${token}`;
+  const base = `${BASE}/act_${accountId}/insights?level=ad&time_increment=1&time_range=${timeRange}&limit=1000&access_token=${token}`;
+
+  // Meta bug: for some accounts, asking for `actions` in the same request as
+  // spend/impressions returns spend ≈ 0 with no error (inbox stays correct).
+  // So delivery and actions are always requested separately, in two requests
+  // other, and merged back by (ad_id, date). The two run in parallel so a
+  // full-month, all-account sync still fits in the function time limit.
+  const [delivery, actionRows] = await Promise.all([
+    fetchAllInsightPages(`${base}&fields=${AD_IDENTITY_FIELDS},spend,impressions,clicks,ctr`, accountName),
+    fetchAllInsightPages(`${base}&fields=${AD_IDENTITY_FIELDS},actions`, accountName),
+  ]);
+  const rowKey = (row: any) => `${row.ad_id ?? ""}|${row.date_start ?? ""}`;
+  const merged = new Map<string, any>();
+  for (const row of delivery) merged.set(rowKey(row), row);
+  // An ad can have actions on a day with no delivery (a chat from yesterday's ad).
+  for (const row of actionRows) merged.set(rowKey(row), { ...row, ...merged.get(rowKey(row)), actions: row.actions });
 
   const insights: AccountInsight[] = [];
+  for (const row of merged.values()) {
+    if (!row.ad_id) continue;
+    const actions = row.actions ?? [];
+    const spend = parseFloat(row.spend || "0");
+    const impressions = parseInt(row.impressions || "0");
+    const clicks = parseInt(row.clicks || "0");
+    const ctr = parseFloat(row.ctr || "0");
+
+    const inbox = actionValue(actions,
+      "onsite_conversion.messaging_conversation_started_7d",
+      "onsite_conversion.messaging_first_reply",
+    );
+    const leads = actionValue(actions,
+      "lead", "onsite_conversion.lead_grouped",
+      "offsite_conversion.fb_pixel_lead",
+    );
+
+    insights.push({
+      accountId,
+      accountName,
+      adId: row.ad_id,
+      adName: row.ad_name || "Untitled",
+      campaignId: row.campaign_id,
+      campaignName: row.campaign_name || "Untitled",
+      spend,
+      impressions,
+      clicks,
+      ctr,
+      inbox,
+      cpi: inbox > 0 ? spend / inbox : 0,
+      leads,
+      cpl: leads > 0 ? spend / leads : 0,
+      likes: actionValue(actions, "like", "page_engagement"),
+      comments: actionValue(actions, "comment"),
+      shares: actionValue(actions, "post"),
+      videoViews: actionValue(actions, "video_view"),
+      date: row.date_start || since,
+      // Insight rows do not include effective_status. This is filled from the
+      // ad object during the creative lookup below.
+      status: "unknown",
+    });
+  }
+
+  return insights;
+}
+
+const AD_IDENTITY_FIELDS = "ad_id,ad_name,campaign_id,campaign_name";
+
+async function fetchAllInsightPages(url: string, accountName: string): Promise<any[]> {
+  const rows: any[] = [];
   let nextUrl: string | null = url;
   while (nextUrl) {
     const res = await fetchMeta(nextUrl);
@@ -206,54 +263,10 @@ async function fetchInsightsForAccount(
     if (data?.error) {
       throw new Error(`${accountName}: ${data.error.message ?? "Meta API error"}`);
     }
-
-    for (const row of data.data || []) {
-      if (!row.ad_id) continue;
-      const actions = row.actions ?? [];
-      const spend = parseFloat(row.spend || "0");
-      const impressions = parseInt(row.impressions || "0");
-      const clicks = parseInt(row.clicks || "0");
-      const ctr = parseFloat(row.ctr || "0");
-
-      const inbox = actionValue(actions,
-        "onsite_conversion.messaging_conversation_started_7d",
-        "onsite_conversion.messaging_first_reply",
-      );
-      const leads = actionValue(actions,
-        "lead", "onsite_conversion.lead_grouped",
-        "offsite_conversion.fb_pixel_lead",
-      );
-
-      insights.push({
-        accountId,
-        accountName,
-        adId: row.ad_id,
-        adName: row.ad_name || "Untitled",
-        campaignId: row.campaign_id,
-        campaignName: row.campaign_name || "Untitled",
-        spend,
-        impressions,
-        clicks,
-        ctr,
-        inbox,
-        cpi: inbox > 0 ? spend / inbox : 0,
-        leads,
-        cpl: leads > 0 ? spend / leads : 0,
-        likes: actionValue(actions, "like", "page_engagement"),
-        comments: actionValue(actions, "comment"),
-        shares: actionValue(actions, "post"),
-        videoViews: actionValue(actions, "video_view"),
-        date: row.date_start || since,
-        // Insight rows do not include effective_status. This is filled from the
-        // ad object during the creative lookup below.
-        status: "unknown",
-      });
-    }
-
-    nextUrl = data.paging?.next || null;
+    rows.push(...(data?.data ?? []));
+    nextUrl = data?.paging?.next || null;
   }
-
-  return insights;
+  return rows;
 }
 
 // ── Scrape page name from Facebook mobile (fallback when API fails) ─────────
@@ -416,9 +429,11 @@ export async function GET(req: NextRequest) {
     const today = new Date();
     const toISO = (d: Date) => d.toISOString().slice(0, 10);
 
-    // Default: last 3 days (Meta attribution window)
-    const threeDaysAgo = new Date(today.getTime() - 3 * 86400000);
-    const since = searchParams.get("since") || toISO(threeDaysAgo);
+    // Default: the last RECENT_WINDOW_DAYS days. Meta's 7-day click attribution
+    // keeps moving a day's numbers for about a week, so each day is re-fetched
+    // daily until it settles.
+    const windowStart = new Date(today.getTime() - (RECENT_WINDOW_DAYS - 1) * 86400000);
+    const since = searchParams.get("since") || toISO(windowStart);
     const until = searchParams.get("until") || toISO(today);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(since) || !/^\d{4}-\d{2}-\d{2}$/.test(until) || since > until) {
       return NextResponse.json({ error: "Invalid date range" }, { status: 400 });
@@ -980,6 +995,60 @@ export async function GET(req: NextRequest) {
       console.log(`📛 Preview resolved ${previewResolved}/${previewUnknown.length} page names`);
     }
 
+    // ── Step 4.9: Data-quality guards ─────────────────────────────────────
+    const warnings: string[] = [];
+
+    // Don't let a zero overwrite good numbers: an ad/day that already had spend
+    // but now comes back with spend = 0 AND impressions = 0 is almost never real
+    // (Meta does not revise delivery to zero) — it has come from Meta bugs. Keep
+    // the stored delivery numbers; chats/leads still update normally.
+    const zeroDeliveryKeys = new Set(
+      allInsights.filter(r => r.spend === 0 && r.impressions === 0).map(r => `${r.adId}|${r.date}`),
+    );
+    if (zeroDeliveryKeys.size > 0) {
+      const zeroAdIds = [...new Set([...zeroDeliveryKeys].map(k => k.split("|")[0]))];
+      const previous = new Map<string, { spend: number; impressions: number; clicks: number; ctr: number }>();
+      for (let i = 0; i < zeroAdIds.length; i += HASH_CACHE_BATCH_SIZE) {
+        const stored = await prisma.adsContentDaily.findMany({
+          where: { adId: { in: zeroAdIds.slice(i, i + HASH_CACHE_BATCH_SIZE) }, date: { gte: since, lte: until }, spend: { gt: 0 } },
+          select: { adId: true, date: true, spend: true, impressions: true, clicks: true, ctr: true },
+        });
+        for (const s of stored) previous.set(`${s.adId}|${s.date}`, s);
+      }
+      const restored = new Set<string>();
+      for (const row of allInsights) {
+        const key = `${row.adId}|${row.date}`;
+        const old = previous.get(key);
+        if (!old || row.spend !== 0 || row.impressions !== 0 || restored.has(key)) continue;
+        row.spend = old.spend;
+        row.impressions = old.impressions;
+        row.clicks = old.clicks;
+        row.ctr = old.ctr;
+        row.cpi = row.inbox > 0 ? row.spend / row.inbox : 0;
+        row.cpl = row.leads > 0 ? row.spend / row.leads : 0;
+        restored.add(key);
+      }
+      if (restored.size > 0) {
+        const sample = [...restored].slice(0, 20).join(", ");
+        warnings.push(`Kept previous spend for ${restored.size} ad-day(s) that Meta returned as spend=0, impressions=0: ${sample}`);
+      }
+    }
+
+    // Flag accounts whose numbers look impossible (many chats, almost no spend).
+    const byAccount = new Map<string, { name: string; spend: number; inbox: number }>();
+    for (const row of allInsights) {
+      const agg = byAccount.get(row.accountId) ?? { name: row.accountName, spend: 0, inbox: 0 };
+      agg.spend += row.spend;
+      agg.inbox += row.inbox;
+      byAccount.set(row.accountId, agg);
+    }
+    for (const [accId, a] of byAccount) {
+      if (a.inbox >= SUSPICIOUS_MIN_INBOX && a.spend < a.inbox * SUSPICIOUS_MAX_CPI) {
+        warnings.push(`Suspicious delivery for ${a.name} (${accId}): inbox ${a.inbox} but spend ฿${a.spend.toFixed(2)}`);
+      }
+    }
+    for (const w of warnings) console.warn(`⚠️ ${w}`);
+
     // ── Step 5: Aggregate campaign-level data from ad insights ───────────
     type CampaignKey = string;
     const campaignAgg = new Map<CampaignKey, {
@@ -1102,6 +1171,20 @@ export async function GET(req: NextRequest) {
     }, { timeout: DB_TRANSACTION_TIMEOUT_MS });
     console.log(`📝 Reconciled ${campaignRows.length} campaign rows and ${adRows.length} ad rows (atomic)`);
 
+    // Record which account/day pairs this run fetched successfully (including
+    // days an account spent nothing), so the backfill cron can find gaps.
+    if (succeededAccountIds.length > 0) {
+      const rangeDates: string[] = [];
+      for (let t = Date.parse(`${since}T00:00:00Z`); t <= Date.parse(`${until}T00:00:00Z`); t += 86400000) {
+        rangeDates.push(new Date(t).toISOString().slice(0, 10));
+      }
+      await prisma.$executeRaw`
+        INSERT INTO "AdsSyncProgress" ("accountId", "date", "syncedAt")
+        SELECT a, d, NOW() FROM unnest(${succeededAccountIds}::text[]) AS a CROSS JOIN unnest(${rangeDates}::text[]) AS d
+        ON CONFLICT ("accountId", "date") DO UPDATE SET "syncedAt" = NOW()
+      `;
+    }
+
     const elapsed = ((Date.now() - start) / 1000).toFixed(1);
     const syncMetrics = {
       event: "meta_ads_sync_completed",
@@ -1127,15 +1210,17 @@ export async function GET(req: NextRequest) {
         accountsFailed,
         campaignRows: campaignRows.length,
         contentRows: adRows.length,
+        warnings: warnings.join("\n").slice(0, 4000),
         completedAt: new Date(),
       },
     });
 
     const parts = [`✅ Sync ${since} → ${until} — ${allAccountEntries.length} accounts (${tokens.length} tokens), ${campaignRows.length} campaign rows, ${adRows.length} ad rows (${elapsed}s)`];
     if (accountsFailed > 0) parts.push(`⚠️ ${accountsFailed} account(s) failed`);
+    if (warnings.length > 0) parts.push(`⚠️ ${warnings.length} data warning(s)`);
     return NextResponse.json({
       message: parts.join("\n"),
-      results: accountSummary, since, until, metrics: syncMetrics,
+      results: accountSummary, since, until, metrics: syncMetrics, warnings,
     });
 
   } catch (err: any) {

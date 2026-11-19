@@ -94,10 +94,22 @@ model AdsSyncRun {
   campaignRows   Int      @default(0)
   contentRows    Int      @default(0)
   error          String   @default("")
+  warnings       String   @default("")
   startedAt      DateTime @default(now())
   completedAt    DateTime?
 
   @@index([status, startedAt])
+}
+
+// Per-account, per-day record of the last successful fetch of that day.
+// The backfill cron re-syncs days never fetched after they ended.
+model AdsSyncProgress {
+  accountId String
+  date      String   // "YYYY-MM-DD"
+  syncedAt  DateTime @default(now())
+
+  @@id([accountId, date])
+  @@index([date])
 }
 
 // Database-backed lease prevents concurrent cron/manual syncs across instances.
