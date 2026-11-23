@@ -12,6 +12,7 @@ const protectedRoots = [
   "/timeline",
   "/notifications",
   "/platform-ops",
+  "/compare",
 ] as const;
 
 const restrictedRoutes: Array<{ prefix: string; roles: UserRole[] }> = [
@@ -25,6 +26,7 @@ const restrictedRoutes: Array<{ prefix: string; roles: UserRole[] }> = [
   { prefix: "/ai-brain", roles: ["ceo", "admin", "finance", "am", "content", "ads"] },
   { prefix: "/ticketing", roles: ["ceo", "admin", "finance", "am", "content", "ads"] },
   { prefix: "/timeline", roles: ["ceo", "admin", "finance", "am", "content", "ads"] },
+  { prefix: "/compare", roles: ["ceo", "admin", "finance", "am", "content", "ads"] },
   { prefix: "/notifications", roles: ["ceo", "admin", "finance", "am", "content", "ads"] },
 ];
 

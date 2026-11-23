@@ -1,5 +1,7 @@
 {
-  "regions": ["sin1"],
+  "regions": [
+    "sin1"
+  ],
   "crons": [
     {
       "path": "/api/cron/sync-ads",
@@ -8,6 +10,10 @@
     {
       "path": "/api/cron/sync-ads-backfill",
       "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/cron/sync-chats",
+      "schedule": "*/10 * * * *"
     }
   ]
 }

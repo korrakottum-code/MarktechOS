@@ -148,3 +148,57 @@ model PancakeTrackedPage {
   name      String
   createdAt DateTime @default(now())
 }
+
+// ── Chat outcomes read from Pancake (for close % / queues per ad) ────────────
+// One row per "chat": an ad click, or a customer returning after a long silence.
+// Holds no names, phone numbers or message text — only outcomes.
+model ChatEpisode {
+  id             String    @id            // convHash|startedAt ISO
+  pageId         String
+  convHash       String                   // sha256 of the Pancake conversation id
+  adId           String    @default("")
+  adTitle        String    @default("")
+  startedAt      DateTime
+  date           String                   // Bangkok "YYYY-MM-DD" of startedAt
+  hour           Int                      // Bangkok hour of startedAt
+  isNew          Boolean   @default(true)
+  closed         Boolean   @default(false)
+  closedAt       DateTime?
+  queues         Int       @default(0)
+  phoneGiven     Boolean   @default(false)
+  lastActivityAt DateTime
+  updatedAt      DateTime  @updatedAt
+
+  @@index([pageId, date])
+  @@index([convHash, startedAt])
+  @@index([date])
+}
+
+// Manual service/price for an ad name the team named without a service
+// (e.g. "onewan [brm]"). Keyed by the normalized ad name, so one entry covers
+// every ad with that name. exclude = not a sales ad (left out of all numbers).
+model AdServiceMap {
+  nameKey   String   @id
+  service   String   @default("")
+  price     Int?
+  exclude   Boolean  @default(false)
+  updatedBy String   @default("")
+  updatedAt DateTime @updatedAt
+}
+
+// Ad copy (title + body) fetched from Meta for ads whose service is not in the
+// name, so the service/price can be read from the text instead.
+model AdCreativeText {
+  adId      String   @id
+  text      String   @default("")
+  fetchedAt DateTime @default(now())
+}
+
+model ChatSyncState {
+  pageId        String    @id
+  cursor        DateTime                 // last conversation updated_at processed (UTC)
+  lastRunAt     DateTime?
+  lastError     String    @default("")
+  convsTotal    Int       @default(0)
+  updatedAt     DateTime  @updatedAt
+}

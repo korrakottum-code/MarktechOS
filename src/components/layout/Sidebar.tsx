@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams, useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, X, LayoutDashboard, Search, CheckSquare, Users, EyeOff, Eye } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, LayoutDashboard, Search, CheckSquare, Users, EyeOff, Eye, ArrowRightLeft } from "lucide-react";
 import { useAuthSession } from "@/lib/use-auth-session";
 import { canAccessPath, isClientRole } from "@/lib/auth/permissions";
 import { useExcludedPages } from "@/lib/use-excluded-pages";
@@ -37,6 +37,8 @@ export default function Sidebar({
   const [showExcluded, setShowExcluded] = useState(false);
 
   const urlPages = searchParams.get("pages");
+  // Page selection stays on the comparison page; everywhere else it filters the overview.
+  const filterBase = pathname === "/compare" ? "/compare" : "/";
   const selectedPages = new Set(urlPages ? urlPages.split(",") : []);
 
   useEffect(() => {
@@ -61,7 +63,7 @@ export default function Sidebar({
       const singlePageId = pages[0].pageId;
       const params = new URLSearchParams(searchParams.toString());
       params.set("pages", singlePageId);
-      router.replace(`/?${params.toString()}`, { scroll: false });
+      router.replace(`${filterBase}?${params.toString()}`, { scroll: false });
     }
   }, [isClient, pages, selectedPages.size, searchParams, router]);
 
@@ -74,13 +76,13 @@ export default function Sidebar({
     if (next.size > 0) params.set("pages", Array.from(next).join(","));
     else params.delete("pages");
     
-    router.replace(`/?${params.toString()}`, { scroll: false });
+    router.replace(`${filterBase}?${params.toString()}`, { scroll: false });
   }
 
   function clearPages() {
     const params = new URLSearchParams(searchParams.toString());
     params.delete("pages");
-    router.replace(`/?${params.toString()}`, { scroll: false });
+    router.replace(`${filterBase}?${params.toString()}`, { scroll: false });
   }
 
   function selectAll() {
@@ -98,7 +100,7 @@ export default function Sidebar({
     if (next.size > 0) params.set("pages", Array.from(next).join(","));
     else params.delete("pages");
     
-    router.replace(`/?${params.toString()}`, { scroll: false });
+    router.replace(`${filterBase}?${params.toString()}`, { scroll: false });
   }
 
   // Filter by search AND exclude hidden pages from the main list
@@ -161,7 +163,8 @@ export default function Sidebar({
         {!(isClient && pages.length <= 1) && (
         <button
           onClick={() => {
-            clearPages();
+            if (pathname === "/compare") router.push("/");
+            else clearPages();
             if (mobileOpen) onCloseMobile();
           }}
           className={`w-full relative group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-200 ${
@@ -177,6 +180,25 @@ export default function Sidebar({
           {(!collapsed || mobileOpen) && <span className="truncate">{isClient ? "ภาพรวมของฉัน" : "เลือกชุดที่ดู"}</span>}
           {pathname === "/" && selectedPages.size === 0 && <div className="absolute left-0 w-1 h-8 rounded-r-full bg-gold-400" />}
         </button>
+        )}
+
+        {/* Month comparison — staff only (keeps the sidebar's page selection) */}
+        {user && !isClient && (
+          <Link
+            href={`/compare${selectedPages.size ? `?pages=${Array.from(selectedPages).join(",")}` : ""}`}
+            onClick={() => { if (mobileOpen) onCloseMobile(); }}
+            className={`w-full relative group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-200 ${
+              (!collapsed || mobileOpen) ? "" : "justify-center"
+            } ${
+              pathname === "/compare"
+                ? "bg-gradient-to-r from-gold-500/15 to-transparent text-gold-400 border border-gold-500/20"
+                : "text-foreground-muted hover:bg-navy-800 hover:text-foreground"
+            }`}
+            title={collapsed && !mobileOpen ? "เทียบเดือน" : undefined}
+          >
+            <ArrowRightLeft size={20} className={`shrink-0 ${pathname === "/compare" ? "text-gold-400" : "text-foreground-muted group-hover:text-foreground"}`} />
+            {(!collapsed || mobileOpen) && <span className="truncate">เทียบเดือน</span>}
+          </Link>
         )}
 
         {pages.length > 0 && (
