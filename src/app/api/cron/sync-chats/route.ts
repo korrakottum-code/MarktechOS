@@ -51,7 +51,9 @@ export async function GET(req: NextRequest) {
     pages.sort((a, b) => (lastRun.get(a.id) ?? 0) - (lastRun.get(b.id) ?? 0));
 
     for (const page of pages) {
-      if (Date.now() > deadline - 15_000) break;
+      // Leave pages that still need a long backfill for the next run rather than
+      // starting them with too little time to list their conversations.
+      if (Date.now() > deadline - (lastRun.get(page.id) ? 15_000 : 120_000)) break;
       results.push(await syncPageChats(page, token, deadline));
     }
     const summary = {

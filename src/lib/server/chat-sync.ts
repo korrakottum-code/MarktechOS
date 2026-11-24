@@ -8,7 +8,7 @@ import { analyzeConversation, type ChatLine, type EpisodeState } from "@/lib/cha
 const API = "https://pages.fm/api/v1";
 /** Chats before this are not tracked (first run backfills from here). */
 export const CHAT_FLOOR = Date.parse("2026-10-01T00:00:00+07:00");
-const LIST_PAGE_CAP = 150;           // × 60 conversations
+const LIST_PAGE_CAP = 400;           // × 60 conversations (busiest pages need ~100+ to backfill)
 const MESSAGE_CALL_CAP = 12;         // × ~25 messages per conversation
 const CONCURRENCY = 6;
 const DAY = 86400000;
@@ -190,8 +190,9 @@ export async function syncPageChats(page: { id: string; name: string }, token: s
     result.error = err instanceof Error ? err.message : String(err);
     await prisma.chatSyncState.upsert({
       where: { pageId: page.id },
-      create: { pageId: page.id, cursor: new Date(cursor), lastRunAt: new Date(), lastError: result.error.slice(0, 500) },
-      update: { lastRunAt: new Date(), lastError: result.error.slice(0, 500) },
+      // lastRunAt is left alone so a page that ran out of time goes first next run.
+      create: { pageId: page.id, cursor: new Date(cursor), lastRunAt: null, lastError: result.error.slice(0, 500) },
+      update: { lastError: result.error.slice(0, 500) },
     });
   }
   return result;
