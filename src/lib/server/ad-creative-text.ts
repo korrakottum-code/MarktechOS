@@ -30,7 +30,10 @@ function creativeText(c: Creative | undefined): string {
     ...(c.asset_feed_spec?.titles ?? []).map(t => t.text),
     ...(c.asset_feed_spec?.bodies ?? []).map(b => b.text),
   ];
-  return [...new Set(parts.filter((p): p is string => !!p && p.trim().length > 0))].join("\n").slice(0, 2000);
+  const text = [...new Set(parts.filter((p): p is string => !!p && p.trim().length > 0))].join("\n");
+  // Cut by code point so an emoji is never split, and drop any lone surrogate:
+  // Postgres rejects text with half an emoji.
+  return [...text].slice(0, 2000).join("").replace(/[\uD800-\uDFFF]/gu, "");
 }
 
 async function fetchBatch(ids: string[], tokens: string[]): Promise<Map<string, string>> {
@@ -79,10 +82,16 @@ export async function fetchMissingCreativeTexts(limit = 150, deadline = Date.now
   for (let i = 0; i < need.length && Date.now() < deadline; i += BATCH) {
     const ids = need.slice(i, i + BATCH);
     const texts = await fetchBatch(ids, tokens).catch(() => new Map<string, string>());
-    await prisma.adCreativeText.createMany({
-      data: ids.map(adId => ({ adId, text: texts.get(adId) ?? "" })),
-      skipDuplicates: true,
-    });
+    const data = ids.map(adId => ({ adId, text: texts.get(adId) ?? "" }));
+    try {
+      await prisma.adCreativeText.createMany({ data, skipDuplicates: true });
+    } catch {
+      // One bad row fails the whole insert; save the rest one by one, empty if needed.
+      for (const row of data) {
+        await prisma.adCreativeText.createMany({ data: [row], skipDuplicates: true })
+          .catch(() => prisma.adCreativeText.createMany({ data: [{ adId: row.adId, text: "" }], skipDuplicates: true }));
+      }
+    }
     saved += ids.length;
   }
   return saved;
