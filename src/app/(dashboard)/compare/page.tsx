@@ -41,8 +41,8 @@ const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart
 type Better = "up" | "down";
 interface Col { label: string; get: (m: Metrics, days: number) => number; fmt: (n: number) => string; better: Better; chat?: boolean }
 const COLS: Col[] = [
-  { label: "งบ/วัน", get: (m, d) => m.spend / d, fmt: thb, better: "up" },
-  { label: "แชท/วัน", get: (m, d) => m.inbox / d, fmt: n => num(n, 1), better: "up" },
+  { label: "งบ", get: m => m.spend, fmt: thb, better: "up" },
+  { label: "แชท", get: m => m.inbox, fmt: n => num(n), better: "up" },
   { label: "฿/แชท", get: m => div(m.spend, m.inbox), fmt: thb, better: "down" },
   { label: "฿/ลีด", get: m => div(m.spend, m.leads), fmt: thb, better: "down" },
   { label: "%ปิด", get: m => div(m.closes, m.chats), fmt: pct, better: "up", chat: true },
@@ -276,8 +276,8 @@ function CompareContent() {
   const tokenError = coverage.find(c => c.error)?.error;
 
   const kpis = ov && co ? [
-    { label: "งบ/วัน", c: ov.cur.spend / days.cur, p: ov.prev.spend / days.prev, f: thb, b: "up" as Better },
-    { label: "แชท/วัน", c: ov.cur.inbox / days.cur, p: ov.prev.inbox / days.prev, f: (n: number) => num(n, 1), b: "up" as Better },
+    { label: "งบรวม", c: ov.cur.spend, p: ov.prev.spend, f: thb, b: "up" as Better },
+    { label: "แชท", c: ov.cur.inbox, p: ov.prev.inbox, f: (n: number) => num(n), b: "up" as Better },
     { label: "ลีด/วัน", c: ov.cur.leads / days.cur, p: ov.prev.leads / days.prev, f: (n: number) => num(n, 1), b: "up" as Better },
     { label: "฿/แชท", c: div(ov.cur.spend, ov.cur.inbox), p: div(ov.prev.spend, ov.prev.inbox), f: thb, b: "down" as Better },
     { label: "฿/ลีด", c: div(ov.cur.spend, ov.cur.leads), p: div(ov.prev.spend, ov.prev.leads), f: thb, b: "down" as Better },
@@ -418,7 +418,7 @@ function CompareContent() {
             <p>• &quot;ลีด&quot; ของ Meta คือ lead event ไม่ใช่คิว และบางเพจไม่ได้ตั้งการติดลีด · เพจที่ไม่อยู่ใน Pancake จะไม่มีตัวเลขปิด</p>
             <p>• บริการ/ราคา อ่านจากชื่อแอด ชื่อแคมเปญ หรือข้อความในแอด ถ้าไม่เจอจะอยู่ใน &quot;ไม่ระบุบริการ&quot; (ผูกเองได้ด้านบน) · บางห้องไม่มีรหัสแอด (นับเป็น &quot;ไม่มีแอด&quot;)</p>
             <p>• แคมเปญ Lead นับแชทตามปกติ แต่ข้อเสนอดูที่ ฿/ลีด เพราะแคมเปญ opt หาคนให้ลีด · ไม่นับแคมเปญ Awareness/Engagement ที่แทบไม่มีแชท และแคมเปญสมัครงาน</p>
-            <p>• ช่วงนี้ที่ยังไม่จบเดือนคิดค่าเฉลี่ยต่อวันถึงวันนี้ · การคาดการณ์ใช้ประสิทธิภาพเดือนก่อน เป็นค่าประมาณ</p>
+            <p>• งบและแชทเป็นยอดรวมของช่วงที่เลือก เทียบกับวันที่เดียวกันของเดือนก่อน · การคาดการณ์ใช้ประสิทธิภาพเดือนก่อน เป็นค่าประมาณ</p>
           </div>
         </div>
       )}
