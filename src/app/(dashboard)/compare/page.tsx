@@ -49,6 +49,13 @@ const COLS: Col[] = [
   { label: "฿/ปิด", get: m => div(m.chatSpend, m.closes), fmt: thb, better: "down", chat: true },
 ];
 
+const KPI_GROUPS = [
+  { key: "spend", title: "งบ", box: "border-amber-500/25 bg-amber-500/5", text: "text-amber-300", dot: "bg-amber-400" },
+  { key: "chat", title: "แชท", box: "border-sky-500/25 bg-sky-500/5", text: "text-sky-300", dot: "bg-sky-400" },
+  { key: "lead", title: "ลีด", box: "border-violet-500/25 bg-violet-500/5", text: "text-violet-300", dot: "bg-violet-400" },
+  { key: "close", title: "คิว / ปิด (Pancake)", box: "border-emerald-500/25 bg-emerald-500/5", text: "text-emerald-300", dot: "bg-emerald-400" },
+];
+
 function Delta({ cur, prev, better }: { cur: number; prev: number; better: Better }) {
   if (!Number.isFinite(cur) || !Number.isFinite(prev) || prev === 0) return null;
   const change = (cur - prev) / Math.abs(prev);
@@ -82,20 +89,41 @@ const SOURCE_LABEL: Record<string, { text: string; cls: string }> = {
 
 function Table({ rows, days, kind, showChat }: { rows: Row[]; days: { cur: number; prev: number }; kind: "page" | "service" | "price"; showChat: boolean }) {
   const cols = COLS.filter(c => showChat || !c.chat);
+  const [sort, setSort] = useState<{ key: string; dir: 1 | -1 } | null>(null);
+  const sorted = useMemo(() => {
+    if (!sort) return rows;
+    const name = (r: Row) => r.pageName ?? r.key;
+    const col = cols.find(c => c.label === sort.key);
+    return [...rows].sort((x, y) => {
+      if (!col) return name(x).localeCompare(name(y), "th") * sort.dir;
+      const a = col.get(x.cur, days.cur), b = col.get(y.cur, days.cur);
+      const fa = Number.isFinite(a), fb = Number.isFinite(b);
+      if (!fa || !fb) return fa === fb ? 0 : fa ? -1 : 1; // blanks last
+      return (a - b) * sort.dir;
+    });
+  }, [rows, sort, cols, days]);
+  const toggle = (key: string) =>
+    setSort(s => (s?.key !== key ? { key, dir: key === "name" ? 1 : -1 } : s.dir === -1 ? { key, dir: 1 } : key === "name" ? { key, dir: -1 } : null));
+  const arrow = (key: string) => (sort?.key === key ? (sort.dir === -1 ? " ↓" : " ↑") : "");
+  const thBtn = "cursor-pointer select-none hover:text-foreground";
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left">
         <thead>
           <tr className="border-b border-border">
-            <th className="px-3 py-2.5 text-[13px] font-bold text-foreground-muted uppercase min-w-[180px]">
-              {kind === "page" ? "เพจ" : kind === "service" ? "บริการ" : "แอด (ราคา)"}
+            <th onClick={() => toggle("name")} className={`px-3 py-2.5 text-[13px] font-bold text-foreground-muted uppercase min-w-[180px] ${thBtn}`}>
+              {kind === "page" ? "เพจ" : kind === "service" ? "บริการ" : "แอด (ราคา)"}{arrow("name")}
             </th>
-            {cols.map(c => <th key={c.label} className="px-3 py-2.5 text-[13px] font-bold text-foreground-muted text-right whitespace-nowrap">{c.label}</th>)}
+            {cols.map(c => (
+              <th key={c.label} onClick={() => toggle(c.label)} className={`px-3 py-2.5 text-[13px] font-bold text-right whitespace-nowrap ${thBtn} ${sort?.key === c.label ? "text-gold-400" : "text-foreground-muted"}`}>
+                {c.label}{arrow(c.label)}
+              </th>
+            ))}
             {kind === "page" && <th className="px-3 py-2.5 text-[13px] font-bold text-foreground-muted">แหล่งแชท</th>}
           </tr>
         </thead>
         <tbody>
-          {rows.map(r => (
+          {sorted.map(r => (
             <tr key={r.key} className="border-b border-border/50 hover:bg-navy-800/40">
               <td className="px-3 py-2.5 align-top">
                 <div className="text-sm font-semibold text-foreground max-w-[260px] truncate" title={r.pageName ?? r.key}>{r.pageName ?? r.key}</div>
@@ -276,15 +304,15 @@ function CompareContent() {
   const tokenError = coverage.find(c => c.error)?.error;
 
   const kpis = ov && co ? [
-    { label: "งบรวม", c: ov.cur.spend, p: ov.prev.spend, f: thb, b: "up" as Better },
-    { label: "แชท", c: ov.cur.inbox, p: ov.prev.inbox, f: (n: number) => num(n), b: "up" as Better },
-    { label: "ลีด/วัน", c: ov.cur.leads / days.cur, p: ov.prev.leads / days.prev, f: (n: number) => num(n, 1), b: "up" as Better },
-    { label: "฿/แชท", c: div(ov.cur.spend, ov.cur.inbox), p: div(ov.prev.spend, ov.prev.inbox), f: thb, b: "down" as Better },
-    { label: "฿/ลีด", c: div(ov.cur.spend, ov.cur.leads), p: div(ov.prev.spend, ov.prev.leads), f: thb, b: "down" as Better },
+    { g: "spend", label: "งบรวม", c: ov.cur.spend, p: ov.prev.spend, f: thb, b: "up" as Better },
+    { g: "chat", label: "แชท", c: ov.cur.inbox, p: ov.prev.inbox, f: (n: number) => num(n), b: "up" as Better },
+    { g: "chat", label: "฿/แชท", c: div(ov.cur.spend, ov.cur.inbox), p: div(ov.prev.spend, ov.prev.inbox), f: thb, b: "down" as Better },
+    { g: "lead", label: "ลีด", c: ov.cur.leads, p: ov.prev.leads, f: (n: number) => num(n), b: "up" as Better },
+    { g: "lead", label: "฿/ลีด", c: div(ov.cur.spend, ov.cur.leads), p: div(ov.prev.spend, ov.prev.leads), f: thb, b: "down" as Better },
     ...(hasChat ? [
-      { label: "%ปิด (Pancake)", c: div(co.cur.closes, co.cur.chats), p: div(co.prev.closes, co.prev.chats), f: pct, b: "up" as Better },
-      { label: "คิว/วัน", c: co.cur.queues / days.cur, p: co.prev.queues / days.prev, f: (n: number) => num(n, 1), b: "up" as Better },
-      { label: "฿/ปิด", c: div(co.cur.chatSpend, co.cur.closes), p: div(co.prev.chatSpend, co.prev.closes), f: thb, b: "down" as Better },
+      { g: "close", label: "คิว", c: co.cur.queues, p: co.prev.queues, f: (n: number) => num(n), b: "up" as Better },
+      { g: "close", label: "%ปิด", c: div(co.cur.closes, co.cur.chats), p: div(co.prev.closes, co.prev.chats), f: pct, b: "up" as Better },
+      { g: "close", label: "฿/ปิด", c: div(co.cur.chatSpend, co.cur.closes), p: div(co.prev.chatSpend, co.prev.closes), f: thb, b: "down" as Better },
     ] : []),
   ] : [];
 
@@ -327,14 +355,24 @@ function CompareContent() {
             </details>
           )}
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 mb-6">
-            {kpis.map(k => (
-              <div key={k.label} className="stat-card !py-3 !px-4">
-                <p className="text-[13px] text-foreground-muted font-medium">{k.label}</p>
-                <p className="text-xl font-bold text-foreground leading-tight">{k.f(k.c)}</p>
-                <p className="text-[13px] text-foreground-muted">เดิม {k.f(k.p)} <Delta cur={k.c} prev={k.p} better={k.b} /></p>
-              </div>
-            ))}
+          <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6 ${hasChat ? "xl:grid-cols-[1fr_2fr_2fr_3fr]" : "xl:grid-cols-[1fr_2fr_2fr]"}`}>
+            {KPI_GROUPS.filter(g => kpis.some(k => k.g === g.key)).map(g => {
+              const items = kpis.filter(k => k.g === g.key);
+              return (
+                <div key={g.key} className={`rounded-2xl border ${g.box} p-3`}>
+                  <p className={`text-[13px] font-bold mb-2 flex items-center gap-1.5 ${g.text}`}><span className={`w-2 h-2 rounded-full ${g.dot}`} />{g.title}</p>
+                  <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}>
+                    {items.map(k => (
+                      <div key={k.label} className="rounded-xl bg-navy-900/70 px-3 py-2.5">
+                        <p className="text-[13px] text-foreground-muted font-medium">{k.label}</p>
+                        <p className={`text-xl font-bold leading-tight ${g.text}`}>{k.f(k.c)}</p>
+                        <p className="text-[13px] text-foreground-muted whitespace-nowrap">เดิม {k.f(k.p)} <Delta cur={k.c} prev={k.p} better={k.b} /></p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
