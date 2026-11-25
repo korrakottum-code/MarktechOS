@@ -70,8 +70,8 @@ function Cell({ col, row, days }: { col: Col; row: Row; days: { cur: number; pre
   const p = col.get(row.prev, days.prev);
   return (
     <td className="px-3 py-2.5 text-right align-top whitespace-nowrap">
-      <div className="text-xs font-semibold text-foreground">{col.fmt(c)}</div>
-      <div className="text-[10px] text-foreground-muted">
+      <div className="text-sm font-semibold text-foreground">{col.fmt(c)}</div>
+      <div className="text-[13px] text-foreground-muted">
         {col.fmt(p)} <Delta cur={c} prev={p} better={col.better} />
       </div>
     </td>
@@ -91,24 +91,24 @@ function Table({ rows, days, kind, showChat }: { rows: Row[]; days: { cur: numbe
       <table className="w-full text-left">
         <thead>
           <tr className="border-b border-border">
-            <th className="px-3 py-2.5 text-[10px] font-bold text-foreground-muted uppercase min-w-[180px]">
+            <th className="px-3 py-2.5 text-[13px] font-bold text-foreground-muted uppercase min-w-[180px]">
               {kind === "page" ? "เพจ" : kind === "service" ? "บริการ" : "แอด (ราคา)"}
             </th>
-            {cols.map(c => <th key={c.label} className="px-3 py-2.5 text-[10px] font-bold text-foreground-muted text-right whitespace-nowrap">{c.label}</th>)}
-            {kind === "page" && <th className="px-3 py-2.5 text-[10px] font-bold text-foreground-muted">แหล่งแชท</th>}
+            {cols.map(c => <th key={c.label} className="px-3 py-2.5 text-[13px] font-bold text-foreground-muted text-right whitespace-nowrap">{c.label}</th>)}
+            {kind === "page" && <th className="px-3 py-2.5 text-[13px] font-bold text-foreground-muted">แหล่งแชท</th>}
           </tr>
         </thead>
         <tbody>
           {rows.map(r => (
             <tr key={r.key} className="border-b border-border/50 hover:bg-navy-800/40">
               <td className="px-3 py-2.5 align-top">
-                <div className="text-xs font-semibold text-foreground max-w-[260px] truncate" title={r.pageName ?? r.key}>{r.pageName ?? r.key}</div>
-                {kind === "price" && r.service && r.service !== r.key && <div className="text-[10px] text-foreground-muted">{r.service}</div>}
+                <div className="text-sm font-semibold text-foreground max-w-[260px] truncate" title={r.pageName ?? r.key}>{r.pageName ?? r.key}</div>
+                {kind === "price" && r.service && r.service !== r.key && <div className="text-[13px] text-foreground-muted">{r.service}</div>}
               </td>
               {cols.map(c => <Cell key={c.label} col={c} row={r} days={days} />)}
               {kind === "page" && (
                 <td className="px-3 py-2.5 align-top">
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full border whitespace-nowrap ${SOURCE_LABEL[r.chatSource ?? "none"].cls}`}>
+                  <span className={`text-[13px] px-2 py-0.5 rounded-full border whitespace-nowrap ${SOURCE_LABEL[r.chatSource ?? "none"].cls}`}>
                     {SOURCE_LABEL[r.chatSource ?? "none"].text}
                   </span>
                 </td>
@@ -127,8 +127,8 @@ function DecompCard({ title, unit, d, prevLabel }: { title: string; unit: string
   const sign = (n: number) => `${n >= 0 ? "+" : ""}${num(n)}`;
   return (
     <div className="bg-navy-900 border border-border rounded-2xl p-5">
-      <h3 className="text-sm font-bold text-foreground mb-3">{title}</h3>
-      <div className="space-y-2 text-xs">
+      <h3 className="text-base font-bold text-foreground mb-3">{title}</h3>
+      <div className="space-y-2 text-sm">
         <div className="flex justify-between"><span className="text-foreground-muted">{prevLabel}</span><span>{num(d.prevActual)} {unit}</span></div>
         <div className="flex justify-between"><span className="text-foreground-muted">ช่วงนี้ ถ้าประสิทธิภาพเท่าเดือนก่อน</span><span>{num(d.atPrevRate)} {unit}</span></div>
         <div className="flex justify-between"><span className="text-foreground-muted">ผลจาก mix (งบย้ายไปแอด/บริการอื่น)</span><span className={d.mixEffect >= 0 ? "text-emerald-400" : "text-rose-400"}>{sign(d.mixEffect)}</span></div>
@@ -162,27 +162,27 @@ function MapRow({ ad, onSaved }: { ad: UnknownAd; onSaved: () => void }) {
   return (
     <tr className="border-b border-border/50 align-top">
       <td className="px-3 py-2.5 max-w-[280px]">
-        <div className="text-xs font-semibold text-foreground truncate" title={ad.adName}>{ad.adName}</div>
-        <div className="text-[10px] text-foreground-muted truncate" title={ad.campaignName}>{ad.campaignName}</div>
-        <div className="text-[10px] text-foreground-muted truncate" title={ad.pages.join(", ")}>{ad.pages.join(", ")}</div>
+        <div className="text-sm font-semibold text-foreground truncate" title={ad.adName}>{ad.adName}</div>
+        <div className="text-[13px] text-foreground-muted truncate" title={ad.campaignName}>{ad.campaignName}</div>
+        <div className="text-[13px] text-foreground-muted truncate" title={ad.pages.join(", ")}>{ad.pages.join(", ")}</div>
       </td>
-      <td className="px-3 py-2.5 text-right text-xs whitespace-nowrap">{thb(ad.spend)}<div className="text-[10px] text-foreground-muted">{num(ad.inbox)} แชท</div></td>
-      <td className="px-3 py-2.5 text-[10px] text-foreground-muted max-w-[320px]"><div className="line-clamp-3" title={ad.creativeText}>{ad.creativeText || "—"}</div></td>
+      <td className="px-3 py-2.5 text-right text-sm whitespace-nowrap">{thb(ad.spend)}<div className="text-[13px] text-foreground-muted">{num(ad.inbox)} แชท</div></td>
+      <td className="px-3 py-2.5 text-[13px] text-foreground-muted max-w-[320px]"><div className="line-clamp-3" title={ad.creativeText}>{ad.creativeText || "—"}</div></td>
       <td className="px-3 py-2.5">
         <div className="flex flex-wrap items-center gap-2">
           <input list="known-services" value={service} onChange={e => setService(e.target.value)} disabled={exclude} placeholder="บริการ"
-            className="w-32 bg-navy-950 border border-border rounded-lg px-2 py-1 text-xs text-foreground disabled:opacity-40" />
+            className="w-32 bg-navy-950 border border-border rounded-lg px-2 py-1 text-sm text-foreground disabled:opacity-40" />
           <input value={price} onChange={e => setPrice(e.target.value.replace(/[^\d]/g, ""))} disabled={exclude} placeholder="ราคา" inputMode="numeric"
-            className="w-20 bg-navy-950 border border-border rounded-lg px-2 py-1 text-xs text-foreground disabled:opacity-40" />
-          <label className="flex items-center gap-1 text-[10px] text-foreground-muted whitespace-nowrap">
+            className="w-20 bg-navy-950 border border-border rounded-lg px-2 py-1 text-sm text-foreground disabled:opacity-40" />
+          <label className="flex items-center gap-1 text-[13px] text-foreground-muted whitespace-nowrap">
             <input type="checkbox" checked={exclude} onChange={e => setExclude(e.target.checked)} /> ไม่ใช่แอดขาย
           </label>
           <button onClick={save} disabled={saving || (!service.trim() && !exclude)}
-            className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-gold-500/15 text-gold-400 border border-gold-500/20 disabled:opacity-40">
+            className="px-2.5 py-1 rounded-lg text-sm font-semibold bg-gold-500/15 text-gold-400 border border-gold-500/20 disabled:opacity-40">
             {saving ? "…" : "บันทึก"}
           </button>
         </div>
-        {err && <div className="text-[10px] text-rose-400 mt-1">{err}</div>}
+        {err && <div className="text-[13px] text-rose-400 mt-1">{err}</div>}
       </td>
     </tr>
   );
@@ -199,8 +199,8 @@ function ServiceMapping({ data, onChanged }: { data: CompareData; onChanged: () 
   return (
     <div className="bg-navy-900 border border-border rounded-2xl overflow-hidden mb-6">
       <div className="p-5 pb-3">
-        <h3 className="text-sm font-bold text-foreground">แอดที่ยังไม่รู้บริการ</h3>
-        <p className="text-[10px] text-foreground-muted mt-1">
+        <h3 className="text-base font-bold text-foreground">แอดที่ยังไม่รู้บริการ</h3>
+        <p className="text-[13px] text-foreground-muted mt-1">
           ระบบหาบริการจากชื่อแอด → ชื่อแคมเปญ → ข้อความในแอด ถ้ายังไม่เจอจะรวมไว้ที่ &quot;ไม่ระบุบริการ&quot; (งบรวม 2 ช่วง {thb(unknownSpend)}) ·
           ผูกครั้งเดียวใช้กับทุกแอดที่ชื่อเดียวกัน
         </p>
@@ -212,7 +212,7 @@ function ServiceMapping({ data, onChanged }: { data: CompareData; onChanged: () 
             <thead className="sticky top-0 bg-navy-900">
               <tr className="border-b border-border">
                 {["ชื่อแอด / แคมเปญ / เพจ", "งบ", "ข้อความในแอด", "ผูกบริการ"].map(h => (
-                  <th key={h} className="px-3 py-2 text-[10px] font-bold text-foreground-muted">{h}</th>
+                  <th key={h} className="px-3 py-2 text-[13px] font-bold text-foreground-muted">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -222,16 +222,16 @@ function ServiceMapping({ data, onChanged }: { data: CompareData; onChanged: () 
       )}
       {data.mappedAds.length > 0 && (
         <div className="border-t border-border p-4">
-          <button onClick={() => setShowMapped(v => !v)} className="text-[11px] text-gold-400">
+          <button onClick={() => setShowMapped(v => !v)} className="text-[14px] text-gold-400">
             {showMapped ? "ซ่อน" : "ดู"}ที่ผูกไว้แล้ว ({data.mappedAds.length})
           </button>
           {showMapped && (
             <ul className="mt-2 space-y-1">
               {data.mappedAds.map(m => (
-                <li key={m.nameKey} className="flex items-center gap-2 text-xs">
+                <li key={m.nameKey} className="flex items-center gap-2 text-sm">
                   <span className="text-foreground">{m.nameKey}</span>
                   <span className="text-foreground-muted">→ {m.exclude ? "ไม่ใช่แอดขาย" : `${m.service}${m.price ? ` ${m.price}` : ""}`}</span>
-                  <button onClick={() => remove(m.nameKey)} className="text-[10px] text-rose-400 hover:underline">ลบ</button>
+                  <button onClick={() => remove(m.nameKey)} className="text-[13px] text-rose-400 hover:underline">ลบ</button>
                 </li>
               ))}
             </ul>
@@ -296,8 +296,8 @@ function CompareContent() {
     <div className="space-y-6">
       <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-foreground flex items-center gap-2"><ArrowRightLeft size={20} className="text-gold-400" /> เทียบเดือน</h1>
-          <p className="text-xs text-foreground-muted mt-1">
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2"><ArrowRightLeft size={20} className="text-gold-400" /> เทียบเดือน</h1>
+          <p className="text-sm text-foreground-muted mt-1">
             {data ? <>ช่วงนี้ {data.ranges.cur.since} → {data.ranges.cur.until} เทียบ {data.ranges.prev.since} → {data.ranges.prev.until} (วันที่เดียวกันของเดือนก่อน)</> : "เลือกช่วงวันที่"}
             {pages && " · เฉพาะเพจที่เลือกในแถบซ้าย"}
           </p>
@@ -305,13 +305,13 @@ function CompareContent() {
         <MarkTechDatePicker mode="range" value={range} onChange={(v: { start: Date; end: Date }) => v?.start && v?.end && setRange(v)} />
       </div>
 
-      {error && <div className="p-4 rounded-xl border border-rose-500/30 bg-rose-500/10 text-sm text-rose-300">{error}</div>}
-      {loading && !data && <div className="flex items-center gap-2 text-foreground-muted text-sm"><Loader2 size={16} className="animate-spin" /> กำลังโหลด…</div>}
+      {error && <div className="p-4 rounded-xl border border-rose-500/30 bg-rose-500/10 text-base text-rose-300">{error}</div>}
+      {loading && !data && <div className="flex items-center gap-2 text-foreground-muted text-base"><Loader2 size={16} className="animate-spin" /> กำลังโหลด…</div>}
 
       {data && ov && co && (
         <div className={loading ? "opacity-60 transition-opacity" : ""}>
           {(syncing > 0 || tokenError) && (
-            <div className="mb-4 p-3 rounded-xl border border-amber-500/30 bg-amber-500/10 text-xs text-amber-200 flex gap-2">
+            <div className="mb-4 p-3 rounded-xl border border-amber-500/30 bg-amber-500/10 text-sm text-amber-200 flex gap-2">
               <AlertTriangle size={14} className="shrink-0 mt-0.5" />
               <span>
                 {syncing > 0 && `แชทจาก Pancake ยังดึงไม่ทัน ${syncing} เพจ (ดึงอัตโนมัติทุก 10 นาที) — เพจเหล่านี้ยังไม่ถูกนับใน %ปิด / คิว / ฿/ปิด `}
@@ -321,7 +321,7 @@ function CompareContent() {
           )}
 
           {(data.excluded.cur.spend > 0 || data.excluded.prev.spend > 0) && (
-            <details className="mb-4 text-[11px] text-foreground-muted">
+            <details className="mb-4 text-[14px] text-foreground-muted">
               <summary className="cursor-pointer">
                 ไม่นับแคมเปญที่ไม่ใช่แอดขาย (Awareness/Engagement ที่แทบไม่มีแชท, สมัครงาน): ช่วงนี้ {thb(data.excluded.cur.spend)} · เดือนก่อน {thb(data.excluded.prev.spend)}
               </summary>
@@ -334,9 +334,9 @@ function CompareContent() {
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 mb-6">
             {kpis.map(k => (
               <div key={k.label} className="stat-card !py-3 !px-4">
-                <p className="text-[10px] text-foreground-muted font-medium">{k.label}</p>
-                <p className="text-lg font-bold text-foreground leading-tight">{k.f(k.c)}</p>
-                <p className="text-[10px] text-foreground-muted">เดิม {k.f(k.p)} <Delta cur={k.c} prev={k.p} better={k.b} /></p>
+                <p className="text-[13px] text-foreground-muted font-medium">{k.label}</p>
+                <p className="text-xl font-bold text-foreground leading-tight">{k.f(k.c)}</p>
+                <p className="text-[13px] text-foreground-muted">เดิม {k.f(k.p)} <Delta cur={k.c} prev={k.p} better={k.b} /></p>
               </div>
             ))}
           </div>
@@ -346,8 +346,8 @@ function CompareContent() {
             {data.decomposition.closes && <DecompCard title="ปิดที่เปลี่ยนไปมาจากอะไร (Pancake)" unit="ห้อง" d={data.decomposition.closes} prevLabel="เดือนก่อน (ช่วงเดียวกัน)" />}
             {hasChat && (
               <div className="bg-navy-900 border border-border rounded-2xl p-5">
-                <h3 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2"><MessageCircle size={14} className="text-gold-400" /> เหตุผลรอง (Pancake)</h3>
-                <div className="space-y-2 text-xs">
+                <h3 className="text-base font-bold text-foreground mb-3 flex items-center gap-2"><MessageCircle size={14} className="text-gold-400" /> เหตุผลรอง (Pancake)</h3>
+                <div className="space-y-2 text-sm">
                   {[
                     ["ลูกค้าใหม่", pct(div(co.cur.newChats, co.cur.chats)), pct(div(co.prev.newChats, co.prev.chats))],
                     ["ปิดภายใน 1 ชม.", pct(div(co.cur.closes1h, co.cur.closes)), pct(div(co.prev.closes1h, co.prev.closes))],
@@ -363,11 +363,11 @@ function CompareContent() {
 
           {data.flags.length > 0 && (
             <div className="bg-navy-900 border border-border rounded-2xl p-5 mb-6">
-              <h3 className="text-sm font-bold text-foreground mb-1">ข้อเสนอฝั่งแอด</h3>
-              <p className="text-[10px] text-foreground-muted mb-3">เรียงตามผลต่อเงินมากสุด (สูงสุด 3 ข้อต่อเพจ{data.flagsTotal && data.flagsTotal > data.flags.length ? ` · แสดง ${data.flags.length} จาก ${data.flagsTotal} ข้อ` : ""}) · ปรับทีละ ±10% แล้วรอ 3–4 วันก่อนดูผล · ไม่ต้องปิดแอดถ้าไม่จำเป็น</p>
+              <h3 className="text-base font-bold text-foreground mb-1">ข้อเสนอฝั่งแอด</h3>
+              <p className="text-[13px] text-foreground-muted mb-3">เรียงตามผลต่อเงินมากสุด (สูงสุด 3 ข้อต่อเพจ{data.flagsTotal && data.flagsTotal > data.flags.length ? ` · แสดง ${data.flags.length} จาก ${data.flagsTotal} ข้อ` : ""}) · ปรับทีละ ±10% แล้วรอ 3–4 วันก่อนดูผล · ไม่ต้องปิดแอดถ้าไม่จำเป็น</p>
               <ul className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
                 {data.flags.map((f, i) => (
-                  <li key={i} className="flex gap-2 text-xs">
+                  <li key={i} className="flex gap-2 text-sm">
                     {f.level === "warn" ? <AlertTriangle size={14} className="text-rose-400 shrink-0 mt-0.5" />
                       : f.level === "good" ? <CheckCircle2 size={14} className="text-emerald-400 shrink-0 mt-0.5" />
                       : <Info size={14} className="text-sky-400 shrink-0 mt-0.5" />}
@@ -382,11 +382,11 @@ function CompareContent() {
             <div className="flex items-center gap-1 p-3 border-b border-border">
               {([["page", "แยกเพจ"], ["service", "แยกบริการ"], ["price", "แยกราคา"]] as const).map(([k, l]) => (
                 <button key={k} onClick={() => setTab(k)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${tab === k ? "bg-gold-500/15 text-gold-400 border border-gold-500/20" : "text-foreground-muted hover:bg-navy-800"}`}>
+                  className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${tab === k ? "bg-gold-500/15 text-gold-400 border border-gold-500/20" : "text-foreground-muted hover:bg-navy-800"}`}>
                   {l}
                 </button>
               ))}
-              <span className="ml-auto text-[10px] text-foreground-muted">ตัวบน = ช่วงนี้ · ตัวล่าง = เดือนก่อน{tab === "price" ? " · แสดงเฉพาะแอดที่มีแชท ≥ 10" : ""}</span>
+              <span className="ml-auto text-[13px] text-foreground-muted">ตัวบน = ช่วงนี้ · ตัวล่าง = เดือนก่อน{tab === "price" ? " · แสดงเฉพาะแอดที่มีแชท ≥ 10" : ""}</span>
             </div>
             <Table rows={rows} days={days} kind={tab} showChat={hasChat} />
           </div>
@@ -395,8 +395,8 @@ function CompareContent() {
 
           {hasChat && data.hours.length > 0 && (
             <div className="bg-navy-900 border border-border rounded-2xl p-5 mb-6">
-              <h3 className="text-sm font-bold text-foreground mb-1">แชทเข้าตามชั่วโมง และปิดภายใน 1 ชม.</h3>
-              <p className="text-[10px] text-foreground-muted mb-4">ใช้ตั้งเวลาแอดให้ตรงช่วงที่แอดมินตอบและปิดได้เร็ว (เฉพาะเพจที่อ่านจาก Pancake)</p>
+              <h3 className="text-base font-bold text-foreground mb-1">แชทเข้าตามชั่วโมง และปิดภายใน 1 ชม.</h3>
+              <p className="text-[13px] text-foreground-muted mb-4">ใช้ตั้งเวลาแอดให้ตรงช่วงที่แอดมินตอบและปิดได้เร็ว (เฉพาะเพจที่อ่านจาก Pancake)</p>
               <div className="flex items-end gap-1 h-36">
                 {Array.from({ length: 24 }, (_, h) => data.hours.find(x => x.hour === h) ?? { hour: h, chats: 0, closes: 0, closes1h: 0 }).map(h => (
                   <div key={h.hour} className="flex-1 flex flex-col items-center gap-1 min-w-0" title={`${h.hour}:00 แชท ${h.chats} · ปิด ${h.closes} · ปิดใน 1 ชม. ${h.closes1h} (${pct(div(h.closes1h, h.chats))})`}>
@@ -405,18 +405,18 @@ function CompareContent() {
                         <div className="w-full bg-emerald-400/80 rounded-t" style={{ height: `${h.chats ? (h.closes1h / h.chats) * 100 : 0}%` }} />
                       </div>
                     </div>
-                    <span className="text-[8px] text-foreground-muted">{h.hour}</span>
+                    <span className="text-[11px] text-foreground-muted">{h.hour}</span>
                   </div>
                 ))}
               </div>
-              <div className="flex gap-4 mt-3 text-[10px] text-foreground-muted">
+              <div className="flex gap-4 mt-3 text-[13px] text-foreground-muted">
                 <span className="flex items-center gap-1"><span className="w-3 h-2 bg-gold-500/60 rounded-sm" /> แชท</span>
                 <span className="flex items-center gap-1"><span className="w-3 h-2 bg-emerald-400/80 rounded-sm" /> ปิดภายใน 1 ชม.</span>
               </div>
             </div>
           )}
 
-          <div className="text-[10px] text-foreground-muted space-y-1 bg-navy-900/50 border border-border rounded-xl p-4">
+          <div className="text-[13px] text-foreground-muted space-y-1 bg-navy-900/50 border border-border rounded-xl p-4">
             <p className="font-semibold text-foreground-muted">ข้อจำกัด</p>
             <p>• แชท/ลีด/งบ มาจาก Meta · &quot;ปิด&quot; และ &quot;คิว&quot; นับจากข้อความในแชท Pancake (บรรทัดสรุปคิว การโอน หรือให้เบอร์แล้วแอดมินลงคิว) ยังไม่ได้เทียบกับยอดในระบบหน้าร้าน</p>
             <p>• &quot;ลีด&quot; ของ Meta คือ lead event ไม่ใช่คิว และบางเพจไม่ได้ตั้งการติดลีด · เพจที่ไม่อยู่ใน Pancake จะไม่มีตัวเลขปิด</p>
@@ -432,7 +432,7 @@ function CompareContent() {
 
 export default function ComparePage() {
   return (
-    <Suspense fallback={<div className="text-foreground-muted text-sm">Loading...</div>}>
+    <Suspense fallback={<div className="text-foreground-muted text-base">Loading...</div>}>
       <CompareContent />
     </Suspense>
   );
