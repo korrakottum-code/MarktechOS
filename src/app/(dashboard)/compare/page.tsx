@@ -43,14 +43,10 @@ interface Col { label: string; get: (m: Metrics, days: number) => number; fmt: (
 const COLS: Col[] = [
   { label: "งบ/วัน", get: (m, d) => m.spend / d, fmt: thb, better: "up" },
   { label: "แชท/วัน", get: (m, d) => m.inbox / d, fmt: n => num(n, 1), better: "up" },
-  { label: "ลีด/วัน", get: (m, d) => m.leads / d, fmt: n => num(n, 1), better: "up" },
-  { label: "%แชท→ลีด", get: m => div(m.leads, m.inbox), fmt: pct, better: "up" },
   { label: "฿/แชท", get: m => div(m.spend, m.inbox), fmt: thb, better: "down" },
   { label: "฿/ลีด", get: m => div(m.spend, m.leads), fmt: thb, better: "down" },
   { label: "%ปิด", get: m => div(m.closes, m.chats), fmt: pct, better: "up", chat: true },
-  { label: "คิว/วัน", get: (m, d) => (m.chats > 0 ? m.queues / d : NaN), fmt: n => num(n, 1), better: "up", chat: true },
   { label: "฿/ปิด", get: m => div(m.chatSpend, m.closes), fmt: thb, better: "down", chat: true },
-  { label: "ลีดค้าง", get: m => (m.chats > 0 ? m.pending : NaN), fmt: n => num(n), better: "down", chat: true },
 ];
 
 function Delta({ cur, prev, better }: { cur: number; prev: number; better: Better }) {
